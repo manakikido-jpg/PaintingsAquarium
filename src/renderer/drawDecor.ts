@@ -1,9 +1,15 @@
 import {
   rockOutline,
   seaweedShape,
+  shellOutline,
+  shellRidges,
+  shipwreckHull,
+  shipwreckMasts,
   type Point,
   type Rock,
   type Seaweed,
+  type Shell,
+  type Shipwreck,
 } from '../core/decor'
 import type { Tank } from '../core/swim'
 
@@ -15,7 +21,19 @@ import type { Tank } from '../core/swim'
  * 呼び出し側は必ず**絵より先に**呼ぶこと（手前に置くと絵が隠れる）。
  */
 
-const SILHOUETTE = '2, 26, 38'
+/*
+ * 色の決め方。ここを外すと飾りが「見えない」ので、理由を残しておく。
+ *
+ * 最初は砂も岩も船も同じ暗い色で描いていたが、画面の下は水の色自体が暗いため、
+ * **暗いシルエットが背景と同化して船体が完全に消えた**（R-006）。
+ *
+ * 本物の水槽と同じ関係にする。砂は**上から光が当たって明るい**。
+ * その上に乗る岩・海藻・貝・沈没船は、砂を背にした**暗い影絵**になる。
+ * 暗い物を見せたいなら、その背後を明るくするしかない。
+ */
+const SAND = '150, 186, 200'
+const SILHOUETTE = '2, 22, 33'
+const ON_SAND_MIN_ALPHA = 0.72
 
 /** 砂地の高さの列から、指定 X での高さを線形に求める。 */
 export function groundAt(profile: readonly number[], x: number, tank: Tank): number {
@@ -39,9 +57,10 @@ export function drawSand(
 
   const top = Math.min(...profile)
   const gradient = context.createLinearGradient(0, top, 0, tank.height)
-  gradient.addColorStop(0, `rgba(${SILHOUETTE}, ${0.35 * strength})`)
-  gradient.addColorStop(0.35, `rgba(${SILHOUETTE}, ${0.7 * strength})`)
-  gradient.addColorStop(1, `rgba(${SILHOUETTE}, ${0.92 * strength})`)
+  // 上端は水に溶かし、下へ行くほど明るくする。手前ほど光が届いている見立て。
+  gradient.addColorStop(0, `rgba(${SAND}, ${0.06 * strength})`)
+  gradient.addColorStop(0.4, `rgba(${SAND}, ${0.2 * strength})`)
+  gradient.addColorStop(1, `rgba(${SAND}, ${0.4 * strength})`)
 
   context.fillStyle = gradient
   context.beginPath()
@@ -77,7 +96,7 @@ export function drawRocks(
 
   // 奥の岩から先に描く。手前の岩が奥に隠れると重なりがおかしく見える。
   for (const rock of [...rocks].sort((a, b) => a.depth - b.depth)) {
-    context.fillStyle = `rgba(${SILHOUETTE}, ${(0.45 + rock.depth * 0.45) * strength})`
+    context.fillStyle = `rgba(${SILHOUETTE}, ${(ON_SAND_MIN_ALPHA + rock.depth * 0.22) * strength})`
     // 少し砂に埋める。砂の線にちょうど乗せると置物のように浮いて見える。
     fillPolygon(context, rockOutline(rock, groundAt(profile, rock.x, tank) + rock.height * 0.08))
   }
@@ -97,7 +116,7 @@ export function drawSeaweed(
     const nodes = seaweedShape(weed, timeSeconds, groundAt(profile, weed.baseX, tank) + 2)
     if (nodes.length === 0) continue
 
-    context.fillStyle = `rgba(${SILHOUETTE}, ${(0.4 + weed.depth * 0.45) * strength})`
+    context.fillStyle = `rgba(${SILHOUETTE}, ${(ON_SAND_MIN_ALPHA + weed.depth * 0.22) * strength})`
 
     // 節の列を、左側を上りながら・右側を下りながら 1 つの形にする。
     context.beginPath()
@@ -109,4 +128,70 @@ export function drawSeaweed(
     context.closePath()
     context.fill()
   }
+}
+
+/**
+ * 沈没船。一番奥に、薄く置く。
+ * 濃く描くと画面の主役になってしまい、子どもの絵が背景に見える。
+ */
+export function drawShipwreck(
+  context: CanvasRenderingContext2D,
+  wreck: Shipwreck,
+  profile: readonly number[],
+  tank: Tank,
+  strength: number,
+): void {
+  if (strength <= 0) return
+
+  const groundY = groundAt(profile, wreck.x, tank)
+  context.save()
+  // 手前の岩や海藻より薄くする。同じ濃さだと重なった部分の輪郭が消え、
+  // 船と海藻がひと続きの黒い塊になる（R-006）。
+  context.fillStyle = `rgba(${SILHOUETTE}, ${0.62 * strength})`
+  context.strokeStyle = `rgba(${SILHOUETTE}, ${0.62 * strength})`
+  context.lineCap = 'round'
+
+  for (const mast of shipwreckMasts(wreck, groundY)) {
+    context.lineWidth = mast.width
+    context.beginPath()
+    context.moveTo(mast.from.x, mast.from.y)
+    context.lineTo(mast.to.x, mast.to.y)
+    context.stroke()
+  }
+
+  fillPolygon(context, shipwreckHull(wreck, groundY))
+  context.restore()
+}
+
+/** 貝殻。扇の筋は水の色で描いて、彫りが入っているように見せる。 */
+export function drawShells(
+  context: CanvasRenderingContext2D,
+  shells: readonly Shell[],
+  profile: readonly number[],
+  tank: Tank,
+  strength: number,
+): void {
+  if (strength <= 0) return
+
+  context.save()
+  for (const shell of [...shells].sort((a, b) => a.depth - b.depth)) {
+    const groundY = groundAt(profile, shell.x, tank)
+
+    context.fillStyle = `rgba(${SILHOUETTE}, ${(ON_SAND_MIN_ALPHA + shell.depth * 0.22) * strength})`
+    fillPolygon(context, shellOutline(shell, groundY))
+
+    // 筋は塗りを削る形で入れる。線を上から足すと、貝の外へはみ出て見える。
+    context.save()
+    context.globalCompositeOperation = 'destination-out'
+    context.strokeStyle = `rgba(0, 0, 0, ${0.35 * strength})`
+    context.lineWidth = Math.max(0.7, shell.halfWidth * 0.05)
+    for (const ridge of shellRidges(shell, groundY)) {
+      context.beginPath()
+      context.moveTo(ridge.from.x, ridge.from.y)
+      context.lineTo(ridge.to.x, ridge.to.y)
+      context.stroke()
+    }
+    context.restore()
+  }
+  context.restore()
 }

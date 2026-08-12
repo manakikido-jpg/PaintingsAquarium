@@ -47,6 +47,29 @@ export function sandProfile(seed: number, tank: Tank, samples = 48): number[] {
   return points
 }
 
+/** 画面上の横方向の範囲。0（左端）〜1（右端）。 */
+export interface Span {
+  readonly from: number
+  readonly to: number
+}
+
+/**
+ * 0〜1 の位置を、避けたい範囲の外へ写す。
+ *
+ * 同じ濃さのシルエットどうしが重なると輪郭が消え、**1 つの黒い塊**になる。
+ * 沈没船の前に海藻や岩が生えると、船の形が読めなくなるのはそのため（R-006）。
+ * 単純に「範囲内なら端へ寄せる」と境目に固まるので、
+ * 残った幅に均等に割り直している。
+ */
+export function placeOutside(t: number, avoid?: Span): number {
+  if (!avoid) return t
+  const gap = Math.max(0, Math.min(1, avoid.to) - Math.max(0, avoid.from))
+  if (gap <= 0 || gap >= 1) return t
+
+  const scaled = Math.min(1, Math.max(0, t)) * (1 - gap)
+  return scaled < avoid.from ? scaled : scaled + gap
+}
+
 // ---------------------------------------------------------------- 岩
 
 export interface Rock {
@@ -58,16 +81,16 @@ export interface Rock {
   readonly seed: number
 }
 
-export function spawnRocks(seed: number, count: number, tank: Tank): Rock[] {
+export function spawnRocks(seed: number, count: number, tank: Tank, avoid?: Span): Rock[] {
   const random = pseudoRandom(seed)
   const rocks: Rock[] = []
 
   for (let index = 0; index < count; index++) {
     // 等間隔の枠の中でずらす。完全な乱数だと固まって置かれ、
     // 岩場ではなく「1つの大きな塊」に見える。
-    const slot = (index + 0.5) / count
+    const slot = (index + 0.5) / count + (random() - 0.5) * 0.7 / count
     rocks.push({
-      x: tank.width * (slot + (random() - 0.5) * 0.7 / count),
+      x: tank.width * placeOutside(slot, avoid),
       halfWidth: tank.width * (0.035 + random() * 0.075),
       height: tank.height * (0.03 + random() * 0.075),
       depth: random(),
@@ -76,6 +99,14 @@ export function spawnRocks(seed: number, count: number, tank: Tank): Rock[] {
   }
 
   return rocks
+}
+
+/** 沈没船が画面のどこを占めるか。海藻や岩を生やさない範囲として使う。 */
+export function shipwreckSpan(wreck: Shipwreck, tank: Tank): Span {
+  // 帆柱の傾きぶん、船体より少し広めに空ける。
+  const half = (wreck.width / 2 / Math.max(1, tank.width)) * 1.25
+  const centre = wreck.x / Math.max(1, tank.width)
+  return { from: Math.max(0, centre - half), to: Math.min(1, centre + half) }
 }
 
 export interface Point {
@@ -136,16 +167,28 @@ export interface Seaweed {
  * 1 株 1 枚にすると、細い線が 1 本立っているだけで**竹串**にしか見えない。
  * 高さと揺れをわずかにずらした葉を束ねると、はじめて海藻の房に見える。
  */
-export function spawnSeaweed(seed: number, clusters: number, tank: Tank): Seaweed[] {
+export function spawnSeaweed(
+  seed: number,
+  clusters: number,
+  tank: Tank,
+  avoid?: Span,
+): Seaweed[] {
   const random = pseudoRandom(seed)
   const weeds: Seaweed[] = []
 
+  const spread = tank.width * 0.012
+  // 株の中心ではなく**葉の端**で避ける。中心だけで判定すると、
+  // 横に広がった葉が範囲へはみ出す。
+  const widened: Span | undefined = avoid && {
+    from: avoid.from - spread / 2 / Math.max(1, tank.width),
+    to: avoid.to + spread / 2 / Math.max(1, tank.width),
+  }
+
   for (let index = 0; index < clusters; index++) {
-    const slot = (index + 0.5) / clusters
     const depth = random()
-    const rootX = tank.width * (slot + (random() - 0.5) * 0.8 / clusters)
+    const slot = (index + 0.5) / clusters + (random() - 0.5) * 0.8 / clusters
+    const rootX = tank.width * placeOutside(slot, widened)
     const rootHeight = tank.height * (0.11 + depth * 0.2)
-    const spread = tank.width * 0.012
     const blades = 3 + Math.floor(random() * 2)
 
     for (let blade = 0; blade < blades; blade++) {
@@ -194,4 +237,173 @@ export function seaweedShape(weed: Seaweed, timeSeconds: number, groundY: number
   }
 
   return nodes
+}
+
+// ---------------------------------------------------------------- 貝殻
+
+/** 扇の筋の数。縁の波打ちの山数と揃えると貝らしく見える。 */
+export const SHELL_RIDGES = 7
+
+export interface Shell {
+  readonly x: number
+  readonly halfWidth: number
+  readonly height: number
+  /** 傾き（ラジアン）。まっすぐ立っていると作り物に見える */
+  readonly tilt: number
+  readonly depth: number
+  readonly seed: number
+}
+
+export function spawnShells(seed: number, count: number, tank: Tank): Shell[] {
+  const random = pseudoRandom(seed)
+  const shells: Shell[] = []
+
+  for (let index = 0; index < count; index++) {
+    const slot = (index + 0.5) / count
+    const size = tank.width * (0.013 + random() * 0.012)
+    shells.push({
+      x: tank.width * (slot + (random() - 0.5) * 0.8 / count),
+      halfWidth: size,
+      height: size * (0.85 + random() * 0.3),
+      tilt: (random() - 0.5) * 0.7,
+      depth: random(),
+      seed: Math.floor(random() * 100000) + 1,
+    })
+  }
+
+  return shells
+}
+
+function rotateAround(point: Point, origin: Point, angle: number): Point {
+  const sin = Math.sin(angle)
+  const cos = Math.cos(angle)
+  const dx = point.x - origin.x
+  const dy = point.y - origin.y
+  return { x: origin.x + dx * cos - dy * sin, y: origin.y + dx * sin + dy * cos }
+}
+
+/**
+ * 帆立貝の形。蝶番を砂に置き、そこから扇形に開く。
+ * 縁は波打たせる。きれいな円弧のままだと扇子に見える。
+ */
+export function shellOutline(shell: Shell, groundY: number, steps = 20): Point[] {
+  const hinge: Point = { x: shell.x, y: groundY }
+  const points: Point[] = [hinge]
+  const span = Math.PI * 0.78
+
+  for (let index = 0; index <= steps; index++) {
+    const t = index / steps
+    const angle = -Math.PI / 2 - span / 2 + span * t
+    // 縁の波打ち。山の数を扇の筋の数と揃えると、貝らしく見える。
+    const ripple = 1 + Math.sin(t * Math.PI * SHELL_RIDGES) * 0.05
+    points.push(
+      rotateAround(
+        {
+          x: shell.x + Math.cos(angle) * shell.halfWidth * ripple,
+          y: groundY + Math.sin(angle) * shell.height * ripple,
+        },
+        hinge,
+        shell.tilt,
+      ),
+    )
+  }
+
+  return points
+}
+
+/** 扇の筋。蝶番から縁へ向かう線の組。 */
+export function shellRidges(shell: Shell, groundY: number): { from: Point; to: Point }[] {
+  const hinge: Point = { x: shell.x, y: groundY }
+  const span = Math.PI * 0.78
+  const lines: { from: Point; to: Point }[] = []
+
+  for (let index = 1; index < SHELL_RIDGES; index++) {
+    const t = index / SHELL_RIDGES
+    const angle = -Math.PI / 2 - span / 2 + span * t
+    lines.push({
+      from: hinge,
+      to: rotateAround(
+        {
+          x: shell.x + Math.cos(angle) * shell.halfWidth * 0.92,
+          y: groundY + Math.sin(angle) * shell.height * 0.92,
+        },
+        hinge,
+        shell.tilt,
+      ),
+    })
+  }
+
+  return lines
+}
+
+// ---------------------------------------------------------------- 沈没船
+
+export interface Shipwreck {
+  readonly x: number
+  readonly width: number
+  readonly height: number
+  /** 傾き（ラジアン）。水平に置くと沈んだ船に見えない */
+  readonly tilt: number
+  /** 砂にどれだけ埋まっているか（高さに対する割合） */
+  readonly buried: number
+}
+
+export function spawnShipwreck(tank: Tank, at = 0.72): Shipwreck {
+  return {
+    x: tank.width * at,
+    width: tank.width * 0.24,
+    height: tank.height * 0.16,
+    tilt: -0.15,
+    buried: 0.06,
+  }
+}
+
+/** 船体の輪郭（単位座標。y は上が負）。 */
+const HULL_SHAPE: readonly Point[] = [
+  { x: -0.5, y: -0.66 },
+  { x: 0.5, y: -0.6 },
+  { x: 0.46, y: -0.1 },
+  { x: 0.16, y: 0.06 },
+  { x: -0.22, y: 0.05 },
+  { x: -0.44, y: -0.14 },
+]
+
+function placeWreckPoint(wreck: Shipwreck, local: Point, groundY: number): Point {
+  const base: Point = { x: wreck.x, y: groundY + wreck.height * wreck.buried }
+  return rotateAround(
+    { x: base.x + local.x * wreck.width, y: base.y + local.y * wreck.height },
+    base,
+    wreck.tilt,
+  )
+}
+
+export function shipwreckHull(wreck: Shipwreck, groundY: number): Point[] {
+  return HULL_SHAPE.map((local) => placeWreckPoint(wreck, local, groundY))
+}
+
+export interface WreckMast {
+  readonly from: Point
+  readonly to: Point
+  readonly width: number
+}
+
+/**
+ * 折れた帆柱と横木。
+ * まっすぐ 1 本立てると帆船ではなく「棒の刺さった箱」に見えるので、
+ * 長さの違う 2 本と横木を組み合わせている。
+ */
+export function shipwreckMasts(wreck: Shipwreck, groundY: number): WreckMast[] {
+  const place = (local: Point): Point => placeWreckPoint(wreck, local, groundY)
+  const thick = wreck.width * 0.016
+
+  return [
+    // 主帆柱
+    { from: place({ x: -0.04, y: -0.52 }), to: place({ x: -0.14, y: -2.2 }), width: thick },
+    // 折れた前帆柱
+    { from: place({ x: 0.28, y: -0.52 }), to: place({ x: 0.34, y: -1.3 }), width: thick * 0.8 },
+    // 横木。これが1本あるだけで帆船に見える。
+    { from: place({ x: -0.38, y: -1.6 }), to: place({ x: 0.08, y: -1.66 }), width: thick * 0.7 },
+    // 船首から前へ突き出す棒。船首の向きが分かるようになる。
+    { from: place({ x: 0.5, y: -0.8 }), to: place({ x: 0.95, y: -1.05 }), width: thick * 0.7 },
+  ]
 }

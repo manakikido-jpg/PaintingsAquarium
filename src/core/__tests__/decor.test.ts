@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { rockOutline, sandProfile, seaweedShape, spawnRocks, spawnSeaweed } from '../decor'
+import {
+  placeOutside,
+  rockOutline,
+  sandProfile,
+  seaweedShape,
+  shellOutline,
+  shellRidges,
+  shipwreckHull,
+  shipwreckMasts,
+  shipwreckSpan,
+  spawnRocks,
+  spawnSeaweed,
+  spawnShells,
+  spawnShipwreck,
+} from '../decor'
 import type { Tank } from '../swim'
 
 const tank: Tank = { width: 1920, height: 1080 }
@@ -185,5 +199,141 @@ describe('岩の輪郭のなめらかさ', () => {
         expect(step).toBeLessThan(rock.halfWidth * 0.5)
       }
     }
+  })
+})
+
+describe('spawnShells / shellOutline', () => {
+  const groundY = 900
+
+  it('同じ種なら必ず同じ結果になる', () => {
+    expect(spawnShells(3, 5, tank)).toEqual(spawnShells(3, 5, tank))
+  })
+
+  it('蝶番が砂に接し、扇は砂より上に開く', () => {
+    for (const shell of spawnShells(3, 5, tank)) {
+      const outline = shellOutline(shell, groundY)
+      expect(outline[0]).toEqual({ x: shell.x, y: groundY })
+      expect(Math.min(...outline.map((point) => point.y))).toBeLessThan(groundY - 1)
+    }
+  })
+
+  // 割合の上限を直に書くと、見た目を調整するたびに数字だけ書き換わって
+  // テストの意味が消える。「岩より小さい」という意図そのものを固定する。
+  it('どの貝殻も、一番小さい岩より小さい', () => {
+    const smallestRock = Math.min(...spawnRocks(7, 6, tank).map((rock) => rock.halfWidth))
+
+    for (const shell of spawnShells(3, 5, tank)) {
+      expect(shell.halfWidth).toBeLessThan(smallestRock)
+    }
+  })
+
+  it('扇の筋は蝶番から出て、輪郭の内側で終わる', () => {
+    const shell = spawnShells(3, 5, tank)[0]
+    const reach = Math.max(shell.halfWidth, shell.height)
+
+    for (const ridge of shellRidges(shell, groundY)) {
+      expect(ridge.from).toEqual({ x: shell.x, y: groundY })
+      expect(Math.hypot(ridge.to.x - shell.x, ridge.to.y - groundY)).toBeLessThan(reach * 1.05)
+    }
+  })
+
+  it('0 個でも落ちない', () => {
+    expect(spawnShells(3, 0, tank)).toEqual([])
+  })
+})
+
+describe('沈没船', () => {
+  const groundY = 900
+
+  it('船体は砂に少し埋まる（置物のように浮かない）', () => {
+    const wreck = spawnShipwreck(tank)
+    const hull = shipwreckHull(wreck, groundY)
+
+    expect(Math.max(...hull.map((point) => point.y))).toBeGreaterThan(groundY)
+    expect(Math.min(...hull.map((point) => point.y))).toBeLessThan(groundY)
+  })
+
+  it('傾いている（水平だと沈んだ船に見えない）', () => {
+    const wreck = spawnShipwreck(tank)
+    const hull = shipwreckHull(wreck, groundY)
+    const flat = shipwreckHull({ ...wreck, tilt: 0 }, groundY)
+
+    expect(wreck.tilt).not.toBe(0)
+    expect(hull).not.toEqual(flat)
+  })
+
+  it('帆柱は甲板から出て、船より上に伸びる', () => {
+    const wreck = spawnShipwreck(tank)
+    const hull = shipwreckHull(wreck, groundY)
+    const deckY = Math.min(...hull.map((point) => point.y))
+
+    for (const mast of shipwreckMasts(wreck, groundY)) {
+      expect(mast.width).toBeGreaterThan(0)
+      expect(Number.isFinite(mast.from.x)).toBe(true)
+    }
+    expect(Math.min(...shipwreckMasts(wreck, groundY).map((mast) => mast.to.y))).toBeLessThan(deckY)
+  })
+
+  it('絵の泳ぐ範囲を埋めるほど大きくない', () => {
+    const wreck = spawnShipwreck(tank)
+    expect(wreck.width).toBeLessThan(tank.width * 0.35)
+    expect(wreck.height).toBeLessThan(tank.height * 0.2)
+  })
+
+  it('同じ水槽なら毎回同じ場所に沈んでいる', () => {
+    expect(spawnShipwreck(tank)).toEqual(spawnShipwreck(tank))
+  })
+})
+
+describe('placeOutside', () => {
+  it('避ける範囲を指定しなければ、そのまま', () => {
+    expect(placeOutside(0.42)).toBe(0.42)
+  })
+
+  it('どの入力も避ける範囲の外に出る', () => {
+    const avoid = { from: 0.4, to: 0.7 }
+    for (let step = 0; step <= 100; step++) {
+      const placed = placeOutside(step / 100, avoid)
+      expect(placed >= 0 && placed <= 1).toBe(true)
+      expect(placed > avoid.from && placed < avoid.to).toBe(false)
+    }
+  })
+
+  it('境目に固まらない（残った幅に散らばる）', () => {
+    const avoid = { from: 0.4, to: 0.7 }
+    const placed = Array.from({ length: 20 }, (_, index) => placeOutside(index / 19, avoid))
+    const left = placed.filter((value) => value <= avoid.from)
+    const right = placed.filter((value) => value >= avoid.to)
+
+    expect(left.length).toBeGreaterThan(3)
+    expect(right.length).toBeGreaterThan(3)
+    expect(new Set(placed.map((value) => value.toFixed(4))).size).toBe(placed.length)
+  })
+
+  it('順番を入れ替えない', () => {
+    const avoid = { from: 0.3, to: 0.5 }
+    expect(placeOutside(0.2, avoid)).toBeLessThan(placeOutside(0.8, avoid))
+  })
+})
+
+describe('沈没船の前を空ける', () => {
+  it('海藻も岩も、沈没船の範囲には生えない', () => {
+    const wreck = spawnShipwreck(tank)
+    const span = shipwreckSpan(wreck, tank)
+
+    for (const weed of spawnSeaweed(5507, 8, tank, span)) {
+      const at = weed.baseX / tank.width
+      expect(at > span.from && at < span.to).toBe(false)
+    }
+    for (const rock of spawnRocks(8823, 6, tank, span)) {
+      const at = rock.x / tank.width
+      expect(at > span.from && at < span.to).toBe(false)
+    }
+  })
+
+  it('空ける範囲は船体より広い（帆柱の傾きぶん）', () => {
+    const wreck = spawnShipwreck(tank)
+    const span = shipwreckSpan(wreck, tank)
+    expect((span.to - span.from) * tank.width).toBeGreaterThan(wreck.width)
   })
 })

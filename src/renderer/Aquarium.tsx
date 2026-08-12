@@ -14,15 +14,23 @@ import {
   sandProfile,
   spawnRocks,
   spawnSeaweed,
+  shipwreckSpan,
+  spawnShells,
+  spawnShipwreck,
   type Rock,
   type Seaweed,
+  type Shell,
+  type Shipwreck,
 } from '../core/decor'
-import { drawRocks, drawSand, drawSeaweed } from './drawDecor'
+import { drawRocks, drawSand, drawSeaweed, drawShells, drawShipwreck } from './drawDecor'
+import { appearAlpha, appearProgress, appearScale, isNewlyArrived } from '../core/appear'
 import type { Piece } from '../shared/types'
 
 interface Swimmer {
   readonly piece: Piece
   readonly element: HTMLImageElement
+  /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
+  readonly bornAt: number
   fish: Fish
 }
 
@@ -38,6 +46,7 @@ const RAY_COUNT = 7
 const BACK_BUBBLE_COUNT = 34
 const FRONT_BUBBLE_COUNT = 10
 const ROCK_COUNT = 6
+const SHELL_COUNT = 5
 // SEAWEED_COUNT は「株」の数。1 株から数枚の葉が生える。
 const SEAWEED_COUNT = 8
 
@@ -65,6 +74,8 @@ export function Aquarium({
     let animationId = 0
     let previous = performance.now()
     let elapsed = 0
+    // 起動時刻。これより後に取り込まれた絵だけを新入りとして演出する。
+    const appStartedAt = Date.now()
 
     let rays: LightRay[] = []
     let backBubbles: Bubble[] = []
@@ -72,6 +83,8 @@ export function Aquarium({
     let sand: number[] = []
     let rocks: Rock[] = []
     let seaweed: Seaweed[] = []
+    let shells: Shell[] = []
+    let wreck: Shipwreck | null = null
     let builtFor = { width: -1, height: -1 }
 
     const resize = (): void => {
@@ -102,8 +115,12 @@ export function Aquarium({
         maxAlpha: 0.14,
       })
       sand = sandProfile(4471, tank)
-      rocks = spawnRocks(8823, ROCK_COUNT, tank)
-      seaweed = spawnSeaweed(5507, SEAWEED_COUNT, tank)
+      wreck = spawnShipwreck(tank)
+      // 沈没船の前には生やさない。重ねると輪郭が消えて塊になる（R-006）。
+      const wreckSpan = shipwreckSpan(wreck, tank)
+      rocks = spawnRocks(8823, ROCK_COUNT, tank, wreckSpan)
+      seaweed = spawnSeaweed(5507, SEAWEED_COUNT, tank, wreckSpan)
+      shells = spawnShells(6619, SHELL_COUNT, tank)
     }
 
     const frame = (now: number): void => {
@@ -130,6 +147,9 @@ export function Aquarium({
         swimmers.set(piece.id, {
           piece,
           element,
+          // 起動前からある絵は演出しない。起動のたびに全部が一斉に現れると
+          // 不具合に見えるため。
+          bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? elapsed : -Infinity,
           fish: spawnFish(seedOf(piece.id), tank, piece.width, piece.height),
         })
       }
@@ -142,6 +162,8 @@ export function Aquarium({
       drawWater(context, tank, strength)
       drawLightRays(context, rays, elapsed, tank, strength)
       drawSand(context, sand, tank, strength)
+      if (wreck) drawShipwreck(context, wreck, sand, tank, strength)
+      drawShells(context, shells, sand, tank, strength)
       drawSeaweed(context, seaweed, sand, tank, elapsed, strength)
       drawRocks(context, rocks, sand, tank, strength)
       drawVignette(context, tank, strength)
@@ -164,10 +186,14 @@ export function Aquarium({
 
         const { fish } = swimmer
         const y = renderY(fish)
+        const progress = appearProgress(elapsed - swimmer.bornAt)
+        const scale = appearScale(progress)
+
         context.save()
+        context.globalAlpha = appearAlpha(progress)
         context.translate(fish.x, y)
         // 進む向きに合わせて左右反転する。魚が後ろ向きに泳いで見えるのを避けるため。
-        if (!facesRight(fish)) context.scale(-1, 1)
+        context.scale(facesRight(fish) ? scale : -scale, scale)
         context.drawImage(
           swimmer.element,
           -fish.width / 2,
