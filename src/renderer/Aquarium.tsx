@@ -1,7 +1,23 @@
 import { useEffect, useRef } from 'react'
-import { facesRight, renderY, spawnFish, stepFish, type Fish, type Tank } from '../core/swim'
+import {
+  facesRight,
+  renderY,
+  separateFish,
+  spawnFish,
+  stepFish,
+  type Fish,
+  type Tank,
+} from '../core/swim'
 import { spawnBubbles, spawnRays, stepBubble, type Bubble, type LightRay } from '../core/scenery'
 import { drawBubbles, drawLightRays, drawVignette, drawWater } from './drawScenery'
+import {
+  sandProfile,
+  spawnRocks,
+  spawnSeaweed,
+  type Rock,
+  type Seaweed,
+} from '../core/decor'
+import { drawRocks, drawSand, drawSeaweed } from './drawDecor'
 import type { Piece } from '../shared/types'
 
 interface Swimmer {
@@ -21,6 +37,9 @@ const RAY_COUNT = 7
 // 手前の泡は絵に重なるので少なく、奥は多めに。奥行きを出すため。
 const BACK_BUBBLE_COUNT = 34
 const FRONT_BUBBLE_COUNT = 10
+const ROCK_COUNT = 6
+// SEAWEED_COUNT は「株」の数。1 株から数枚の葉が生える。
+const SEAWEED_COUNT = 8
 
 export function Aquarium({
   pieces,
@@ -50,6 +69,9 @@ export function Aquarium({
     let rays: LightRay[] = []
     let backBubbles: Bubble[] = []
     let frontBubbles: Bubble[] = []
+    let sand: number[] = []
+    let rocks: Rock[] = []
+    let seaweed: Seaweed[] = []
     let builtFor = { width: -1, height: -1 }
 
     const resize = (): void => {
@@ -79,6 +101,9 @@ export function Aquarium({
         maxSpeed: 62,
         maxAlpha: 0.14,
       })
+      sand = sandProfile(4471, tank)
+      rocks = spawnRocks(8823, ROCK_COUNT, tank)
+      seaweed = spawnSeaweed(5507, SEAWEED_COUNT, tank)
     }
 
     const frame = (now: number): void => {
@@ -116,8 +141,22 @@ export function Aquarium({
       //（絵のあとに掛けると、端を泳ぐ絵が暗くなって見えづらい）。
       drawWater(context, tank, strength)
       drawLightRays(context, rays, elapsed, tank, strength)
+      drawSand(context, sand, tank, strength)
+      drawSeaweed(context, seaweed, sand, tank, elapsed, strength)
+      drawRocks(context, rocks, sand, tank, strength)
       drawVignette(context, tank, strength)
       drawBubbles(context, backBubbles, strength)
+
+      // 進める前に、近づきすぎた組の向きを変える。
+      // これをしないと、絵が重なったまま並走して1枚にしか見えなくなる（R-005）。
+      const list = [...swimmers.values()]
+      const separated = separateFish(
+        list.map((swimmer) => swimmer.fish),
+        dt,
+      )
+      for (let index = 0; index < list.length; index++) {
+        list[index].fish = separated[index]
+      }
 
       for (const swimmer of swimmers.values()) {
         swimmer.fish = stepFish(swimmer.fish, dt, tank)

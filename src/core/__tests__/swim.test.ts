@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { facesRight, renderY, spawnFish, stepFish, type Fish, type Tank } from '../swim'
+import {
+  facesRight,
+  renderY,
+  separateFish,
+  spawnFish,
+  stepFish,
+  type Fish,
+  type Tank,
+} from '../swim'
 
 const tank: Tank = { width: 1920, height: 1080 }
 
@@ -123,5 +131,104 @@ describe('spawnFish の横位置', () => {
 
     expect(atCentre).toBeLessThan(3)
     expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(tank.width * 0.4)
+  })
+})
+
+describe('separateFish', () => {
+  it('重なった2匹が離れていく', () => {
+    let fishes = [
+      fishAt({ x: 900, y: 540, vx: 60, vy: 0 }),
+      fishAt({ x: 910, y: 545, vx: -60, vy: 0 }),
+    ]
+    const distanceOf = (list: Fish[]): number =>
+      Math.hypot(list[0].x - list[1].x, renderY(list[0]) - renderY(list[1]))
+
+    const before = distanceOf(fishes)
+    for (let frame = 0; frame < 120; frame++) {
+      fishes = separateFish(fishes, 1 / 60).map((fish) => stepFish(fish, 1 / 60, tank))
+    }
+
+    expect(distanceOf(fishes)).toBeGreaterThan(before)
+  })
+
+  it('完全に同じ位置でも離れる（0除算しない）', () => {
+    let fishes = [fishAt({ x: 900, y: 540 }), fishAt({ x: 900, y: 540 })]
+
+    for (let frame = 0; frame < 120; frame++) {
+      fishes = separateFish(fishes, 1 / 60).map((fish) => stepFish(fish, 1 / 60, tank))
+    }
+
+    for (const fish of fishes) {
+      expect(Number.isFinite(fish.x)).toBe(true)
+      expect(Number.isFinite(fish.y)).toBe(true)
+    }
+    expect(Math.hypot(fishes[0].x - fishes[1].x, fishes[0].y - fishes[1].y)).toBeGreaterThan(1)
+  })
+
+  it('離れている2匹には何もしない', () => {
+    const fishes = [fishAt({ x: 100 }), fishAt({ x: 1800 })]
+    expect(separateFish(fishes, 1 / 60)).toEqual(fishes)
+  })
+
+  it('速さを変えない（一部だけ加速しない）', () => {
+    const fishes = [fishAt({ x: 900, vx: 60, vy: 10 }), fishAt({ x: 915, vx: -40, vy: -5 })]
+    const after = separateFish(fishes, 1 / 60)
+
+    for (let index = 0; index < fishes.length; index++) {
+      expect(Math.hypot(after[index].vx, after[index].vy)).toBeCloseTo(
+        Math.hypot(fishes[index].vx, fishes[index].vy),
+        6,
+      )
+    }
+  })
+
+  it('同じ入力なら必ず同じ結果になる', () => {
+    const fishes = [fishAt({ x: 900 }), fishAt({ x: 915 })]
+    expect(separateFish(fishes, 1 / 60)).toEqual(separateFish(fishes, 1 / 60))
+  })
+
+  it('1匹でも0匹でも落ちない', () => {
+    expect(separateFish([], 1 / 60)).toEqual([])
+    expect(separateFish([fishAt()], 1 / 60)).toHaveLength(1)
+  })
+
+  /**
+   * 定数を1つ選ぶだけの緩いテストにしないため、**避けない場合と比べる**。
+   * 瞬間の最悪値ではなく平均で見るのは、すれ違いざまに一瞬重なるのは
+   * 水槽として自然で、避けるべきなのは「重なったまま並走する」ほうだから。
+   */
+  it('避けない場合より、重なっている時間がはっきり短くなる', () => {
+    const deepOverlaps = (list: Fish[]): number => {
+      let count = 0
+      for (let a = 0; a < list.length; a++) {
+        for (let b = a + 1; b < list.length; b++) {
+          const limit =
+            ((Math.max(list[a].width, list[a].height) + Math.max(list[b].width, list[b].height)) /
+              2) *
+            0.5
+          if (Math.hypot(list[a].x - list[b].x, renderY(list[a]) - renderY(list[b])) < limit) {
+            count++
+          }
+        }
+      }
+      return count
+    }
+
+    const averageOverlap = (avoid: boolean): number => {
+      let fishes = Array.from({ length: 50 }, (_, seed) => spawnFish(seed, tank, 800, 500))
+      let total = 0
+      for (let frame = 0; frame < 1800; frame++) {
+        if (avoid) fishes = separateFish(fishes, 1 / 60)
+        fishes = fishes.map((fish) => stepFish(fish, 1 / 60, tank))
+        total += deepOverlaps(fishes)
+      }
+      return total / 1800
+    }
+
+    const without = averageOverlap(false)
+    const withAvoidance = averageOverlap(true)
+
+    expect(withAvoidance).toBeLessThan(without * 0.3)
+    expect(withAvoidance).toBeLessThan(3)
   })
 })
