@@ -1,0 +1,35 @@
+appId: jp.paintingsaquarium.app
+productName: PaintingsAquarium
+copyright: PaintingsAquarium
+
+directories:
+  output: release
+  buildResources: build
+
+# ビルド済みのものだけを詰める。src や docs を入れても動作に関係なく、
+# 会場PCへ配るファイルが無駄に大きくなる。
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+
+# 完全オフラインで動くアプリなので、自動更新の仕組みは入れない。
+# 更新はインストーラを配り直す（会場PC1台のため、それで足りる）。
+publish: null
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # 署名証明書は買っていない。未署名なので SmartScreen の警告が出る。
+  # 会場PC1台に対して年数万円の証明書は見合わないと判断した（要件定義 §8）。
+  signAndEditExecutable: true
+
+nsis:
+  oneClick: false
+  # 会場PCが管理者権限で使えないことがあるため、ユーザー単位で入れられるようにする。
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: お絵かき水族館
