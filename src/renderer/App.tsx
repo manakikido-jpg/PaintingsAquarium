@@ -87,7 +87,7 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <Aquarium pieces={visible} />
+      <Aquarium pieces={visible} sceneryStrength={settings?.sceneryStrength ?? 1} />
 
       {settings && settings.watchFolder === null && (
         <div className="setup">
@@ -170,6 +170,28 @@ export function App(): React.JSX.Element {
             <p className="note">
               絵が消えすぎるときは「明るさ」を上げ、紙の白が残るときは下げてください。
               変更は次に取り込む写真から効きます。
+            </p>
+          </section>
+
+          <section>
+            <label>
+              背景の強さ: {settings.sceneryStrength.toFixed(2)}
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={settings.sceneryStrength}
+                onChange={(event) =>
+                  void window.aquarium
+                    .updateSettings({ sceneryStrength: Number(event.target.value) })
+                    .then(setSettings)
+                }
+              />
+            </label>
+            <p className="note">
+              光の筋や泡が絵より目立つときは下げてください。0 にすると無地になります。
+              こちらは動かした瞬間に反映されます。
             </p>
           </section>
 

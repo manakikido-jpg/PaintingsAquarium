@@ -125,8 +125,13 @@ export function spawnFish(
   const marginY = height / 2 + amplitude
   const usableHeight = Math.max(0, tank.height - marginY * 2)
 
+  // 横位置も散らす。全部を画面中央から出すと、同じ時間帯に取り込んだ絵どうしが
+  // 速度も近いためほぼ重なったまま泳ぎ、2匹が1匹に見える。
+  const marginX = Math.min(width / 2, tank.width / 2)
+  const usableWidth = Math.max(0, tank.width - marginX * 2)
+
   return {
-    x: tank.width / 2,
+    x: marginX + random() * usableWidth,
     y: marginY + random() * usableHeight,
     vx: towardsRight ? speed : -speed,
     vy: (random() - 0.5) * speed * 0.3,

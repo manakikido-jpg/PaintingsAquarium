@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { facesRight, renderY, spawnFish, stepFish, type Fish } from '../core/swim'
+import { facesRight, renderY, spawnFish, stepFish, type Fish, type Tank } from '../core/swim'
+import { spawnBubbles, spawnRays, stepBubble, type Bubble, type LightRay } from '../core/scenery'
+import { drawBubbles, drawLightRays, drawVignette, drawWater } from './drawScenery'
 import type { Piece } from '../shared/types'
 
 interface Swimmer {
@@ -15,12 +17,25 @@ function seedOf(id: string): number {
   return seed
 }
 
-export function Aquarium({ pieces }: { pieces: Piece[] }): React.JSX.Element {
+const RAY_COUNT = 7
+// 手前の泡は絵に重なるので少なく、奥は多めに。奥行きを出すため。
+const BACK_BUBBLE_COUNT = 34
+const FRONT_BUBBLE_COUNT = 10
+
+export function Aquarium({
+  pieces,
+  sceneryStrength,
+}: {
+  pieces: Piece[]
+  sceneryStrength: number
+}): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const swimmersRef = useRef<Map<string, Swimmer>>(new Map())
   // 描画ループから読むだけの値。state にすると毎フレーム再購読になる。
   const piecesRef = useRef<Piece[]>(pieces)
   piecesRef.current = pieces
+  const strengthRef = useRef(sceneryStrength)
+  strengthRef.current = sceneryStrength
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -30,6 +45,12 @@ export function Aquarium({ pieces }: { pieces: Piece[] }): React.JSX.Element {
 
     let animationId = 0
     let previous = performance.now()
+    let elapsed = 0
+
+    let rays: LightRay[] = []
+    let backBubbles: Bubble[] = []
+    let frontBubbles: Bubble[] = []
+    let builtFor = { width: -1, height: -1 }
 
     const resize = (): void => {
       // 4K の大画面でぼやけないように、実画素に合わせる。
@@ -41,12 +62,35 @@ export function Aquarium({ pieces }: { pieces: Piece[] }): React.JSX.Element {
     resize()
     window.addEventListener('resize', resize)
 
+    /**
+     * 背景の要素は画面の大きさに合わせて置き直す。
+     * 毎フレーム作り直すと、泡が動かず場所だけ変わってちらつくため、
+     * 大きさが変わったときだけ作る。
+     */
+    const rebuildScenery = (tank: Tank): void => {
+      if (builtFor.width === tank.width && builtFor.height === tank.height) return
+      builtFor = { width: tank.width, height: tank.height }
+      rays = spawnRays(20260812, RAY_COUNT, tank)
+      backBubbles = spawnBubbles(1207, BACK_BUBBLE_COUNT, tank, { maxAlpha: 0.2 })
+      frontBubbles = spawnBubbles(9931, FRONT_BUBBLE_COUNT, tank, {
+        minRadius: 5,
+        maxRadius: 13,
+        minSpeed: 26,
+        maxSpeed: 62,
+        maxAlpha: 0.14,
+      })
+    }
+
     const frame = (now: number): void => {
       // タブが隠れていた等で dt が跳ねると、絵が一気に壁まで飛ぶ。上限を掛ける。
       const dt = Math.min(0.05, (now - previous) / 1000)
       previous = now
+      elapsed += dt
 
-      const tank = { width: canvas.clientWidth, height: canvas.clientHeight }
+      const tank: Tank = { width: canvas.clientWidth, height: canvas.clientHeight }
+      const strength = strengthRef.current
+      rebuildScenery(tank)
+
       const swimmers = swimmersRef.current
       const wanted = new Set(piecesRef.current.map((piece) => piece.id))
 
@@ -65,7 +109,15 @@ export function Aquarium({ pieces }: { pieces: Piece[] }): React.JSX.Element {
         })
       }
 
-      context.clearRect(0, 0, tank.width, tank.height)
+      backBubbles = backBubbles.map((bubble) => stepBubble(bubble, dt, tank))
+      frontBubbles = frontBubbles.map((bubble) => stepBubble(bubble, dt, tank))
+
+      // 奥から手前へ順に重ねる。周辺減光は絵より前に掛ける
+      //（絵のあとに掛けると、端を泳ぐ絵が暗くなって見えづらい）。
+      drawWater(context, tank, strength)
+      drawLightRays(context, rays, elapsed, tank, strength)
+      drawVignette(context, tank, strength)
+      drawBubbles(context, backBubbles, strength)
 
       for (const swimmer of swimmers.values()) {
         swimmer.fish = stepFish(swimmer.fish, dt, tank)
@@ -86,6 +138,8 @@ export function Aquarium({ pieces }: { pieces: Piece[] }): React.JSX.Element {
         )
         context.restore()
       }
+
+      drawBubbles(context, frontBubbles, strength)
 
       animationId = requestAnimationFrame(frame)
     }

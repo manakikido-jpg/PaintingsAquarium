@@ -18,6 +18,12 @@ export interface Settings {
   readonly cutout: CutoutOptions
   /** 同時に泳がせる最大数（要件定義 D-3） */
   readonly maxVisible: number
+  /**
+   * 背景（光の筋・泡・周辺減光）の強さ。0〜1。
+   * 会場の投影機やスクリーンによっては背景が絵より目立つことがあるので、
+   * 現場で下げられるようにしてある。0 にすると無地の水色になる。
+   */
+  readonly sceneryStrength: number
 }
 
 /** 取り込みフォルダで見つかった、これから処理する写真。 */

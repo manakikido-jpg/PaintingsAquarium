@@ -8,6 +8,7 @@ const DEFAULT_SETTINGS: Settings = {
   watchFolder: null,
   cutout: DEFAULT_CUTOUT_OPTIONS,
   maxVisible: 50,
+  sceneryStrength: 1,
 }
 
 export function dataRoot(): string {

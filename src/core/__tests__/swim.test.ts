@@ -106,3 +106,22 @@ describe('spawnFish', () => {
     expect(() => spawnFish(1, tank, 0, 0)).not.toThrow()
   })
 })
+
+describe('spawnFish の横位置', () => {
+  it('生まれた時点で横方向も画面の中にいる', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const fish = spawnFish(seed, tank, 800, 600)
+      expect(fish.x - fish.width / 2).toBeGreaterThanOrEqual(-0.001)
+      expect(fish.x + fish.width / 2).toBeLessThanOrEqual(tank.width + 0.001)
+    }
+  })
+
+  it('生まれる横位置が散らばる（全部が画面中央から出ない）', () => {
+    const xs = Array.from({ length: 40 }, (_, seed) => spawnFish(seed, tank, 800, 600).x)
+    const centre = tank.width / 2
+    const atCentre = xs.filter((x) => Math.abs(x - centre) < 1).length
+
+    expect(atCentre).toBeLessThan(3)
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(tank.width * 0.4)
+  })
+})
