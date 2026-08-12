@@ -1,0 +1,44 @@
+# PaintingsAquarium（お絵かき水族館）
+
+紙に描いた絵を撮った写真を**決めたフォルダに入れるだけ**で、
+大画面の水槽を泳ぎ出します。完全オフラインで動き、AI は使いません。
+
+**作業を始める前に `CLAUDE.md` と `docs/` の3ファイルを読んでください。**
+
+- [`docs/要件定義.md`](docs/要件定義.md) — 何を作るか、誰が使うか、やらないこと
+- [`docs/機能要項.md`](docs/機能要項.md) — 実装した機能の台帳
+- [`docs/開発規則.md`](docs/開発規則.md) — 実際に踏んだ失敗の記録（`R-番号`）
+
+## 使い方
+
+1. アプリを起動する
+2. 最初の1回だけ、写真を入れるフォルダを選ぶ
+3. あとはそのフォルダに写真を入れるだけ。**アプリの操作は要りません**
+
+| キー | はたらき |
+|---|---|
+| `S` | 設定と一覧を開く／閉じる |
+| `F` | 全画面の切り替え |
+
+## 開発
+
+```sh
+npm install
+npm test          # 単体テスト
+npm run typecheck # 型チェック
+npm run build     # 画面と Electron 本体をビルド
+npx electron .    # ビルド済みのアプリを起動
+```
+
+開発中に画面だけ動かしたいときは `npm run dev`（Vite）を起動し、
+別のターミナルで `VITE_DEV_SERVER_URL=http://localhost:5173 npx electron .`。
+
+## 保存場所
+
+| 中身 | 場所 |
+|---|---|
+| 設定・絵・台帳 | Electron の userData 配下 `data/`（Windows: `%APPDATA%\PaintingsAquarium`、macOS: `~/Library/Application Support/PaintingsAquarium`） |
+| 元の写真 | 取り込みフォルダ（アプリはコピーしない） |
+
+**取り込みフォルダを消さないでください。** `data/` を失っても、
+写真さえ残っていれば全部やり直せます。これが唯一のバックアップです。
