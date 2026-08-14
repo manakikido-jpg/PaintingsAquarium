@@ -1,4 +1,5 @@
 import type { Tank } from './swim'
+import { seededRandom } from './random'
 
 /**
  * 水槽の背景（光の筋・泡）の動き。
@@ -8,14 +9,6 @@ import type { Tank } from './swim'
  * 会場で強すぎたときにスライダーで弱められるよう、明るさは 0〜1 の係数で返す。
  */
 
-/** 決まった種から擬似乱数を作る。会場ごとに背景が変わらないようにするため。 */
-function pseudoRandom(seed: number): () => number {
-  let state = (seed | 0) || 1
-  return () => {
-    state = (state * 1664525 + 1013904223) | 0
-    return ((state >>> 8) & 0xffffff) / 0x1000000
-  }
-}
 
 // ---------------------------------------------------------------- 光の筋
 
@@ -36,7 +29,7 @@ export interface LightRay {
 }
 
 export function spawnRays(seed: number, count: number, tank: Tank): LightRay[] {
-  const random = pseudoRandom(seed)
+  const random = seededRandom(seed)
   const rays: LightRay[] = []
 
   for (let index = 0; index < count; index++) {
@@ -118,7 +111,7 @@ export function spawnBubbles(
     maxAlpha = 0.22,
   }: SpawnBubblesOptions = {},
 ): Bubble[] {
-  const random = pseudoRandom(seed)
+  const random = seededRandom(seed)
   const bubbles: Bubble[] = []
 
   for (let index = 0; index < count; index++) {

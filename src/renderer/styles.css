@@ -65,6 +65,18 @@ button:hover {
   background: rgba(234, 246, 255, 0.2);
 }
 
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 選んでいるテーマが一目で分かるように。色だけでなく枠も変える */
+button.chosen {
+  background: rgba(127, 211, 255, 0.28);
+  border-color: rgba(127, 211, 255, 0.9);
+  font-weight: 700;
+}
+
 /*
  * 通知と操作ヒントは画面の隅に「浮かせて」いるが、下に押せる要素を置いていない。
  * 水槽は canvas 1 枚で操作対象が無く、設定パネルは別レイヤーで全画面に出るため、

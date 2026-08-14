@@ -1,4 +1,5 @@
 import type { CutoutOptions } from '../core/cutout'
+import type { ThemeId } from '../core/theme'
 
 /** 水槽を泳いでいる絵 1 枚。 */
 export interface Piece {
@@ -10,6 +11,11 @@ export interface Piece {
   readonly height: number
   /** 取り込んだ時刻（ISO 8601） */
   readonly createdAt: string
+  /**
+   * どのテーマで取り込んだ絵か。そのテーマのときだけ画面に出す。
+   * テーマ機能より前の絵には入っていないので、読むときは `themeOf()` を使う。
+   */
+  readonly theme?: ThemeId
 }
 
 export interface Settings {
@@ -24,6 +30,8 @@ export interface Settings {
    * 現場で下げられるようにしてある。0 にすると無地の水色になる。
    */
   readonly sceneryStrength: number
+  /** どの世界で見せるか */
+  readonly theme: ThemeId
 }
 
 /** 取り込みフォルダで見つかった、これから処理する写真。 */
@@ -41,6 +49,7 @@ export interface SavePieceInput {
   readonly height: number
   /** 透過・トリミング済み PNG の base64（data URL の接頭辞なし） */
   readonly pngBase64: string
+  readonly theme: ThemeId
 }
 
 /** 画面下に出す通知。取り込めなかった理由もここに流す。 */

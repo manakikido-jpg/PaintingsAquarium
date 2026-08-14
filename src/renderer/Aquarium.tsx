@@ -1,29 +1,16 @@
 import { useEffect, useRef } from 'react'
+import type { Tank } from '../core/swim'
 import {
-  facesRight,
-  renderY,
-  separateFish,
-  spawnFish,
-  stepFish,
-  type Fish,
-  type Tank,
-} from '../core/swim'
-import { spawnBubbles, spawnRays, stepBubble, type Bubble, type LightRay } from '../core/scenery'
-import { drawBubbles, drawLightRays, drawVignette, drawWater } from './drawScenery'
-import {
-  sandProfile,
-  spawnRocks,
-  spawnSeaweed,
-  shipwreckSpan,
-  spawnShells,
-  spawnShipwreck,
-  type Rock,
-  type Seaweed,
-  type Shell,
-  type Shipwreck,
-} from '../core/decor'
-import { drawRocks, drawSand, drawSeaweed, drawShells, drawShipwreck } from './drawDecor'
+  creatureLane,
+  placeCreature,
+  spawnCreature,
+  stepCreatures,
+  type Creature,
+} from '../core/motion'
 import { appearAlpha, appearProgress, appearScale, isNewlyArrived } from '../core/appear'
+import type { ThemeId } from '../core/theme'
+import { createScene } from './scene'
+import type { Scene } from './scene/types'
 import type { Piece } from '../shared/types'
 
 interface Swimmer {
@@ -31,30 +18,23 @@ interface Swimmer {
   readonly element: HTMLImageElement
   /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
   readonly bornAt: number
-  fish: Fish
+  creature: Creature
 }
 
-/** 絵の id から泳ぎ方の種を作る。同じ絵はいつ起動しても同じ泳ぎ方になる。 */
+/** 絵の id から動き方の種を作る。同じ絵はいつ起動しても同じ動きになる。 */
 function seedOf(id: string): number {
   let seed = 0
   for (const character of id) seed = (seed * 31 + character.charCodeAt(0)) | 0
   return seed
 }
 
-const RAY_COUNT = 7
-// 手前の泡は絵に重なるので少なく、奥は多めに。奥行きを出すため。
-const BACK_BUBBLE_COUNT = 34
-const FRONT_BUBBLE_COUNT = 10
-const ROCK_COUNT = 6
-const SHELL_COUNT = 5
-// SEAWEED_COUNT は「株」の数。1 株から数枚の葉が生える。
-const SEAWEED_COUNT = 8
-
 export function Aquarium({
   pieces,
+  theme,
   sceneryStrength,
 }: {
   pieces: Piece[]
+  theme: ThemeId
   sceneryStrength: number
 }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -64,6 +44,8 @@ export function Aquarium({
   piecesRef.current = pieces
   const strengthRef = useRef(sceneryStrength)
   strengthRef.current = sceneryStrength
+  const themeRef = useRef(theme)
+  themeRef.current = theme
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -77,15 +59,8 @@ export function Aquarium({
     // 起動時刻。これより後に取り込まれた絵だけを新入りとして演出する。
     const appStartedAt = Date.now()
 
-    let rays: LightRay[] = []
-    let backBubbles: Bubble[] = []
-    let frontBubbles: Bubble[] = []
-    let sand: number[] = []
-    let rocks: Rock[] = []
-    let seaweed: Seaweed[] = []
-    let shells: Shell[] = []
-    let wreck: Shipwreck | null = null
-    let builtFor = { width: -1, height: -1 }
+    let scene: Scene | null = null
+    let builtFor = { width: -1, height: -1, theme: '' }
 
     const resize = (): void => {
       // 4K の大画面でぼやけないように、実画素に合わせる。
@@ -98,29 +73,18 @@ export function Aquarium({
     window.addEventListener('resize', resize)
 
     /**
-     * 背景の要素は画面の大きさに合わせて置き直す。
-     * 毎フレーム作り直すと、泡が動かず場所だけ変わってちらつくため、
-     * 大きさが変わったときだけ作る。
+     * 世界は画面の大きさかテーマが変わったときだけ作り直す。
+     * 毎フレーム作ると、泡や煙が進まず場所だけ変わってちらつく。
+     * テーマが変わったら、動き方も変わるので絵も置き直す。
      */
-    const rebuildScenery = (tank: Tank): void => {
-      if (builtFor.width === tank.width && builtFor.height === tank.height) return
-      builtFor = { width: tank.width, height: tank.height }
-      rays = spawnRays(20260812, RAY_COUNT, tank)
-      backBubbles = spawnBubbles(1207, BACK_BUBBLE_COUNT, tank, { maxAlpha: 0.2 })
-      frontBubbles = spawnBubbles(9931, FRONT_BUBBLE_COUNT, tank, {
-        minRadius: 5,
-        maxRadius: 13,
-        minSpeed: 26,
-        maxSpeed: 62,
-        maxAlpha: 0.14,
-      })
-      sand = sandProfile(4471, tank)
-      wreck = spawnShipwreck(tank)
-      // 沈没船の前には生やさない。重ねると輪郭が消えて塊になる（R-006）。
-      const wreckSpan = shipwreckSpan(wreck, tank)
-      rocks = spawnRocks(8823, ROCK_COUNT, tank, wreckSpan)
-      seaweed = spawnSeaweed(5507, SEAWEED_COUNT, tank, wreckSpan)
-      shells = spawnShells(6619, SHELL_COUNT, tank)
+    const rebuild = (tank: Tank, theme: ThemeId): boolean => {
+      if (builtFor.width === tank.width && builtFor.height === tank.height && builtFor.theme === theme) {
+        return false
+      }
+      builtFor = { width: tank.width, height: tank.height, theme }
+      scene = createScene(theme, tank)
+      swimmersRef.current.clear()
+      return true
     }
 
     const frame = (now: number): void => {
@@ -131,11 +95,14 @@ export function Aquarium({
 
       const tank: Tank = { width: canvas.clientWidth, height: canvas.clientHeight }
       const strength = strengthRef.current
-      rebuildScenery(tank)
+      rebuild(tank, themeRef.current)
+      if (!scene) {
+        animationId = requestAnimationFrame(frame)
+        return
+      }
 
       const swimmers = swimmersRef.current
       const wanted = new Set(piecesRef.current.map((piece) => piece.id))
-
       for (const id of swimmers.keys()) {
         if (!wanted.has(id)) swimmers.delete(id)
       }
@@ -150,61 +117,68 @@ export function Aquarium({
           // 起動前からある絵は演出しない。起動のたびに全部が一斉に現れると
           // 不具合に見えるため。
           bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? elapsed : -Infinity,
-          fish: spawnFish(seedOf(piece.id), tank, piece.width, piece.height),
+          creature: spawnCreature(
+            scene.motion,
+            seedOf(piece.id),
+            tank,
+            piece.width,
+            piece.height,
+            scene.lanes,
+          ),
         })
       }
 
-      backBubbles = backBubbles.map((bubble) => stepBubble(bubble, dt, tank))
-      frontBubbles = frontBubbles.map((bubble) => stepBubble(bubble, dt, tank))
-
-      // 奥から手前へ順に重ねる。周辺減光は絵より前に掛ける
-      //（絵のあとに掛けると、端を泳ぐ絵が暗くなって見えづらい）。
-      drawWater(context, tank, strength)
-      drawLightRays(context, rays, elapsed, tank, strength)
-      drawSand(context, sand, tank, strength)
-      if (wreck) drawShipwreck(context, wreck, sand, tank, strength)
-      drawShells(context, shells, sand, tank, strength)
-      drawSeaweed(context, seaweed, sand, tank, elapsed, strength)
-      drawRocks(context, rocks, sand, tank, strength)
-      drawVignette(context, tank, strength)
-      drawBubbles(context, backBubbles, strength)
-
-      // 進める前に、近づきすぎた組の向きを変える。
-      // これをしないと、絵が重なったまま並走して1枚にしか見えなくなる（R-005）。
       const list = [...swimmers.values()]
-      const separated = separateFish(
-        list.map((swimmer) => swimmer.fish),
+      const stepped = stepCreatures(
+        list.map((swimmer) => swimmer.creature),
         dt,
+        tank,
       )
-      for (let index = 0; index < list.length; index++) {
-        list[index].fish = separated[index]
-      }
+      for (let index = 0; index < list.length; index++) list[index].creature = stepped[index]
 
-      for (const swimmer of swimmers.values()) {
-        swimmer.fish = stepFish(swimmer.fish, dt, tank)
-        if (!swimmer.element.complete || swimmer.element.naturalWidth === 0) continue
+      const drawSwimmer = (swimmer: Swimmer): void => {
+        if (!swimmer.element.complete || swimmer.element.naturalWidth === 0) return
+        if (!scene) return
 
-        const { fish } = swimmer
-        const y = renderY(fish)
+        const place = placeCreature(swimmer.creature, scene.lanes)
         const progress = appearProgress(elapsed - swimmer.bornAt)
         const scale = appearScale(progress)
 
+        context.globalAlpha = appearAlpha(progress)
+        scene.drawShadow?.(context, place, creatureLane(swimmer.creature), strength)
+        context.globalAlpha = 1
+
         context.save()
         context.globalAlpha = appearAlpha(progress)
-        context.translate(fish.x, y)
-        // 進む向きに合わせて左右反転する。魚が後ろ向きに泳いで見えるのを避けるため。
-        context.scale(facesRight(fish) ? scale : -scale, scale)
+        context.translate(place.x, place.y)
+        // 進む向きに合わせて左右反転する。後ろ向きに進んで見えるのを避けるため。
+        context.scale(place.facingRight ? scale : -scale, scale)
         context.drawImage(
           swimmer.element,
-          -fish.width / 2,
-          -fish.height / 2,
-          fish.width,
-          fish.height,
+          -place.width / 2,
+          -place.height / 2,
+          place.width,
+          place.height,
         )
         context.restore()
       }
 
-      drawBubbles(context, frontBubbles, strength)
+      scene.drawBehind(context, elapsed, strength)
+
+      if (scene.lanes.length === 0) {
+        for (const swimmer of list) drawSwimmer(swimmer)
+      } else {
+        // 奥の地面 → その列の絵 → 次の地面、の順。まとめて描くと
+        // 手前の地面が奥の絵にかぶさって足が埋まる。
+        for (let index = 0; index < scene.lanes.length; index++) {
+          scene.drawLane(context, index, elapsed, strength)
+          for (const swimmer of list) {
+            if (creatureLane(swimmer.creature) === index) drawSwimmer(swimmer)
+          }
+        }
+      }
+
+      scene.drawFront(context, elapsed, strength)
 
       animationId = requestAnimationFrame(frame)
     }

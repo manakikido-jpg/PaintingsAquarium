@@ -123,11 +123,12 @@ describe('seaweedShape', () => {
   it('先端ほど大きく揺れる', () => {
     const weed = spawnSeaweed(11, 8, tank)[0]
     const swayAt = (t: number): number => {
+      const index = Math.round(t * weed.segments)
+      const still = weed.baseX + weed.lean * (index / weed.segments) ** 2
       let widest = 0
       for (let step = 0; step < 400; step++) {
-        const nodes = seaweedShape(weed, step * 0.05, groundY)
-        const node = nodes[Math.round(t * weed.segments)]
-        widest = Math.max(widest, Math.abs(node.x - weed.baseX))
+        const node = seaweedShape(weed, step * 0.05, groundY)[index]
+        widest = Math.max(widest, Math.abs(node.x - still))
       }
       return widest
     }
@@ -136,13 +137,16 @@ describe('seaweedShape', () => {
     expect(swayAt(0.5)).toBeGreaterThan(swayAt(0.1))
   })
 
-  it('揺れ幅の上限を超えない', () => {
+  it('揺れ幅の上限を超えない（開きのぶんを除いて）', () => {
     const weed = spawnSeaweed(11, 8, tank)[0]
 
     for (let step = 0; step < 600; step++) {
-      for (const node of seaweedShape(weed, step * 0.05, groundY)) {
-        expect(Math.abs(node.x - weed.baseX)).toBeLessThanOrEqual(weed.swayAmplitude + 1e-9)
-      }
+      const nodes = seaweedShape(weed, step * 0.05, groundY)
+      nodes.forEach((node, index) => {
+        const t = index / weed.segments
+        const still = weed.baseX + weed.lean * t * t
+        expect(Math.abs(node.x - still)).toBeLessThanOrEqual(weed.swayAmplitude + 1e-9)
+      })
     }
   })
 
@@ -335,5 +339,23 @@ describe('沈没船の前を空ける', () => {
     const wreck = spawnShipwreck(tank)
     const span = shipwreckSpan(wreck, tank)
     expect((span.to - span.from) * tank.width).toBeGreaterThan(wreck.width)
+  })
+})
+
+describe('葉の開き', () => {
+  it('株の中で葉が左右に開く（棘の束にしない）', () => {
+    const weeds = spawnSeaweed(11, 1, tank)
+    const leans = weeds.map((weed) => weed.lean)
+
+    expect(Math.min(...leans)).toBeLessThan(0)
+    expect(Math.max(...leans)).toBeGreaterThan(0)
+  })
+
+  it('根元では開かず、先端で開く', () => {
+    const weed = spawnSeaweed(11, 1, tank).find((entry) => Math.abs(entry.lean) > 1)!
+    const nodes = seaweedShape(weed, 0, 900)
+
+    expect(Math.abs(nodes[0].x - weed.baseX)).toBeLessThan(1)
+    expect(Math.abs(nodes[nodes.length - 1].x - weed.baseX)).toBeGreaterThan(1)
   })
 })

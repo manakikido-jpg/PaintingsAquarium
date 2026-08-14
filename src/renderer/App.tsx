@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Aquarium } from './Aquarium'
 import { processPhoto } from './processImage'
 import type { IncomingPhoto, Notice, Piece, Settings } from '../shared/types'
+import { THEMES, themeOf, type ThemeId } from '../core/theme'
 
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -54,6 +55,9 @@ export function App(): React.JSX.Element {
           width: result.width,
           height: result.height,
           pngBase64: result.pngBase64,
+          // 取り込んだ時点のテーマを絵に記録する。あとでテーマを変えても、
+          // その会期の絵だけを出せるようにするため。
+          theme: current.theme,
         })
         setPieces((current) => [...current, piece])
       })
@@ -71,7 +75,9 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const visible = settings ? pieces.slice(-settings.maxVisible) : []
+  // いま選んでいるテーマの絵だけを出す。恐竜の会期に魚が混ざるのを防ぐ。
+  const forTheme = settings ? pieces.filter((piece) => themeOf(piece) === settings.theme) : []
+  const visible = settings ? forTheme.slice(-settings.maxVisible) : []
   const today = new Date().toISOString().slice(0, 10)
   const todayCount = pieces.filter((piece) => piece.createdAt.startsWith(today)).length
 
@@ -87,7 +93,24 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <Aquarium pieces={visible} sceneryStrength={settings?.sceneryStrength ?? 1} />
+      <Aquarium
+        pieces={visible}
+        theme={settings?.theme ?? 'aquarium'}
+        sceneryStrength={settings?.sceneryStrength ?? 1}
+      />
+
+      {settings && settings.watchFolder !== null && forTheme.length === 0 && pieces.length > 0 && (
+        <div className="setup">
+          <h1>このテーマの絵はまだありません</h1>
+          <p>
+            ほかのテーマに {pieces.length} 枚あります。絵はテーマごとに分かれているので、
+            <br />
+            このテーマの絵は、このテーマを選んだ状態で写真を入れると増えます。
+            <br />
+            テーマは <strong>S</strong> キーの設定画面で切り替えられます。
+          </p>
+        </div>
+      )}
 
       {settings && settings.watchFolder === null && (
         <div className="setup">
@@ -123,6 +146,33 @@ export function App(): React.JSX.Element {
               閉じる
             </button>
           </div>
+
+          <section>
+            <div className="row">
+              <span>テーマ</span>
+              {THEMES.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  disabled={!entry.ready}
+                  aria-pressed={settings.theme === entry.id}
+                  className={settings.theme === entry.id ? 'chosen' : undefined}
+                  onClick={() =>
+                    void window.aquarium
+                      .updateSettings({ theme: entry.id as ThemeId })
+                      .then(setSettings)
+                  }
+                >
+                  {entry.name}
+                  {entry.ready ? '' : '（準備中）'}
+                </button>
+              ))}
+            </div>
+            <p className="note">
+              テーマを変えると、そのテーマで取り込んだ絵だけが出ます。
+              いま {forTheme.length} 枚がこのテーマの絵です。
+            </p>
+          </section>
 
           <section>
             <div className="row">

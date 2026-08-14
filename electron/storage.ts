@@ -3,12 +3,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Piece, SavePieceInput, Settings } from '../src/shared/types'
 import { DEFAULT_CUTOUT_OPTIONS } from '../src/core/cutout'
+import { DEFAULT_THEME, isThemeId } from '../src/core/theme'
 
 const DEFAULT_SETTINGS: Settings = {
   watchFolder: null,
   cutout: DEFAULT_CUTOUT_OPTIONS,
   maxVisible: 50,
   sceneryStrength: 1,
+  theme: DEFAULT_THEME,
 }
 
 export function dataRoot(): string {
@@ -53,6 +55,9 @@ export function readSettings(): Settings {
   return {
     ...DEFAULT_SETTINGS,
     ...stored,
+    // 設定ファイルを人が触れる形で置いているので、知らない値が入りうる。
+    // 落とさず既定に戻す。
+    theme: isThemeId(stored.theme) ? stored.theme : DEFAULT_THEME,
     cutout: { ...DEFAULT_SETTINGS.cutout, ...stored.cutout },
   }
 }
@@ -91,6 +96,7 @@ export function savePiece(input: SavePieceInput): Piece {
     width: input.width,
     height: input.height,
     createdAt: new Date().toISOString(),
+    theme: input.theme,
   }
 
   writeJsonAtomic(indexPath(), [...readPieces(), piece])

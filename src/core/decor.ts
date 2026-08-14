@@ -1,4 +1,5 @@
 import type { Tank } from './swim'
+import { seededRandom } from './random'
 
 /**
  * 水槽の底の飾り（砂地・岩・海藻）の形。
@@ -8,13 +9,6 @@ import type { Tank } from './swim'
  * ここは形と揺れの計算だけを持ち、色と描き方は画面側に置く。
  */
 
-function pseudoRandom(seed: number): () => number {
-  let state = (seed | 0) || 1
-  return () => {
-    state = (state * 1664525 + 1013904223) | 0
-    return ((state >>> 8) & 0xffffff) / 0x1000000
-  }
-}
 
 // ---------------------------------------------------------------- 砂地
 
@@ -25,7 +19,7 @@ function pseudoRandom(seed: number): () => number {
  * 波長の違う 3 本の sin を足して滑らかな起伏にしている。
  */
 export function sandProfile(seed: number, tank: Tank, samples = 48): number[] {
-  const random = pseudoRandom(seed)
+  const random = seededRandom(seed)
   const waves = Array.from({ length: 3 }, (_, index) => ({
     length: tank.width / (1.2 + index * 1.9),
     height: tank.height * (0.030 / (index + 1)),
@@ -82,7 +76,7 @@ export interface Rock {
 }
 
 export function spawnRocks(seed: number, count: number, tank: Tank, avoid?: Span): Rock[] {
-  const random = pseudoRandom(seed)
+  const random = seededRandom(seed)
   const rocks: Rock[] = []
 
   for (let index = 0; index < count; index++) {
@@ -122,7 +116,7 @@ export interface Point {
  * 「なだらかだが左右非対称」な形にしている。
  */
 export function rockOutline(rock: Rock, groundY: number, steps = 24): Point[] {
-  const random = pseudoRandom(rock.seed)
+  const random = seededRandom(rock.seed)
   const lumps = [
     { waves: 2, size: 0.07, phase: random() * Math.PI * 2 },
     { waves: 3, size: 0.05, phase: random() * Math.PI * 2 },
@@ -156,6 +150,11 @@ export interface Seaweed {
   readonly swayAmplitude: number
   /** 上に行くほど曲がる度合い */
   readonly curl: number
+  /**
+   * 先端が横へ開く量（ピクセル）。株の中で葉ごとに変える。
+   * これが無いと葉が全部まっすぐ上を向き、扇ではなく**棘の束**に見える。
+   */
+  readonly lean: number
   /** 0〜1。大きいほど手前（濃く描く） */
   readonly depth: number
   readonly segments: number
@@ -173,7 +172,7 @@ export function spawnSeaweed(
   tank: Tank,
   avoid?: Span,
 ): Seaweed[] {
-  const random = pseudoRandom(seed)
+  const random = seededRandom(seed)
   const weeds: Seaweed[] = []
 
   const spread = tank.width * 0.012
@@ -192,8 +191,10 @@ export function spawnSeaweed(
     const blades = 3 + Math.floor(random() * 2)
 
     for (let blade = 0; blade < blades; blade++) {
+      const across = blades === 1 ? 0 : blade / (blades - 1) - 0.5
       weeds.push({
-        baseX: rootX + (blade / Math.max(1, blades - 1) - 0.5) * spread,
+        baseX: rootX + across * spread,
+        lean: across * rootHeight * 0.55,
         // 手前の株ほど高く見せて奥行きを出す
         height: rootHeight * (0.7 + random() * 0.55),
         halfWidth: tank.width * (0.005 + random() * 0.006),
@@ -229,7 +230,7 @@ export function seaweedShape(weed: Seaweed, timeSeconds: number, groundY: number
     const t = index / weed.segments
     const angle = weed.swayPhase + timeSeconds * weed.swaySpeed + t * weed.curl
     nodes.push({
-      x: weed.baseX + Math.sin(angle) * weed.swayAmplitude * Math.pow(t, 1.7),
+      x: weed.baseX + weed.lean * t * t + Math.sin(angle) * weed.swayAmplitude * Math.pow(t, 1.7),
       y: groundY - weed.height * t,
       // 先端へ向けて細くする。根元と同じ太さのままだと海藻に見えない。
       halfWidth: weed.halfWidth * (1 - t * t * 0.9),
@@ -255,7 +256,7 @@ export interface Shell {
 }
 
 export function spawnShells(seed: number, count: number, tank: Tank): Shell[] {
-  const random = pseudoRandom(seed)
+  const random = seededRandom(seed)
   const shells: Shell[] = []
 
   for (let index = 0; index < count; index++) {

@@ -1,3 +1,4 @@
+import { seededRandom } from './random'
 /**
  * 水槽の中を泳ぐ動き。純粋関数にしてあるのは、
  * 「絵が画面の外に出てしまう」類の不具合を目視ではなくテストで止めるため。
@@ -81,17 +82,6 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
   return { ...fish, x, y, vx, vy, phase: fish.phase + fish.phaseSpeed * dt }
 }
 
-/**
- * 決まった種から擬似乱数を作る。`Math.random` を使わないのは、
- * 泳ぎ方をテストで再現できるようにするため。
- */
-function pseudoRandom(seed: number): () => number {
-  let state = (seed | 0) || 1
-  return () => {
-    state = (state * 1664525 + 1013904223) | 0
-    return ((state >>> 8) & 0xffffff) / 0x1000000
-  }
-}
 
 export interface SpawnOptions {
   /** 絵の長辺をこの長さに合わせる（ピクセル） */
@@ -112,7 +102,7 @@ export function spawnFish(
   imageHeight: number,
   { targetSize = 180, minSpeed = 30, maxSpeed = 90 }: SpawnOptions = {},
 ): Fish {
-  const random = pseudoRandom(seed)
+  const random = seededRandom(seed)
   const longestSide = Math.max(imageWidth, imageHeight, 1)
   const scale = targetSize / longestSide
   const width = Math.max(1, imageWidth * scale)
