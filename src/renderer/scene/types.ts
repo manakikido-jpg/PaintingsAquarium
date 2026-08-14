@@ -23,10 +23,10 @@ export interface Scene {
   /** `index` 番の列の地面。列が無いテーマでは呼ばれない */
   drawLane(context: CanvasRenderingContext2D, index: number, elapsed: number, strength: number): void
   /**
-   * 絵1枚を描く直前に呼ばれる。地面に立つテーマで足元の影を落とすため。
-   * 影が要らないテーマは持たなくてよい。
+   * 絵1枚を描く直前に、その絵の位置で呼ばれる。
+   * 陸なら足元の影、水中なら絵の後ろの光。要らないテーマは持たなくてよい。
    */
-  drawShadow?(
+  drawBeneath?(
     context: CanvasRenderingContext2D,
     place: Placement,
     laneIndex: number,

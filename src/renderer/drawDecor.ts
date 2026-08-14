@@ -31,8 +31,8 @@ import type { Tank } from '../core/swim'
  * その上に乗る岩・海藻・貝・沈没船は、砂を背にした**暗い影絵**になる。
  * 暗い物を見せたいなら、その背後を明るくするしかない。
  */
-const SAND = '150, 186, 200'
-const SILHOUETTE = '2, 22, 33'
+const SAND = '104, 142, 160'
+const SILHOUETTE = '0, 8, 14'
 const ON_SAND_MIN_ALPHA = 0.72
 
 /** 砂地の高さの列から、指定 X での高さを線形に求める。 */
@@ -58,9 +58,9 @@ export function drawSand(
   const top = Math.min(...profile)
   const gradient = context.createLinearGradient(0, top, 0, tank.height)
   // 上端は水に溶かし、下へ行くほど明るくする。手前ほど光が届いている見立て。
-  gradient.addColorStop(0, `rgba(${SAND}, ${0.06 * strength})`)
-  gradient.addColorStop(0.4, `rgba(${SAND}, ${0.2 * strength})`)
-  gradient.addColorStop(1, `rgba(${SAND}, ${0.4 * strength})`)
+  gradient.addColorStop(0, `rgba(${SAND}, ${0.05 * strength})`)
+  gradient.addColorStop(0.4, `rgba(${SAND}, ${0.16 * strength})`)
+  gradient.addColorStop(1, `rgba(${SAND}, ${0.32 * strength})`)
 
   context.fillStyle = gradient
   context.beginPath()

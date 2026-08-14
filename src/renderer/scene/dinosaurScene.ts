@@ -196,7 +196,7 @@ export function createDinosaurScene(tank: Tank): Scene {
     },
 
     /** 足元の影。地面に立っていることを示す唯一の手がかり。 */
-    drawShadow(context, place, laneIndex, strength) {
+    drawBeneath(context, place, laneIndex, strength) {
       if (strength <= 0) return
       const lane = lanes[laneIndex]
       if (!lane) return

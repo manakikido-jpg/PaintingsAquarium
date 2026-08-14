@@ -15,19 +15,24 @@ export function drawWater(
   tank: Tank,
   strength: number,
 ): void {
+  /*
+   * 深く沈んだ色にしている。以前はもっと明るい青だったが、
+   * それだと**背景のほうが子どもの絵より明るく**、絵が沈んで見えた。
+   * 映すのはモニターなので黒がきちんと沈む。暗くするほど絵が浮き上がる。
+   */
   const gradient = context.createLinearGradient(0, 0, 0, tank.height)
-  gradient.addColorStop(0, '#0d6f92')
-  gradient.addColorStop(0.35, '#0a4a6b')
-  gradient.addColorStop(0.72, '#062f47')
-  gradient.addColorStop(1, '#02121d')
+  gradient.addColorStop(0, '#073246')
+  gradient.addColorStop(0.3, '#04202f')
+  gradient.addColorStop(0.7, '#02131e')
+  gradient.addColorStop(1, '#00070c')
   context.fillStyle = gradient
   context.fillRect(0, 0, tank.width, tank.height)
 
   // 水面の明るい帯。画面の上端が「水の中の上のほう」に見えるようにする。
-  const surfaceHeight = Math.min(tank.height * 0.18, 220)
+  const surfaceHeight = Math.min(tank.height * 0.22, 260)
   const surface = context.createLinearGradient(0, 0, 0, surfaceHeight)
-  surface.addColorStop(0, `rgba(190, 244, 255, ${0.28 * strength})`)
-  surface.addColorStop(1, 'rgba(190, 244, 255, 0)')
+  surface.addColorStop(0, `rgba(120, 214, 245, ${0.2 * strength})`)
+  surface.addColorStop(1, 'rgba(120, 214, 245, 0)')
   context.fillStyle = surface
   context.fillRect(0, 0, tank.width, surfaceHeight)
 }
@@ -87,10 +92,14 @@ export function drawLightRays(
 }
 
 /** 光の筋を柔らかく見せるための重ね方。外側ほど広く薄い。 */
+/*
+ * 揺らぎ模様（コースティクス）を入れたぶん、光の筋は弱めてある。
+ * 両方を強く出すと、光の情報が多すぎて絵が埋もれる。
+ */
 const RAY_LAYERS = [
-  { widthScale: 2.4, alphaScale: 0.26 },
-  { widthScale: 1.35, alphaScale: 0.32 },
-  { widthScale: 0.7, alphaScale: 0.34 },
+  { widthScale: 2.6, alphaScale: 0.16 },
+  { widthScale: 1.4, alphaScale: 0.18 },
+  { widthScale: 0.7, alphaScale: 0.2 },
 ] as const
 
 /**
@@ -113,8 +122,8 @@ export function drawVignette(
     tank.height / 2,
     radius,
   )
-  gradient.addColorStop(0, 'rgba(1, 12, 20, 0)')
-  gradient.addColorStop(1, `rgba(1, 12, 20, ${0.4 * strength})`)
+  gradient.addColorStop(0, 'rgba(0, 6, 11, 0)')
+  gradient.addColorStop(1, `rgba(0, 6, 11, ${0.55 * strength})`)
   context.fillStyle = gradient
   context.fillRect(0, 0, tank.width, tank.height)
 }

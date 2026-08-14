@@ -145,7 +145,7 @@ export function Aquarium({
         const scale = appearScale(progress)
 
         context.globalAlpha = appearAlpha(progress)
-        scene.drawShadow?.(context, place, creatureLane(swimmer.creature), strength)
+        scene.drawBeneath?.(context, place, creatureLane(swimmer.creature), strength)
         context.globalAlpha = 1
 
         context.save()
