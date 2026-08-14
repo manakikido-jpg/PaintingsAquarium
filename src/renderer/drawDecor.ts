@@ -15,25 +15,74 @@ import type { Tank } from '../core/swim'
 
 /**
  * 底の飾りの描き方。
- *
- * 全部**暗いシルエット**で描く。色を付けると子どもの絵と派手さで喧嘩し、
- * 何が主役か分からない画面になる。奥行きは色ではなく「濃さ」で出す。
  * 呼び出し側は必ず**絵より先に**呼ぶこと（手前に置くと絵が隠れる）。
+ *
+ * 色の決め方には経緯がある。
+ *
+ * まず全部を同じ暗い色で描いていたが、画面の下は水の色自体が暗いため、
+ * **暗いシルエットが背景と同化して沈没船が消えた**（R-006）。
+ * 砂を明るい敷物にし、その上に乗る物を暗い影絵にして直した。
+ *
+ * それでも**輪郭が硬く、全部が同じ濃さで、切り絵を並べたように安く見えた**（R-011）。
+ * いまは次の3つで奥行きを作っている。
+ *
+ * 1. 遠い物ほど**薄く、水の色に寄せる**（空気遠近。水中では特に強く効く）
+ * 2. 遠い物ほど**ぼかす**（`bake.ts` で焼き付けるので毎フレームの費用はかからない）
+ * 3. 上面に**光の縁**を入れる。水面から光が来ていることが分かり、
+ *    ただの黒い塗りが「立体の影」に変わる
  */
 
-/*
- * 色の決め方。ここを外すと飾りが「見えない」ので、理由を残しておく。
- *
- * 最初は砂も岩も船も同じ暗い色で描いていたが、画面の下は水の色自体が暗いため、
- * **暗いシルエットが背景と同化して船体が完全に消えた**（R-006）。
- *
- * 本物の水槽と同じ関係にする。砂は**上から光が当たって明るい**。
- * その上に乗る岩・海藻・貝・沈没船は、砂を背にした**暗い影絵**になる。
- * 暗い物を見せたいなら、その背後を明るくするしかない。
- */
+/** 1つの奥行きの層の見え方。 */
+export interface DecorStyle {
+  /** 本体の色 `r, g, b` */
+  readonly body: string
+  /** 上側の色 `r, g, b`。本体より少し明るく、水の色寄りにする */
+  readonly lit: string
+  /** 上面の光の縁の色（`rgba(...)` を丸ごと） */
+  readonly rim: string
+  /** 縁の太さ（ピクセル） */
+  readonly rimWidth: number
+  /** 本体の濃さ 0〜1 */
+  readonly alpha: number
+  /**
+   * 輪郭のまわりに敷く薄い影の広がり（本体の大きさに対する倍率）。
+   * 0 で無し。`filter: blur()` の代わりに輪郭の硬さを取るためのもの。
+   */
+  readonly halo: number
+}
+
+/** 手前（濃くはっきり）。 */
+export const NEAR_STYLE: DecorStyle = {
+  body: '0, 9, 15',
+  lit: '36, 84, 110',
+  rim: 'rgba(126, 206, 240, 0.5)',
+  rimWidth: 1.8,
+  alpha: 0.96,
+  halo: 0.055,
+}
+
+/** 中景。 */
+export const MID_STYLE: DecorStyle = {
+  body: '6, 28, 42',
+  lit: '34, 78, 102',
+  rim: 'rgba(126, 206, 240, 0.32)',
+  rimWidth: 1.5,
+  alpha: 0.86,
+  halo: 0.04,
+}
+
+/** 遠景（薄く、水の色に近い）。 */
+export const FAR_STYLE: DecorStyle = {
+  body: '22, 62, 86',
+  lit: '46, 96, 124',
+  rim: 'rgba(140, 212, 244, 0.18)',
+  rimWidth: 1.2,
+  alpha: 0.88,
+  // 遠景は焼き付けるときに本物のぼかしを掛けるので、こちらは要らない
+  halo: 0,
+}
+
 const SAND = '104, 142, 160'
-const SILHOUETTE = '0, 8, 14'
-const ON_SAND_MIN_ALPHA = 0.72
 
 /** 砂地の高さの列から、指定 X での高さを線形に求める。 */
 export function groundAt(profile: readonly number[], x: number, tank: Tank): number {
@@ -57,7 +106,6 @@ export function drawSand(
 
   const top = Math.min(...profile)
   const gradient = context.createLinearGradient(0, top, 0, tank.height)
-  // 上端は水に溶かし、下へ行くほど明るくする。手前ほど光が届いている見立て。
   gradient.addColorStop(0, `rgba(${SAND}, ${0.05 * strength})`)
   gradient.addColorStop(0.4, `rgba(${SAND}, ${0.16 * strength})`)
   gradient.addColorStop(1, `rgba(${SAND}, ${0.32 * strength})`)
@@ -74,7 +122,7 @@ export function drawSand(
   context.fill()
 }
 
-function fillPolygon(context: CanvasRenderingContext2D, points: readonly Point[]): void {
+function tracePolygon(context: CanvasRenderingContext2D, points: readonly Point[]): void {
   if (points.length === 0) return
   context.beginPath()
   context.moveTo(points[0].x, points[0].y)
@@ -82,6 +130,81 @@ function fillPolygon(context: CanvasRenderingContext2D, points: readonly Point[]
     context.lineTo(points[index].x, points[index].y)
   }
   context.closePath()
+}
+
+/**
+ * 影絵を1つ描く。
+ *
+ * 塗りは**単色にしない**。上から下へのグラデーションにしてある。
+ * 単色で塗ると、どれだけ形を作り込んでも**紙を切り抜いて貼ったよう**にしか
+ * 見えない（R-011）。上側だけわずかに水の色を混ぜると、
+ * 水面から光が回り込んでいるように見え、同じ形が立体になる。
+ *
+ * さらに、塗る前に少し上へずらした同じ形を薄い色で塗っている。
+ * はみ出したぶんが上面の縁として残る。
+ * 全周に輪郭線を引く方法だと、下側まで光ってかえって作り物に見える。
+ */
+function paintSilhouette(
+  context: CanvasRenderingContext2D,
+  points: readonly Point[],
+  style: DecorStyle,
+  strength: number,
+  shade = 1,
+): void {
+  if (points.length === 0) return
+
+  let top = points[0].y
+  let bottom = points[0].y
+  for (const point of points) {
+    if (point.y < top) top = point.y
+    if (point.y > bottom) bottom = point.y
+  }
+
+  /*
+   * 輪郭の外側に、同じ形をひと回り大きくして薄く敷く。
+   * 縁がすっぱり切れているのが「切り絵っぽさ」の正体なので、
+   * 外へ向かって少し滲ませるだけで印象が変わる。
+   * 本物のぼかしのほうが綺麗だが、毎フレームでは使えない（R-012）。
+   */
+  if (style.halo > 0) {
+    let left = points[0].x
+    let right = points[0].x
+    for (const point of points) {
+      if (point.x < left) left = point.x
+      if (point.x > right) right = point.x
+    }
+    const centreX = (left + right) / 2
+    const grow = 1 + style.halo
+
+    context.save()
+    context.translate(centreX, bottom)
+    context.scale(grow, grow)
+    context.translate(-centreX, -bottom)
+    context.fillStyle = `rgba(${style.body}, ${style.alpha * shade * strength * 0.3})`
+    tracePolygon(context, points)
+    context.fill()
+    context.restore()
+  }
+
+  context.save()
+  context.fillStyle = style.rim
+  context.translate(0, -style.rimWidth)
+  tracePolygon(context, points)
+  context.fill()
+  context.restore()
+
+  const alpha = style.alpha * shade * strength
+  if (bottom - top < 1) {
+    context.fillStyle = `rgba(${style.body}, ${alpha})`
+  } else {
+    const shading = context.createLinearGradient(0, top, 0, bottom)
+    shading.addColorStop(0, `rgba(${style.lit}, ${alpha})`)
+    shading.addColorStop(0.55, `rgba(${style.body}, ${alpha})`)
+    shading.addColorStop(1, `rgba(${style.body}, ${alpha})`)
+    context.fillStyle = shading
+  }
+
+  tracePolygon(context, points)
   context.fill()
 }
 
@@ -91,14 +214,15 @@ export function drawRocks(
   profile: readonly number[],
   tank: Tank,
   strength: number,
+  style: DecorStyle = NEAR_STYLE,
 ): void {
   if (strength <= 0) return
 
   // 奥の岩から先に描く。手前の岩が奥に隠れると重なりがおかしく見える。
   for (const rock of [...rocks].sort((a, b) => a.depth - b.depth)) {
-    context.fillStyle = `rgba(${SILHOUETTE}, ${(ON_SAND_MIN_ALPHA + rock.depth * 0.22) * strength})`
     // 少し砂に埋める。砂の線にちょうど乗せると置物のように浮いて見える。
-    fillPolygon(context, rockOutline(rock, groundAt(profile, rock.x, tank) + rock.height * 0.08))
+    const outline = rockOutline(rock, groundAt(profile, rock.x, tank) + rock.height * 0.08)
+    paintSilhouette(context, outline, style, strength, 0.85 + rock.depth * 0.15)
   }
 }
 
@@ -109,6 +233,7 @@ export function drawSeaweed(
   tank: Tank,
   timeSeconds: number,
   strength: number,
+  style: DecorStyle = NEAR_STYLE,
 ): void {
   if (strength <= 0) return
 
@@ -116,17 +241,14 @@ export function drawSeaweed(
     const nodes = seaweedShape(weed, timeSeconds, groundAt(profile, weed.baseX, tank) + 2)
     if (nodes.length === 0) continue
 
-    context.fillStyle = `rgba(${SILHOUETTE}, ${(ON_SAND_MIN_ALPHA + weed.depth * 0.22) * strength})`
-
     // 節の列を、左側を上りながら・右側を下りながら 1 つの形にする。
-    context.beginPath()
-    context.moveTo(nodes[0].x - nodes[0].halfWidth, nodes[0].y)
-    for (const node of nodes) context.lineTo(node.x - node.halfWidth, node.y)
+    const points: Point[] = []
+    for (const node of nodes) points.push({ x: node.x - node.halfWidth, y: node.y })
     for (let index = nodes.length - 1; index >= 0; index--) {
-      context.lineTo(nodes[index].x + nodes[index].halfWidth, nodes[index].y)
+      points.push({ x: nodes[index].x + nodes[index].halfWidth, y: nodes[index].y })
     }
-    context.closePath()
-    context.fill()
+
+    paintSilhouette(context, points, style, strength, 0.82 + weed.depth * 0.18)
   }
 }
 
@@ -140,16 +262,14 @@ export function drawShipwreck(
   profile: readonly number[],
   tank: Tank,
   strength: number,
+  style: DecorStyle = FAR_STYLE,
 ): void {
   if (strength <= 0) return
 
   const groundY = groundAt(profile, wreck.x, tank)
   context.save()
-  // 手前の岩や海藻より薄くする。同じ濃さだと重なった部分の輪郭が消え、
-  // 船と海藻がひと続きの黒い塊になる（R-006）。
-  context.fillStyle = `rgba(${SILHOUETTE}, ${0.62 * strength})`
-  context.strokeStyle = `rgba(${SILHOUETTE}, ${0.62 * strength})`
   context.lineCap = 'round'
+  context.strokeStyle = `rgba(${style.body}, ${style.alpha * strength})`
 
   for (const mast of shipwreckMasts(wreck, groundY)) {
     context.lineWidth = mast.width
@@ -159,31 +279,36 @@ export function drawShipwreck(
     context.stroke()
   }
 
-  fillPolygon(context, shipwreckHull(wreck, groundY))
+  paintSilhouette(context, shipwreckHull(wreck, groundY), style, strength)
   context.restore()
 }
 
-/** 貝殻。扇の筋は水の色で描いて、彫りが入っているように見せる。 */
+/** 貝殻。扇の筋は塗りを削る形で入れて、彫りが入っているように見せる。 */
 export function drawShells(
   context: CanvasRenderingContext2D,
   shells: readonly Shell[],
   profile: readonly number[],
   tank: Tank,
   strength: number,
+  style: DecorStyle = MID_STYLE,
 ): void {
   if (strength <= 0) return
 
   context.save()
   for (const shell of [...shells].sort((a, b) => a.depth - b.depth)) {
     const groundY = groundAt(profile, shell.x, tank)
-
-    context.fillStyle = `rgba(${SILHOUETTE}, ${(ON_SAND_MIN_ALPHA + shell.depth * 0.22) * strength})`
-    fillPolygon(context, shellOutline(shell, groundY))
+    paintSilhouette(
+      context,
+      shellOutline(shell, groundY),
+      style,
+      strength,
+      0.85 + shell.depth * 0.15,
+    )
 
     // 筋は塗りを削る形で入れる。線を上から足すと、貝の外へはみ出て見える。
     context.save()
     context.globalCompositeOperation = 'destination-out'
-    context.strokeStyle = `rgba(0, 0, 0, ${0.35 * strength})`
+    context.strokeStyle = `rgba(0, 0, 0, ${0.3 * strength})`
     context.lineWidth = Math.max(0.7, shell.halfWidth * 0.05)
     for (const ridge of shellRidges(shell, groundY)) {
       context.beginPath()

@@ -32,6 +32,10 @@ npx electron .    # ビルド済みのアプリを起動
 npm run dist:win  # Windows インストーラを作る（docs/配布手順.md を参照）
 ```
 
+実際の fps を確かめたいときは、`npm run dev` で開いた画面の URL に `?measure` を
+足すと画面の隅に出ます（既定では出ません）。**JS の経過時間を測っても 0ms にしか
+ならない**ので、必ずコマ数で測ること（`docs/開発規則.md` R-012）。
+
 開発中に画面だけ動かしたいときは `npm run dev`（Vite）を起動し、
 別のターミナルで `VITE_DEV_SERVER_URL=http://localhost:5173 npx electron .`。
 

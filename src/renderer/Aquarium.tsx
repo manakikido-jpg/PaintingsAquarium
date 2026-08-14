@@ -59,6 +59,17 @@ export function Aquarium({
     // 起動時刻。これより後に取り込まれた絵だけを新入りとして演出する。
     const appStartedAt = Date.now()
 
+    /*
+     * 速度の実測用。既定では動かない。
+     * 開発中に `?measure` を付けて開いたときだけ、実際の fps を画面の隅に出す。
+     * canvas の描画命令は非同期に処理されるので、JS の経過時間を測っても 0ms に
+     * しかならず、なめらかさは分からない（R-012 の切り分けで判明）。
+     */
+    const measure =
+      typeof window !== 'undefined' && window.location.search.includes('measure')
+        ? { frames: 0, total: 0, last: 0 }
+        : null
+
     let scene: Scene | null = null
     let builtFor = { width: -1, height: -1, theme: '' }
 
@@ -179,6 +190,31 @@ export function Aquarium({
       }
 
       scene.drawFront(context, elapsed, strength)
+
+      if (measure) {
+        measure.frames++
+        // 実際に何コマ描けているかを測る。canvas の描画命令は非同期に処理されるので、
+        // JS の経過時間を測っても 0ms にしかならず、なめらかさは分からない。
+        if (measure.total === 0) measure.total = now
+        if (now - measure.total >= 2000) {
+          measure.last = (measure.frames * 1000) / (now - measure.total)
+          measure.frames = 0
+          measure.total = now
+        }
+        if (measure.last > 0) {
+          context.save()
+          context.fillStyle = 'rgba(0,0,0,0.6)'
+          context.fillRect(8, 8, 300, 34)
+          context.fillStyle = '#9fe8ff'
+          context.font = '16px monospace'
+          context.fillText(
+            `${measure.last.toFixed(1)} fps`,
+            16,
+            30,
+          )
+          context.restore()
+        }
+      }
 
       animationId = requestAnimationFrame(frame)
     }
