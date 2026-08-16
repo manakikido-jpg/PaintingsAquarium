@@ -232,3 +232,29 @@ describe('separateFish', () => {
     expect(withAvoidance).toBeLessThan(3)
   })
 })
+
+describe('絵の大きさ', () => {
+  /**
+   * 画面幅に対する割合で決めていることを固定する（R-015）。
+   * 固定ピクセルにすると、狭い画面では埋め尽くし、広い画面では点になる。
+   */
+  it('画面が広いほど絵も大きくなり、画面に対する割合は変わらない', () => {
+    const narrow = spawnFish(1, { width: 1280, height: 720 }, 800, 600)
+    const wide = spawnFish(1, { width: 3840, height: 2160 }, 800, 600)
+
+    expect(wide.width).toBeGreaterThan(narrow.width)
+    expect(wide.width / 3840).toBeCloseTo(narrow.width / 1280, 6)
+  })
+
+  it('50匹並べても画面を埋め尽くさない', () => {
+    const tank = { width: 1920, height: 1080 }
+    const area = Array.from({ length: 50 }, (_, seed) => spawnFish(seed, tank, 800, 600)).reduce(
+      (total, fish) => total + fish.width * fish.height,
+      0,
+    )
+
+    // 隙間より絵のほうが多くなる境目が「画面の半分」。
+    // 実測: 画面幅の 9% だと 54%（埋まる）、7% だと 33%（探せる）。
+    expect(area).toBeLessThan(tank.width * tank.height * 0.5)
+  })
+})

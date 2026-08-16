@@ -68,7 +68,7 @@ export function createCausticsLayer(
       context.globalAlpha = intensity * strength
       // 引き伸ばすときにぼかす。切っておくと網目が四角く割れて見える。
       context.imageSmoothingEnabled = true
-      context.imageSmoothingQuality = 'high'
+      context.imageSmoothingQuality = 'low'
       context.drawImage(canvas, 0, 0, tank.width, tank.height)
       context.restore()
     },

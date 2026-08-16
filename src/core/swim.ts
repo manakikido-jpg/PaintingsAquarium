@@ -84,7 +84,10 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
 
 
 export interface SpawnOptions {
-  /** 絵の長辺をこの長さに合わせる（ピクセル） */
+  /**
+   * 絵の長辺をこの長さに合わせる（ピクセル）。
+   * 既定は画面幅に対する割合で決まる（下記）。
+   */
   readonly targetSize?: number
   /** 泳ぐ速さの範囲（ピクセル/秒） */
   readonly minSpeed?: number
@@ -100,8 +103,16 @@ export function spawnFish(
   tank: Tank,
   imageWidth: number,
   imageHeight: number,
-  { targetSize = 180, minSpeed = 30, maxSpeed = 90 }: SpawnOptions = {},
+  options: SpawnOptions = {},
 ): Fish {
+  /*
+   * 絵の大きさは**画面幅に対する割合**で決める。
+   * 以前は 180px 固定にしていたが、それだと同じ 50 匹でも
+   * 画面が狭いと埋め尽くされ、広いと点にしか見えない。
+   * 実測（1280px 幅・50匹）では 180px 固定が画面を埋め、
+   * **自分の絵を探せない**状態になった（R-015）。
+   */
+  const { targetSize = tank.width * 0.07, minSpeed = 30, maxSpeed = 90 } = options
   const random = seededRandom(seed)
   const longestSide = Math.max(imageWidth, imageHeight, 1)
   const scale = targetSize / longestSide

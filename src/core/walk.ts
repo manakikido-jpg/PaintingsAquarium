@@ -89,8 +89,11 @@ export function spawnWalker(
   lanes: readonly Lane[],
   imageWidth: number,
   imageHeight: number,
-  { targetSize = 200, minSpeed = 22, maxSpeed = 62 }: SpawnWalkerOptions = {},
+  options: SpawnWalkerOptions = {},
 ): Walker {
+  // 泳ぐ側と同じ考え方。奥の列では列の倍率でさらに小さくなるので、
+  // 基準は少し大きめに取る（R-015）。
+  const { targetSize = tank.width * 0.085, minSpeed = 22, maxSpeed = 62 } = options
   const random = seededRandom(seed)
   const laneIndex = lanes.length === 0 ? 0 : Math.min(lanes.length - 1, Math.floor(random() * lanes.length))
   const lane = lanes[laneIndex]

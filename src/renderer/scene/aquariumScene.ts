@@ -73,7 +73,7 @@ export function createAquariumScene(tank: Tank): Scene {
       drawRocks(context, farRocks, sand, tank, 1, FAR_STYLE)
     },
     // ぼかしすぎると帆柱のような細い物が消える。効き目と消失の境目はここ。
-    { blur: Math.max(3, tank.width * 0.0032), resolution: 0.7 },
+    { blur: Math.max(3, tank.width * 0.0032), resolution: 1 },
   )
 
   const midLayer: BakedLayer | null = bakeLayer(
@@ -82,7 +82,7 @@ export function createAquariumScene(tank: Tank): Scene {
       drawRocks(context, midRocks, sand, tank, 1, MID_STYLE)
       drawShells(context, shells, sand, tank, 1, MID_STYLE)
     },
-    { blur: Math.max(1.5, tank.width * 0.002), resolution: 0.8 },
+    { blur: Math.max(1.5, tank.width * 0.002), resolution: 1 },
   )
 
   let backBubbles: Bubble[] = spawnBubbles(1207, BACK_BUBBLE_COUNT, tank, {

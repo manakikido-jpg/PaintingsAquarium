@@ -3,12 +3,15 @@ import { Aquarium } from './Aquarium'
 import { processPhoto } from './processImage'
 import type { IncomingPhoto, Notice, Piece, Settings } from '../shared/types'
 import { THEMES, themeOf, type ThemeId } from '../core/theme'
+import { GALLERY_PAGE_SIZE, galleryPage } from '../core/gallery'
 
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [pieces, setPieces] = useState<Piece[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
   const [panelOpen, setPanelOpen] = useState(false)
+  // 一覧に出している枚数。全件を一度に描くと会期後半に固まる（R-014）。
+  const [shown, setShown] = useState(GALLERY_PAGE_SIZE)
 
   // 取り込みは 1 枚ずつ順番に。同時に走らせると重い写真で画面が固まり、
   // 泳いでいる絵がカクつく（来場者から見えるのはそこ）。
@@ -68,7 +71,12 @@ export function App(): React.JSX.Element {
   // 常設すると大画面に管理用の要素が映り込み、来場者の視界に入る。
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 's' || event.key === 'S') setPanelOpen((open) => !open)
+      if (event.key === 's' || event.key === 'S') {
+        // 開くたびに先頭へ戻す。前回たくさん送った状態のまま開くと、
+        // 開いた瞬間にその枚数を描くことになり、固まる理由が残る。
+        setShown(GALLERY_PAGE_SIZE)
+        setPanelOpen((open) => !open)
+      }
       if (event.key === 'f' || event.key === 'F') void window.aquarium.toggleFullscreen()
     }
     window.addEventListener('keydown', onKeyDown)
@@ -225,6 +233,28 @@ export function App(): React.JSX.Element {
 
           <section>
             <label>
+              同時に泳ぐ数: {settings.maxVisible} 匹
+              <input
+                type="range"
+                min="10"
+                max="80"
+                step="5"
+                value={settings.maxVisible}
+                onChange={(event) =>
+                  void window.aquarium
+                    .updateSettings({ maxVisible: Number(event.target.value) })
+                    .then(setSettings)
+                }
+              />
+            </label>
+            <p className="note">
+              動きがカクつくときは減らしてください。描画の重さは枚数にほぼ比例します。
+              減らしても絵は消えません。画面に出るのが新しい順の指定数までになるだけです。
+            </p>
+          </section>
+
+          <section>
+            <label>
               背景の強さ: {settings.sceneryStrength.toFixed(2)}
               <input
                 type="range"
@@ -247,7 +277,7 @@ export function App(): React.JSX.Element {
 
           <section className="pieces">
             {pieces.length === 0 && <p className="note">まだ 1 枚も取り込んでいません。</p>}
-            {[...pieces].reverse().map((piece) => (
+            {galleryPage(pieces, shown).items.map((piece) => (
               <figure key={piece.id}>
                 <img src={`aqua://piece/${piece.id}`} alt={piece.fileName} />
                 <figcaption>{piece.fileName}</figcaption>
@@ -257,6 +287,17 @@ export function App(): React.JSX.Element {
               </figure>
             ))}
           </section>
+
+          {galleryPage(pieces, shown).remaining > 0 && (
+            <div className="row">
+              <span>
+                {galleryPage(pieces, shown).items.length} / {pieces.length} 枚を表示中
+              </span>
+              <button type="button" onClick={() => setShown((count) => count + GALLERY_PAGE_SIZE)}>
+                さらに {GALLERY_PAGE_SIZE} 枚
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

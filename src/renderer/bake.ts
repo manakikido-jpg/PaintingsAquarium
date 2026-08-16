@@ -49,7 +49,7 @@ export function bakeLayer(
       target.save()
       target.globalAlpha = alpha
       target.imageSmoothingEnabled = true
-      target.imageSmoothingQuality = 'high'
+      target.imageSmoothingQuality = 'low'
       target.drawImage(canvas, 0, 0, targetTank.width, targetTank.height)
       target.restore()
     },
