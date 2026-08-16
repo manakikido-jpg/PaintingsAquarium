@@ -32,57 +32,100 @@ import type { Tank } from '../core/swim'
  *    ただの黒い塗りが「立体の影」に変わる
  */
 
-/** 1つの奥行きの層の見え方。 */
+export type Rgb = readonly [number, number, number]
+
+/**
+ * サンゴの色。
+ *
+ * 最初は全部を黒い影絵にしていたが、狙っている見え方は**色鮮やかなサンゴ**だった。
+ * ただし子どもの絵と彩度で殴り合うと、どちらも死ぬ。
+ * ここは**絵より一段くすませた色**にしてあり、置き場所も画面の下に限っている。
+ * 絵が泳ぐ中央は、情報の少ない綺麗な青のまま残すこと。
+ */
+export const CORAL_COLOURS: readonly Rgb[] = [
+  [242, 108, 156], // 桃
+  [252, 160, 92], // 珊瑚
+  [250, 214, 108], // 山吹
+  [116, 224, 190], // 若草
+  [124, 186, 250], // 水
+  [186, 140, 246], // 藤
+]
+
+/** その層で色をどれだけ水に溶かすか、という設定。 */
 export interface DecorStyle {
-  /** 本体の色 `r, g, b` */
-  readonly body: string
-  /** 上側の色 `r, g, b`。本体より少し明るく、水の色寄りにする */
-  readonly lit: string
   /** 上面の光の縁の色（`rgba(...)` を丸ごと） */
   readonly rim: string
   /** 縁の太さ（ピクセル） */
   readonly rimWidth: number
-  /** 本体の濃さ 0〜1 */
+  /** 濃さ 0〜1 */
   readonly alpha: number
   /**
    * 輪郭のまわりに敷く薄い影の広がり（本体の大きさに対する倍率）。
    * 0 で無し。`filter: blur()` の代わりに輪郭の硬さを取るためのもの。
    */
   readonly halo: number
+  /** 水の色へ寄せる割合 0〜1。遠いほど大きい（空気遠近） */
+  readonly fade: number
+  /** 寄せる先の水の色 */
+  readonly water: Rgb
 }
 
-/** 手前（濃くはっきり）。 */
+/** その層の水の色。奥ほど明るい青に溶ける。 */
+const NEAR_WATER: Rgb = [12, 96, 156]
+const MID_WATER: Rgb = [16, 116, 180]
+const FAR_WATER: Rgb = [26, 142, 204]
+
+/** 手前（色がはっきり出る）。 */
 export const NEAR_STYLE: DecorStyle = {
-  body: '0, 9, 15',
-  lit: '36, 84, 110',
-  rim: 'rgba(126, 206, 240, 0.5)',
+  rim: 'rgba(226, 250, 255, 0.5)',
   rimWidth: 1.8,
-  alpha: 0.96,
+  alpha: 0.95,
   halo: 0.055,
+  fade: 0.16,
+  water: NEAR_WATER,
 }
 
 /** 中景。 */
 export const MID_STYLE: DecorStyle = {
-  body: '6, 28, 42',
-  lit: '34, 78, 102',
-  rim: 'rgba(126, 206, 240, 0.32)',
+  rim: 'rgba(214, 244, 255, 0.32)',
   rimWidth: 1.5,
-  alpha: 0.86,
+  alpha: 0.9,
   halo: 0.04,
+  fade: 0.42,
+  water: MID_WATER,
 }
 
-/** 遠景（薄く、水の色に近い）。 */
+/** 遠景（ほとんど水に溶ける）。 */
 export const FAR_STYLE: DecorStyle = {
-  body: '22, 62, 86',
-  lit: '46, 96, 124',
-  rim: 'rgba(140, 212, 244, 0.18)',
+  rim: 'rgba(206, 240, 255, 0.18)',
   rimWidth: 1.2,
-  alpha: 0.88,
+  alpha: 0.85,
   // 遠景は焼き付けるときに本物のぼかしを掛けるので、こちらは要らない
   halo: 0,
+  fade: 0.72,
+  water: FAR_WATER,
 }
 
-const SAND = '104, 142, 160'
+/** 2色を混ぜる。`t` が 1 で b になる。 */
+function mix(a: Rgb, b: Rgb, t: number): Rgb {
+  const k = Math.min(1, Math.max(0, t))
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * k),
+    Math.round(a[1] + (b[1] - a[1]) * k),
+    Math.round(a[2] + (b[2] - a[2]) * k),
+  ]
+}
+
+function rgb(colour: Rgb): string {
+  return `${colour[0]}, ${colour[1]}, ${colour[2]}`
+}
+
+/** その層で実際に使う色。空気遠近のぶんだけ水に溶かす。 */
+function coralColour(index: number, style: DecorStyle): Rgb {
+  return mix(CORAL_COLOURS[index % CORAL_COLOURS.length], style.water, style.fade)
+}
+
+const SAND = '196, 232, 245'
 
 /** 砂地の高さの列から、指定 X での高さを線形に求める。 */
 export function groundAt(profile: readonly number[], x: number, tank: Tank): number {
@@ -106,9 +149,9 @@ export function drawSand(
 
   const top = Math.min(...profile)
   const gradient = context.createLinearGradient(0, top, 0, tank.height)
-  gradient.addColorStop(0, `rgba(${SAND}, ${0.05 * strength})`)
-  gradient.addColorStop(0.4, `rgba(${SAND}, ${0.16 * strength})`)
-  gradient.addColorStop(1, `rgba(${SAND}, ${0.32 * strength})`)
+  gradient.addColorStop(0, `rgba(${SAND}, ${0.08 * strength})`)
+  gradient.addColorStop(0.4, `rgba(${SAND}, ${0.3 * strength})`)
+  gradient.addColorStop(1, `rgba(${SAND}, ${0.62 * strength})`)
 
   context.fillStyle = gradient
   context.beginPath()
@@ -149,6 +192,7 @@ function paintSilhouette(
   points: readonly Point[],
   style: DecorStyle,
   strength: number,
+  colour: Rgb,
   shade = 1,
 ): void {
   if (points.length === 0) return
@@ -180,7 +224,7 @@ function paintSilhouette(
     context.translate(centreX, bottom)
     context.scale(grow, grow)
     context.translate(-centreX, -bottom)
-    context.fillStyle = `rgba(${style.body}, ${style.alpha * shade * strength * 0.3})`
+    context.fillStyle = `rgba(${rgb(colour)}, ${style.alpha * shade * strength * 0.3})`
     tracePolygon(context, points)
     context.fill()
     context.restore()
@@ -194,13 +238,17 @@ function paintSilhouette(
   context.restore()
 
   const alpha = style.alpha * shade * strength
+  // 上は光が当たって明るく、下は水に沈んで暗い。単色だと切り絵に見える（R-011）。
+  const lit = mix(colour, [255, 255, 255], 0.3)
+  const deep = mix(colour, style.water, 0.55)
+
   if (bottom - top < 1) {
-    context.fillStyle = `rgba(${style.body}, ${alpha})`
+    context.fillStyle = `rgba(${rgb(colour)}, ${alpha})`
   } else {
     const shading = context.createLinearGradient(0, top, 0, bottom)
-    shading.addColorStop(0, `rgba(${style.lit}, ${alpha})`)
-    shading.addColorStop(0.55, `rgba(${style.body}, ${alpha})`)
-    shading.addColorStop(1, `rgba(${style.body}, ${alpha})`)
+    shading.addColorStop(0, `rgba(${rgb(lit)}, ${alpha})`)
+    shading.addColorStop(0.5, `rgba(${rgb(colour)}, ${alpha})`)
+    shading.addColorStop(1, `rgba(${rgb(deep)}, ${alpha})`)
     context.fillStyle = shading
   }
 
@@ -219,11 +267,15 @@ export function drawRocks(
   if (strength <= 0) return
 
   // 奥の岩から先に描く。手前の岩が奥に隠れると重なりがおかしく見える。
-  for (const rock of [...rocks].sort((a, b) => a.depth - b.depth)) {
+  const sorted = [...rocks].sort((a, b) => a.depth - b.depth)
+  sorted.forEach((rock, index) => {
     // 少し砂に埋める。砂の線にちょうど乗せると置物のように浮いて見える。
     const outline = rockOutline(rock, groundAt(profile, rock.x, tank) + rock.height * 0.08)
-    paintSilhouette(context, outline, style, strength, 0.85 + rock.depth * 0.15)
-  }
+    // 岩は色を持たせず、明るい砂色に寄せる。全部が原色だと下が騒がしくなる。
+    const stone = mix([214, 238, 250], style.water, style.fade * 0.8)
+    paintSilhouette(context, outline, style, strength, stone, 0.9 + rock.depth * 0.1)
+    void index
+  })
 }
 
 export function drawSeaweed(
@@ -237,9 +289,10 @@ export function drawSeaweed(
 ): void {
   if (strength <= 0) return
 
-  for (const weed of [...weeds].sort((a, b) => a.depth - b.depth)) {
+  const sorted = [...weeds].sort((a, b) => a.depth - b.depth)
+  sorted.forEach((weed, order) => {
     const nodes = seaweedShape(weed, timeSeconds, groundAt(profile, weed.baseX, tank) + 2)
-    if (nodes.length === 0) continue
+    if (nodes.length === 0) return
 
     // 節の列を、左側を上りながら・右側を下りながら 1 つの形にする。
     const points: Point[] = []
@@ -248,8 +301,10 @@ export function drawSeaweed(
       points.push({ x: nodes[index].x + nodes[index].halfWidth, y: nodes[index].y })
     }
 
-    paintSilhouette(context, points, style, strength, 0.82 + weed.depth * 0.18)
-  }
+    // 同じ株の葉は同じ色にする。1枚ずつ色が違うと、束ではなく寄せ集めに見える。
+    const cluster = Math.floor(order / 3)
+    paintSilhouette(context, points, style, strength, coralColour(cluster, style), 0.85 + weed.depth * 0.15)
+  })
 }
 
 /**
@@ -269,7 +324,8 @@ export function drawShipwreck(
   const groundY = groundAt(profile, wreck.x, tank)
   context.save()
   context.lineCap = 'round'
-  context.strokeStyle = `rgba(${style.body}, ${style.alpha * strength})`
+  const hullColour = mix([94, 122, 140], style.water, style.fade)
+  context.strokeStyle = `rgba(${rgb(hullColour)}, ${style.alpha * strength})`
 
   for (const mast of shipwreckMasts(wreck, groundY)) {
     context.lineWidth = mast.width
@@ -279,7 +335,7 @@ export function drawShipwreck(
     context.stroke()
   }
 
-  paintSilhouette(context, shipwreckHull(wreck, groundY), style, strength)
+  paintSilhouette(context, shipwreckHull(wreck, groundY), style, strength, hullColour)
   context.restore()
 }
 
@@ -295,13 +351,15 @@ export function drawShells(
   if (strength <= 0) return
 
   context.save()
-  for (const shell of [...shells].sort((a, b) => a.depth - b.depth)) {
+  const sorted = [...shells].sort((a, b) => a.depth - b.depth)
+  sorted.forEach((shell, order) => {
     const groundY = groundAt(profile, shell.x, tank)
     paintSilhouette(
       context,
       shellOutline(shell, groundY),
       style,
       strength,
+      coralColour(order + 2, style),
       0.85 + shell.depth * 0.15,
     )
 
@@ -317,6 +375,6 @@ export function drawShells(
       context.stroke()
     }
     context.restore()
-  }
+  })
   context.restore()
 }

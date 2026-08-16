@@ -112,18 +112,20 @@ export function createAquariumScene(tank: Tank): Scene {
     scale: 15,
     speed: 0.1,
     sharpness: 8,
-    topBias: 0.72,
-    intensity: 0.26,
-    tint: [112, 194, 232],
+    // 水面寄りに強く寄せる。画面全体に同じ強さで出すと、中央が騒がしくなり
+    // 絵より模様に目が行く。参考にした見え方も、中央は綺麗な青のままだった。
+    topBias: 0.88,
+    intensity: 0.24,
+    tint: [178, 236, 255],
   })
   const causticsNear = createCausticsLayer(tank, {
     resolution: 520,
     scale: 29,
     speed: 0.16,
     sharpness: 13,
-    topBias: 0.86,
-    intensity: 0.12,
-    tint: [168, 236, 255],
+    topBias: 0.94,
+    intensity: 0.1,
+    tint: [220, 250, 255],
   })
 
   let lastElapsed = 0
@@ -168,26 +170,11 @@ export function createAquariumScene(tank: Tank): Scene {
       // 列を持たないテーマなので何もしない
     },
 
-    /**
-     * 絵の後ろに置く淡い光。
-     * 背景を深く沈めたぶん、絵の輪郭が闇に溶けやすい。
-     * 後ろから薄く照らすと、絵そのものの色を変えずに浮かび上がる。
+    /*
+     * 絵の後ろの淡い光は入れていない。
+     * 背景が暗かったときは輪郭が闇に溶けるので必要だったが、
+     * 明るい水では**白く濁って絵の色が浅くなる**だけだった。
      */
-    drawBeneath(context, place, _laneIndex, strength) {
-      const radius = Math.max(place.width, place.height) * 0.85
-      const glow = context.createRadialGradient(place.x, place.y, 0, place.x, place.y, radius)
-      glow.addColorStop(0, `rgba(126, 214, 255, ${0.16 + 0.06 * strength})`)
-      glow.addColorStop(0.55, `rgba(96, 176, 220, ${0.06 + 0.03 * strength})`)
-      glow.addColorStop(1, 'rgba(96, 176, 220, 0)')
-
-      context.save()
-      context.globalCompositeOperation = 'lighter'
-      context.fillStyle = glow
-      context.beginPath()
-      context.arc(place.x, place.y, radius, 0, Math.PI * 2)
-      context.fill()
-      context.restore()
-    },
 
     drawFront(context, _elapsed, strength) {
       drawBubbles(context, frontBubbles, strength)

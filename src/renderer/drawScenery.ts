@@ -16,23 +16,26 @@ export function drawWater(
   strength: number,
 ): void {
   /*
-   * 深く沈んだ色にしている。以前はもっと明るい青だったが、
-   * それだと**背景のほうが子どもの絵より明るく**、絵が沈んで見えた。
-   * 映すのはモニターなので黒がきちんと沈む。暗くするほど絵が浮き上がる。
+   * 明るく鮮やかな青。一度は「高級感＝暗く」と解釈して真っ黒に近づけたが、
+   * 狙っている見え方（teamLab のお絵かき水族館）は**逆に明るく彩度の高い青**だった。
+   *
+   * 明るい背景でも絵が負けないのは、**中央を情報の少ない綺麗な青のまま**に保ち、
+   * 色数の多い飾りを画面の下に集めているから。
+   * ここを濁らせると、絵と背景がどちらも中途半端になる。
    */
   const gradient = context.createLinearGradient(0, 0, 0, tank.height)
-  gradient.addColorStop(0, '#073246')
-  gradient.addColorStop(0.3, '#04202f')
-  gradient.addColorStop(0.7, '#02131e')
-  gradient.addColorStop(1, '#00070c')
+  gradient.addColorStop(0, '#1ea2e0')
+  gradient.addColorStop(0.32, '#0f7cc2')
+  gradient.addColorStop(0.68, '#0a5695')
+  gradient.addColorStop(1, '#063a6f')
   context.fillStyle = gradient
   context.fillRect(0, 0, tank.width, tank.height)
 
   // 水面の明るい帯。画面の上端が「水の中の上のほう」に見えるようにする。
   const surfaceHeight = Math.min(tank.height * 0.22, 260)
   const surface = context.createLinearGradient(0, 0, 0, surfaceHeight)
-  surface.addColorStop(0, `rgba(120, 214, 245, ${0.2 * strength})`)
-  surface.addColorStop(1, 'rgba(120, 214, 245, 0)')
+  surface.addColorStop(0, `rgba(190, 240, 255, ${0.34 * strength})`)
+  surface.addColorStop(1, 'rgba(190, 240, 255, 0)')
   context.fillStyle = surface
   context.fillRect(0, 0, tank.width, surfaceHeight)
 }
@@ -97,9 +100,9 @@ export function drawLightRays(
  * 両方を強く出すと、光の情報が多すぎて絵が埋もれる。
  */
 const RAY_LAYERS = [
-  { widthScale: 2.6, alphaScale: 0.16 },
-  { widthScale: 1.4, alphaScale: 0.18 },
-  { widthScale: 0.7, alphaScale: 0.2 },
+  { widthScale: 2.6, alphaScale: 0.2 },
+  { widthScale: 1.4, alphaScale: 0.24 },
+  { widthScale: 0.7, alphaScale: 0.26 },
 ] as const
 
 /**
@@ -122,8 +125,8 @@ export function drawVignette(
     tank.height / 2,
     radius,
   )
-  gradient.addColorStop(0, 'rgba(0, 6, 11, 0)')
-  gradient.addColorStop(1, `rgba(0, 6, 11, ${0.55 * strength})`)
+  gradient.addColorStop(0, 'rgba(4, 44, 78, 0)')
+  gradient.addColorStop(1, `rgba(4, 44, 78, ${0.3 * strength})`)
   context.fillStyle = gradient
   context.fillRect(0, 0, tank.width, tank.height)
 }
