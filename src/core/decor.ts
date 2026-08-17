@@ -408,3 +408,93 @@ export function shipwreckMasts(wreck: Shipwreck, groundY: number): WreckMast[] {
     { from: place({ x: 0.5, y: -0.8 }), to: place({ x: 0.95, y: -1.05 }), width: thick * 0.7 },
   ]
 }
+
+// ---------------------------------------------------------------- 枝サンゴ
+
+export interface Coral {
+  readonly x: number
+  readonly height: number
+  /** 幹の根元の太さ（半分） */
+  readonly halfWidth: number
+  /** 枝が分かれる回数 */
+  readonly depthLevels: number
+  readonly depth: number
+  readonly seed: number
+  /** 何番目の色を使うか */
+  readonly colour: number
+}
+
+export function spawnCorals(seed: number, count: number, tank: Tank, avoid?: Span): Coral[] {
+  const random = seededRandom(seed)
+  const corals: Coral[] = []
+
+  for (let index = 0; index < count; index++) {
+    const slot = (index + 0.5) / count + (random() - 0.5) * 0.85 / count
+    const depth = random()
+    corals.push({
+      x: tank.width * placeOutside(slot, avoid),
+      // 海藻より低く抑える。高いと絵の泳ぐ範囲に食い込む。
+      height: tank.height * (0.07 + depth * 0.09 + random() * 0.04),
+      halfWidth: tank.width * (0.004 + random() * 0.004),
+      depthLevels: 3 + Math.floor(random() * 2),
+      depth,
+      seed: Math.floor(random() * 100000) + 1,
+      colour: Math.floor(random() * 6),
+    })
+  }
+
+  return corals
+}
+
+export interface CoralBranch {
+  readonly from: Point
+  readonly to: Point
+  readonly width: number
+  /** 0（根元）〜1（先端）。先ほど明るく描くために使う */
+  readonly level: number
+}
+
+/**
+ * 枝サンゴの枝。
+ *
+ * 海藻（葉が上へ伸びるだけ）と違い、**分かれること**が形の要。
+ * 分かれない形にすると海藻と見分けがつかず、種類を増やした意味が無くなる。
+ * 枝ごとに角度を変え、上へ行くほど短く細くする。
+ */
+export function coralBranches(coral: Coral, groundY: number): CoralBranch[] {
+  const random = seededRandom(coral.seed)
+  const branches: CoralBranch[] = []
+
+  const grow = (
+    from: Point,
+    angle: number,
+    length: number,
+    width: number,
+    level: number,
+  ): void => {
+    const to: Point = {
+      x: from.x + Math.sin(angle) * length,
+      y: from.y - Math.cos(angle) * length,
+    }
+    branches.push({ from, to, width, level: level / coral.depthLevels })
+
+    if (level >= coral.depthLevels) return
+
+    // 2〜3 本に分かれる。毎回2本だと左右対称の作り物に見える。
+    const children = random() < 0.45 ? 3 : 2
+    for (let index = 0; index < children; index++) {
+      const spread = (index / Math.max(1, children - 1) - 0.5) * (0.9 + random() * 0.5)
+      grow(to, angle + spread, length * (0.62 + random() * 0.16), width * 0.68, level + 1)
+    }
+  }
+
+  grow(
+    { x: coral.x, y: groundY },
+    (random() - 0.5) * 0.3,
+    coral.height * 0.42,
+    coral.halfWidth * 2,
+    1,
+  )
+
+  return branches
+}

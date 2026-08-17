@@ -32,6 +32,11 @@ export interface Settings {
   readonly sceneryStrength: number
   /** どの世界で見せるか */
   readonly theme: ThemeId
+  /**
+   * 飾りの多さ。1 で標準。大きいほどサンゴや岩が増える。
+   * 増やすほど画面は賑やかになるが、**絵を見つけにくくなる**ので上げすぎない。
+   */
+  readonly decorDensity: number
 }
 
 /** 取り込みフォルダで見つかった、これから処理する写真。 */

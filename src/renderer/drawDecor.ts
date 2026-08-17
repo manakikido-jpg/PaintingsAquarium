@@ -1,10 +1,12 @@
 import {
+  coralBranches,
   rockOutline,
   seaweedShape,
   shellOutline,
   shellRidges,
   shipwreckHull,
   shipwreckMasts,
+  type Coral,
   type Point,
   type Rock,
   type Seaweed,
@@ -376,5 +378,45 @@ export function drawShells(
     }
     context.restore()
   })
+  context.restore()
+}
+
+/**
+ * 枝サンゴ。
+ *
+ * 枝を線で描き、先端ほど明るくしている。
+ * 全部同じ色で塗ると枝の重なりが潰れて、ただの塊に見える。
+ */
+export function drawCorals(
+  context: CanvasRenderingContext2D,
+  corals: readonly Coral[],
+  profile: readonly number[],
+  tank: Tank,
+  strength: number,
+  style: DecorStyle = NEAR_STYLE,
+): void {
+  if (strength <= 0) return
+
+  context.save()
+  context.lineCap = 'round'
+  context.lineJoin = 'round'
+
+  for (const coral of [...corals].sort((a, b) => a.depth - b.depth)) {
+    const groundY = groundAt(profile, coral.x, tank)
+    const base = coralColour(coral.colour, style)
+    const alpha = style.alpha * (0.82 + coral.depth * 0.18) * strength
+
+    for (const branch of coralBranches(coral, groundY)) {
+      // 先端へ向かって白を混ぜる。日の当たる先のほうが明るいサンゴの見え方に合う。
+      const colour = mix(base, [255, 255, 255], branch.level * 0.35)
+      context.strokeStyle = `rgba(${rgb(colour)}, ${alpha})`
+      context.lineWidth = Math.max(1, branch.width)
+      context.beginPath()
+      context.moveTo(branch.from.x, branch.from.y)
+      context.lineTo(branch.to.x, branch.to.y)
+      context.stroke()
+    }
+  }
+
   context.restore()
 }

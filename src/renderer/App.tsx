@@ -105,6 +105,7 @@ export function App(): React.JSX.Element {
         pieces={visible}
         theme={settings?.theme ?? 'aquarium'}
         sceneryStrength={settings?.sceneryStrength ?? 1}
+        decorDensity={settings?.decorDensity ?? 2}
       />
 
       {settings && settings.watchFolder !== null && forTheme.length === 0 && pieces.length > 0 && (
@@ -269,6 +270,26 @@ export function App(): React.JSX.Element {
                 }
               />
             </label>
+            <label>
+              飾りの多さ: {settings.decorDensity.toFixed(1)} 倍
+              <input
+                type="range"
+                min="0.4"
+                max="2.4"
+                step="0.2"
+                value={settings.decorDensity}
+                onChange={(event) =>
+                  void window.aquarium
+                    .updateSettings({ decorDensity: Number(event.target.value) })
+                    .then(setSettings)
+                }
+              />
+            </label>
+            <p className="note">
+              サンゴ・岩・貝の数です。増やすほど賑やかになりますが、
+              絵を見つけにくくなります。飾りは画面の下にだけ増えます。
+            </p>
+
             <p className="note">
               光の筋や泡が絵より目立つときは下げてください。0 にすると無地になります。
               こちらは動かした瞬間に反映されます。

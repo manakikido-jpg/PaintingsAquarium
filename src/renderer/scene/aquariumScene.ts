@@ -3,14 +3,17 @@ import {
   shipwreckSpan,
   spawnRocks,
   spawnSeaweed,
+  spawnCorals,
   spawnShells,
   spawnShipwreck,
+  type Coral,
   type Rock,
   type Seaweed,
 } from '../../core/decor'
 import { spawnBubbles, spawnRays, stepBubble, type Bubble } from '../../core/scenery'
 import { drawBubbles, drawLightRays, drawVignette, drawWater } from '../drawScenery'
 import {
+  drawCorals,
   drawRocks,
   drawSand,
   drawSeaweed,
@@ -29,21 +32,31 @@ const RAY_COUNT = 7
 // 手前の泡は絵に重なるので少なく、奥は多めに。奥行きを出すため。
 const BACK_BUBBLE_COUNT = 26
 const FRONT_BUBBLE_COUNT = 8
+/*
+ * 飾りの基準の数。実際にはここに「飾りの多さ」の設定を掛ける。
+ *
+ * 増やすほど賑やかになるが、**画面の中央まで増やしてはいけない**。
+ * 絵が泳ぐのは中央で、そこが混むと自分の絵を見つけられなくなる。
+ * 増えるぶんは画面の下に積む（それぞれの `spawn` が下に置くようになっている）。
+ */
 const ROCK_COUNT = 9
-const SHELL_COUNT = 5
+const SHELL_COUNT = 6
+const CORAL_COUNT = 9
 // 「株」の数。1 株から数枚の葉が生える。
 const SEAWEED_COUNT = 10
 
 /** 水族館。絵は水中を自由に泳ぐので、奥行きの列は持たない。 */
-export function createAquariumScene(tank: Tank): Scene {
+export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
+  const many = (base: number): number => Math.max(1, Math.round(base * decorDensity))
   const rays = spawnRays(20260812, RAY_COUNT, tank)
   const sand = sandProfile(4471, tank)
   const wreck = spawnShipwreck(tank)
   // 沈没船の前には生やさない。重ねると輪郭が消えて塊になる（R-006）。
   const wreckSpan = shipwreckSpan(wreck, tank)
-  const allRocks = spawnRocks(8823, ROCK_COUNT, tank, wreckSpan)
-  const allSeaweed = spawnSeaweed(5507, SEAWEED_COUNT, tank, wreckSpan)
-  const shells = spawnShells(6619, SHELL_COUNT, tank)
+  const allRocks = spawnRocks(8823, many(ROCK_COUNT), tank, wreckSpan)
+  const allSeaweed = spawnSeaweed(5507, many(SEAWEED_COUNT), tank, wreckSpan)
+  const shells = spawnShells(6619, many(SHELL_COUNT), tank)
+  const allCorals = spawnCorals(3271, many(CORAL_COUNT), tank, wreckSpan)
 
   /*
    * 飾りを奥行きで3つに分ける。
@@ -58,6 +71,9 @@ export function createAquariumScene(tank: Tank): Scene {
   const nearRocks: Rock[] = pick(allRocks, 0.72, 1.01)
   const farSeaweed: Seaweed[] = pick(allSeaweed, 0, 0.45)
   const nearSeaweed: Seaweed[] = pick(allSeaweed, 0.45, 1.01)
+  const farCorals: Coral[] = pick(allCorals, 0, 0.4)
+  const midCorals: Coral[] = pick(allCorals, 0.4, 0.72)
+  const nearCorals: Coral[] = pick(allCorals, 0.72, 1.01)
 
   /*
    * 遠景と中景は動かないので、起動時に 1 回だけ焼いておく。
@@ -70,6 +86,7 @@ export function createAquariumScene(tank: Tank): Scene {
     (context) => {
       drawShipwreck(context, wreck, sand, tank, 1, FAR_STYLE)
       drawSeaweed(context, farSeaweed, sand, tank, 0, 1, FAR_STYLE)
+      drawCorals(context, farCorals, sand, tank, 1, FAR_STYLE)
       drawRocks(context, farRocks, sand, tank, 1, FAR_STYLE)
     },
     // ぼかしすぎると帆柱のような細い物が消える。効き目と消失の境目はここ。
@@ -80,6 +97,7 @@ export function createAquariumScene(tank: Tank): Scene {
     tank,
     (context) => {
       drawRocks(context, midRocks, sand, tank, 1, MID_STYLE)
+      drawCorals(context, midCorals, sand, tank, 1, MID_STYLE)
       drawShells(context, shells, sand, tank, 1, MID_STYLE)
     },
     { blur: Math.max(1.5, tank.width * 0.002), resolution: 1 },
@@ -160,6 +178,8 @@ export function createAquariumScene(tank: Tank): Scene {
        *（`drawDecor` の halo）。こちらは塗りが1回増えるだけで費用は無視できる。
        */
       drawSeaweed(context, nearSeaweed, sand, tank, elapsed, strength, NEAR_STYLE)
+      // 枝サンゴは動かないので、揺れる海藻のあとに重ねる
+      drawCorals(context, nearCorals, sand, tank, strength, NEAR_STYLE)
       drawRocks(context, nearRocks, sand, tank, strength, NEAR_STYLE)
 
       drawVignette(context, tank, strength)

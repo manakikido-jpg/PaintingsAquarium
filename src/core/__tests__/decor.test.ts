@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  coralBranches,
   placeOutside,
   rockOutline,
   sandProfile,
@@ -11,6 +12,7 @@ import {
   shipwreckSpan,
   spawnRocks,
   spawnSeaweed,
+  spawnCorals,
   spawnShells,
   spawnShipwreck,
 } from '../decor'
@@ -357,5 +359,48 @@ describe('葉の開き', () => {
 
     expect(Math.abs(nodes[0].x - weed.baseX)).toBeLessThan(1)
     expect(Math.abs(nodes[nodes.length - 1].x - weed.baseX)).toBeGreaterThan(1)
+  })
+})
+
+describe('枝サンゴ', () => {
+  const groundY = 900
+
+  it('同じ種なら必ず同じ形になる', () => {
+    const coral = spawnCorals(21, 4, tank)[0]
+    expect(coralBranches(coral, groundY)).toEqual(coralBranches(coral, groundY))
+  })
+
+  it('根元は砂に接する', () => {
+    const coral = spawnCorals(21, 4, tank)[0]
+    expect(coralBranches(coral, groundY)[0].from).toEqual({ x: coral.x, y: groundY })
+  })
+
+  it('枝が分かれる（海藻と見分けがつく形になる）', () => {
+    for (const coral of spawnCorals(21, 4, tank)) {
+      expect(coralBranches(coral, groundY).length).toBeGreaterThan(6)
+    }
+  })
+
+  it('上へ行くほど細くなる', () => {
+    const branches = coralBranches(spawnCorals(21, 4, tank)[0], groundY)
+    const root = branches[0]
+    const tips = branches.filter((branch) => branch.level >= 1)
+
+    expect(tips.length).toBeGreaterThan(0)
+    for (const tip of tips) expect(tip.width).toBeLessThan(root.width)
+  })
+
+  it('砂より上に伸び、絵の泳ぐ範囲を埋めない', () => {
+    for (const coral of spawnCorals(21, 6, tank)) {
+      const branches = coralBranches(coral, groundY)
+      const highest = Math.min(...branches.map((branch) => Math.min(branch.from.y, branch.to.y)))
+
+      expect(highest).toBeLessThan(groundY)
+      expect(groundY - highest).toBeLessThan(tank.height * 0.25)
+    }
+  })
+
+  it('0 本でも落ちない', () => {
+    expect(spawnCorals(21, 0, tank)).toEqual([])
   })
 })

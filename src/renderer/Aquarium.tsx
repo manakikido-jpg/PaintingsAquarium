@@ -32,10 +32,12 @@ export function Aquarium({
   pieces,
   theme,
   sceneryStrength,
+  decorDensity,
 }: {
   pieces: Piece[]
   theme: ThemeId
   sceneryStrength: number
+  decorDensity: number
 }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const swimmersRef = useRef<Map<string, Swimmer>>(new Map())
@@ -46,6 +48,8 @@ export function Aquarium({
   strengthRef.current = sceneryStrength
   const themeRef = useRef(theme)
   themeRef.current = theme
+  const densityRef = useRef(decorDensity)
+  densityRef.current = decorDensity
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -71,7 +75,7 @@ export function Aquarium({
         : null
 
     let scene: Scene | null = null
-    let builtFor = { width: -1, height: -1, theme: '' }
+    let builtFor = { width: -1, height: -1, theme: '', density: -1 }
 
     const resize = (): void => {
       // 4K の大画面でぼやけないように、実画素に合わせる。
@@ -88,12 +92,17 @@ export function Aquarium({
      * 毎フレーム作ると、泡や煙が進まず場所だけ変わってちらつく。
      * テーマが変わったら、動き方も変わるので絵も置き直す。
      */
-    const rebuild = (tank: Tank, theme: ThemeId): boolean => {
-      if (builtFor.width === tank.width && builtFor.height === tank.height && builtFor.theme === theme) {
+    const rebuild = (tank: Tank, theme: ThemeId, density: number): boolean => {
+      if (
+        builtFor.width === tank.width &&
+        builtFor.height === tank.height &&
+        builtFor.theme === theme &&
+        builtFor.density === density
+      ) {
         return false
       }
-      builtFor = { width: tank.width, height: tank.height, theme }
-      scene = createScene(theme, tank)
+      builtFor = { width: tank.width, height: tank.height, theme, density }
+      scene = createScene(theme, tank, density)
       swimmersRef.current.clear()
       return true
     }
@@ -106,7 +115,7 @@ export function Aquarium({
 
       const tank: Tank = { width: canvas.clientWidth, height: canvas.clientHeight }
       const strength = strengthRef.current
-      rebuild(tank, themeRef.current)
+      rebuild(tank, themeRef.current, densityRef.current)
       if (!scene) {
         animationId = requestAnimationFrame(frame)
         return

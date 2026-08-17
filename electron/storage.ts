@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   maxVisible: 50,
   sceneryStrength: 1,
   theme: DEFAULT_THEME,
+  decorDensity: 2,
 }
 
 export function dataRoot(): string {

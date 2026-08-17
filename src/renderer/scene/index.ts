@@ -9,11 +9,11 @@ import { createDinosaurScene } from './dinosaurScene'
  * まだ作っていないテーマ（宇宙・森・夜空）は水族館で代用する。
  * 設定画面では選べないようにしてあるので、通常は起きない。
  */
-export function createScene(theme: ThemeId, tank: Tank): Scene {
+export function createScene(theme: ThemeId, tank: Tank, decorDensity = 1): Scene {
   switch (theme) {
     case 'dinosaur':
       return createDinosaurScene(tank)
     default:
-      return createAquariumScene(tank)
+      return createAquariumScene(tank, decorDensity)
   }
 }
