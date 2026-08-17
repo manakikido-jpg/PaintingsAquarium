@@ -4,10 +4,27 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { decideIngest } from '../src/core/ingest'
-import type { IncomingPhoto, Notice, SavePieceInput, Settings } from '../src/shared/types'
+import { PORTABLE_DATA_FOLDER, portableBaseDir } from '../src/core/portable'
+import type {
+  IncomingPhoto,
+  Notice,
+  SavePieceInput,
+  Settings,
+  StorageLocation,
+} from '../src/shared/types'
 import * as storage from './storage'
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
+
+/*
+ * 保存先の決定は、ほかのどの処理より先にやる。
+ * `app.getPath('userData')` を一度でも読んだあとに `setPath` すると、
+ * 先に読んだ側だけが AppData を見る形になり、絵の保存先が二手に分かれる。
+ */
+const portableBase = portableBaseDir(process.env)
+if (portableBase !== null) {
+  app.setPath('userData', path.join(portableBase, PORTABLE_DATA_FOLDER))
+}
 
 // 保存した絵を <img> から読むための独自スキーム。
 // 全件を base64 で画面へ送ると、会期が進むほど起動が重くなるため。
@@ -128,6 +145,16 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('aquarium:getSettings', () => storage.readSettings())
+
+  /*
+   * 絵がどこに入っているかを設定画面に出す。
+   * インストール版とポータブル版で保存先が別なので、これを出さないと
+   * 「別PCに移したら絵が消えた」ときに、運営者が自力で追えない。
+   */
+  ipcMain.handle(
+    'aquarium:getStorageLocation',
+    (): StorageLocation => ({ dataRoot: storage.dataRoot(), portable: portableBase !== null }),
+  )
 
   ipcMain.handle('aquarium:updateSettings', (_event, patch: Partial<Settings>) => {
     const next = storage.writeSettings(patch)

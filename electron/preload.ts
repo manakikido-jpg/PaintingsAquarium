@@ -9,6 +9,7 @@ import type {
 
 const api: AquariumApi = {
   getSettings: () => ipcRenderer.invoke('aquarium:getSettings'),
+  getStorageLocation: () => ipcRenderer.invoke('aquarium:getStorageLocation'),
   updateSettings: (patch: Partial<Settings>) => ipcRenderer.invoke('aquarium:updateSettings', patch),
   chooseWatchFolder: () => ipcRenderer.invoke('aquarium:chooseWatchFolder'),
   listPieces: () => ipcRenderer.invoke('aquarium:listPieces'),

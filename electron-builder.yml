@@ -21,9 +21,19 @@ win:
   target:
     - target: nsis
       arch: [x64]
+    # 会場PCにインストールできない（管理者に止められている・借り物）ことがあるので、
+    # exe 1個で動く版も一緒に作る。USB に入れて別PCへ持って行けるようにするため。
+    - target: portable
+      arch: [x64]
   # 署名証明書は買っていない。未署名なので SmartScreen の警告が出る。
   # 会場PC1台に対して年数万円の証明書は見合わないと判断した（要件定義 §8）。
   signAndEditExecutable: true
+
+portable:
+  # 既定名は「PaintingsAquarium 0.1.0.exe」で、インストーラの
+  # 「PaintingsAquarium Setup 0.1.0.exe」と 1 語しか違わない。
+  # 会場で取り違えると原因が分かりにくいので、はっきり分ける。
+  artifactName: PaintingsAquarium-${version}-portable.${ext}
 
 nsis:
   oneClick: false

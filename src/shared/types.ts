@@ -57,6 +57,13 @@ export interface SavePieceInput {
   readonly theme: ThemeId
 }
 
+/** 絵と設定の保存先。別PCへ移すときに運営者がコピーする場所。 */
+export interface StorageLocation {
+  readonly dataRoot: string
+  /** インストールせずに exe をそのまま動かしている（保存先も exe の隣） */
+  readonly portable: boolean
+}
+
 /** 画面下に出す通知。取り込めなかった理由もここに流す。 */
 export interface Notice {
   readonly level: 'info' | 'warn'
@@ -65,6 +72,7 @@ export interface Notice {
 
 export interface AquariumApi {
   getSettings(): Promise<Settings>
+  getStorageLocation(): Promise<StorageLocation>
   updateSettings(patch: Partial<Settings>): Promise<Settings>
   chooseWatchFolder(): Promise<Settings>
   listPieces(): Promise<Piece[]>

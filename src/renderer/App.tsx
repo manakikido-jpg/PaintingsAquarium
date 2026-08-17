@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Aquarium } from './Aquarium'
 import { processPhoto } from './processImage'
-import type { IncomingPhoto, Notice, Piece, Settings } from '../shared/types'
+import type { IncomingPhoto, Notice, Piece, Settings, StorageLocation } from '../shared/types'
 import { THEMES, themeOf, type ThemeId } from '../core/theme'
 import { GALLERY_PAGE_SIZE, galleryPage } from '../core/gallery'
 
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null)
+  const [storage, setStorage] = useState<StorageLocation | null>(null)
   const [pieces, setPieces] = useState<Piece[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
   const [panelOpen, setPanelOpen] = useState(false)
@@ -26,6 +27,7 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     void window.aquarium.getSettings().then(setSettings)
+    void window.aquarium.getStorageLocation().then(setStorage)
     void window.aquarium.listPieces().then(setPieces)
   }, [])
 
@@ -199,6 +201,25 @@ export function App(): React.JSX.Element {
               <strong>{todayCount} 枚</strong>
               <span>（全部で {pieces.length} 枚）</span>
             </div>
+            {storage && (
+              <>
+                <div className="row">
+                  <span>絵の保存先</span>
+                  <code>{storage.dataRoot}</code>
+                </div>
+                <p className="note">
+                  {storage.portable
+                    ? 'この版は「持ち運び版」です。exe の隣のフォルダに絵が入るので、'
+                    : 'この版は「インストール版」です。絵はこのPCの中に入るので、'}
+                  別のPCへ移すときは、
+                  {storage.portable
+                    ? 'フォルダごとコピーすれば絵もそのまま移せます。'
+                    : '上のフォルダを丸ごとコピーして、移した先の同じ場所に置いてください。'}
+                  <br />
+                  取り込みフォルダの写真さえ残っていれば、入れ直すだけでもやり直せます。
+                </p>
+              </>
+            )}
           </section>
 
           <section>

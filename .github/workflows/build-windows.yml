@@ -1,0 +1,45 @@
+# Windows 版を GitHub の Windows マシンで作り、ダウンロードできる形で置く。
+#
+# 会場PCや予備機に Node.js を入れなくても、ブラウザから exe を落として
+# 持って行けるようにするのが目的。開発は Linux なので、
+# ここが「Windows で作った exe」を得られる唯一の場所でもある。
+#
+# アプリ自体は完全オフラインで動く（要件定義 §4）。
+# ここでの通信はビルドのためだけで、アプリに外部通信は入らない。
+name: Windows ビルド
+
+on:
+  push:
+    branches:
+      - main
+      - claude/product-dev-guidelines-85ic9x
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # exe を作る前に落とす。壊れたものを配らないため。
+      - run: npm test
+
+      # dist:win の中で typecheck と build も走る
+      - run: npm run dist:win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PaintingsAquarium-windows
+          path: |
+            release/*.exe
+          # 会期をまたいで取りに来られるだけの余裕を持たせる
+          retention-days: 60
+          if-no-files-found: error
