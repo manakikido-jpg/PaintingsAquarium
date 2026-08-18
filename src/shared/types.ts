@@ -1,6 +1,7 @@
 import type { CutoutOptions } from '../core/cutout'
 import type { ThemeId } from '../core/theme'
 import type { Rig } from '../core/rig'
+import type { SpeciesId } from '../core/templates'
 
 /** 水槽を泳いでいる絵 1 枚。 */
 export interface Piece {
@@ -23,6 +24,11 @@ export interface Piece {
    *（`docs/設計-AI.md`）。古い絵には入っていない。
    */
   readonly rig?: Rig
+  /**
+   * どの台紙の絵か。台紙に一致しなかった絵（自由に描いた絵）には入らない。
+   * 種類ごとの動きに使う（`docs/設計-生き物ごとの動き.md`）。
+   */
+  readonly species?: SpeciesId
 }
 
 export interface Settings {
@@ -75,6 +81,7 @@ export interface SavePieceInput {
   readonly pngBase64: string
   readonly theme: ThemeId
   readonly rig?: Rig
+  readonly species?: SpeciesId
 }
 
 /** 絵と設定の保存先。別PCへ移すときに運営者がコピーする場所。 */

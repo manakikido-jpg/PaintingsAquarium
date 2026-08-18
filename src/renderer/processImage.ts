@@ -10,6 +10,7 @@ import { trimTransparent } from '../core/trim'
 import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
 import { orientForSwimming, type Rig } from '../core/rig'
+import { identifySpecies, type SpeciesId } from '../core/templates'
 
 /**
  * 切り抜きは画素数に比例して重い。会場の PC で 1 日 200 枚を捌くので、
@@ -32,6 +33,11 @@ export type ProcessResult =
       turned: boolean
       /** 実際に使ったしきい値。自動で選んだ値を運営者が見られるようにする */
       paperValue: number
+      /**
+       * どの台紙の絵か。台紙に一致しなければ undefined（自由に描いた絵）。
+       * 種類ごとの動きに使う（`docs/設計-生き物ごとの動き.md`）。
+       */
+      species?: SpeciesId
     }
   | { ok: false; message: string }
 
@@ -133,6 +139,20 @@ export async function processPhoto(
    */
   const oriented = orientForSwimming(trimmed.image)
 
+  /*
+   * どの台紙の絵かを見分ける。
+   *
+   * **向きを直したあとに見分ける。** 保存する絵と向きが揃っていないと、
+   * 「頭が右か」の答えがずれる。
+   * 一致したら、頭の向きは推定ではなく**台紙の正解**を使う。
+   * 形から当てる推定は、当たらないことがある（R-030）。
+   */
+  const found = identifySpecies(oriented.image)
+  const rig: Rig =
+    found && found.headsRight !== null
+      ? { ...oriented.rig, headsRight: found.headsRight, headKnown: true }
+      : oriented.rig
+
   const blob = await new Promise<Blob | null>((resolve) =>
     toCanvas(oriented.image).toBlob(resolve, 'image/png'),
   )
@@ -148,8 +168,9 @@ export async function processPhoto(
     width: oriented.image.width,
     height: oriented.image.height,
     touchedBorder,
-    rig: oriented.rig,
+    rig,
     turned: oriented.turns !== 0 || oriented.flipped,
     paperValue: chosen,
+    species: found?.id,
   }
 }

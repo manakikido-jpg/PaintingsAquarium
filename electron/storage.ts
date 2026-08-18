@@ -101,6 +101,7 @@ export function savePiece(input: SavePieceInput): Piece {
     createdAt: new Date().toISOString(),
     theme: input.theme,
     rig: input.rig,
+    species: input.species,
   }
 
   writeJsonAtomic(indexPath(), [...readPieces(), piece])

@@ -71,6 +71,7 @@ export function App(): React.JSX.Element {
           // その会期の絵だけを出せるようにするため。
           theme: current.theme,
           rig: result.rig,
+          species: result.species,
         })
         setPieces((current) => [...current, piece])
       })
