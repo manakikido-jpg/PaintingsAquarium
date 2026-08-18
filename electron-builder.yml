@@ -19,6 +19,11 @@ files:
 #
 # ここを書いておくと、ビルド時に latest.yml も作られる。
 # 更新の仕組みは、その latest.yml を見て新しい版かどうかを判断する。
+#
+# **ビルドでは公開しない**（`dist:win` に `--publish never` を付けてある）。
+# これを外すと electron-builder が自分で公開しようとし、
+# トークンが無くてビルドごと落ちる（実際に落ちた）。
+# 置き場への上書きは Actions 側でやる。
 publish:
   provider: github
   owner: manakikido-jpg
