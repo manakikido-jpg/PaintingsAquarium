@@ -103,6 +103,7 @@ export function savePiece(input: SavePieceInput): Piece {
     rig: input.rig,
     species: input.species,
     head: input.head,
+    fit: input.fit,
   }
 
   writeJsonAtomic(indexPath(), [...readPieces(), piece])

@@ -21,6 +21,13 @@ import {
   tailAngle,
 } from '../core/undulate'
 import { headIsKnown, rigIsUsable, type CreatureKind } from '../core/rig'
+import { partsForPiece } from '../core/templates'
+
+/**
+ * 手足を漕ぐ速さ（ラジアン/秒）。
+ * 速いと機械的に見え、遅いと止まって見える。1周 2 秒弱になる値にした。
+ */
+const LIMB_SPEED = 3.4
 import type { ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
@@ -258,7 +265,49 @@ export function Aquarium({
         const left = -place.width / 2
         const top = -place.height / 2
 
-        if (strips <= 1 || (!headKnown && !drifts)) {
+        /*
+         * 手足のある生き物（タコ・ウミガメ）は、絵を矩形に分けて
+         * 一部だけを回して描く。分割なので同じ画素を2度描かない。
+         * 手足の形に切り抜く（`clip()`）のは使えない（3匹で 0.3fps・R-022）。
+         */
+        const limbs = partsForPiece(
+          swimmer.piece.species,
+          swimmer.piece.fit?.turns,
+          swimmer.piece.fit?.mirrored,
+        )
+
+        if (limbs.length > 0 && sway > 0) {
+          const source = swimmer.element.naturalWidth
+          const sourceHeight = swimmer.element.naturalHeight
+          const time = elapsed * swimmer.beat.rate * LIMB_SPEED
+          for (const part of limbs) {
+            const angle =
+              part.swing === 0
+                ? 0
+                : part.swing * sway * Math.sin(time + part.beat * Math.PI * 2 + swimmer.beat.phase)
+            context.save()
+            if (angle !== 0) {
+              const pivotX = left + place.width * part.pivot.x
+              const pivotY = top + place.height * part.pivot.y
+              context.translate(pivotX, pivotY)
+              context.rotate(angle)
+              context.translate(-pivotX, -pivotY)
+            }
+            context.drawImage(
+              swimmer.element,
+              source * part.box.x,
+              sourceHeight * part.box.y,
+              source * part.box.w,
+              sourceHeight * part.box.h,
+              left + place.width * part.box.x,
+              top + place.height * part.box.y,
+              // わずかに広げて、隣との継ぎ目に髪の毛ほどの隙間が出るのを防ぐ
+              place.width * part.box.w + 0.5,
+              place.height * part.box.h + 0.5,
+            )
+            context.restore()
+          }
+        } else if (strips <= 1 || (!headKnown && !drifts)) {
           /*
            * そのまま1枚で描く。
            * - しなり 0（描画命令が1回に戻るので、重いときの逃げ道）

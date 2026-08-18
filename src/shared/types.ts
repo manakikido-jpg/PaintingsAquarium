@@ -34,6 +34,11 @@ export interface Piece {
    * 上から見た生き物を、進む向きへ回して描くために使う。
    */
   readonly head?: Direction
+  /**
+   * 台紙に合わせるために、絵を何回まわしたか・左右反転したか。
+   * 台紙に書いた手足の位置を、絵の中の位置に直すのに使う。
+   */
+  readonly fit?: { readonly turns: number; readonly mirrored: boolean }
 }
 
 export interface Settings {
@@ -88,6 +93,7 @@ export interface SavePieceInput {
   readonly rig?: Rig
   readonly species?: SpeciesId
   readonly head?: Direction
+  readonly fit?: { readonly turns: number; readonly mirrored: boolean }
 }
 
 /** 絵と設定の保存先。別PCへ移すときに運営者がコピーする場所。 */

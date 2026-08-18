@@ -95,6 +95,9 @@ export interface SpeciesMatch {
    * 縦向き（タコなど）や、頭が上下を向いているときは null。
    */
   readonly headsRight: boolean | null
+  /** 台紙に合わせるために絵を何回まわしたか・反転したか（手足の位置に使う） */
+  readonly turns: number
+  readonly mirrored: boolean
 }
 
 /**
@@ -111,5 +114,119 @@ export function identifySpecies(image: RgbaImage): SpeciesMatch | null {
   const id = best.id as SpeciesId
   const head = directionInPiece(id, best.turns, best.mirrored)
   const sideways = SPECIES[id].swimsSideways && Math.abs(head.x) > Math.abs(head.y)
-  return { id, score: best.score, head, headsRight: sideways ? head.x > 0 : null }
+  return {
+    id,
+    score: best.score,
+    head,
+    headsRight: sideways ? head.x > 0 : null,
+    turns: best.turns,
+    mirrored: best.mirrored,
+  }
+}
+
+
+/* ------------------------------------------------------------------
+ * 手足の動き
+ *
+ * 絵を**矩形に分けて**、その一部だけを回して描く。
+ * `clip()` で手足の形に切り抜く案は使えない（3匹で 0.3fps・R-022）。
+ * 分割なので同じ画素を2度描かず、増える描画は1匹あたり数回で済む。
+ *
+ * 位置は**絵の外接矩形に対する割合**。台紙も取り込んだ絵も、
+ * まわりの余白を詰めてあるので（`trim.ts`）、同じ割合で同じ場所を指す。
+ * 数字は台紙の輪郭を実測して決めた（甲羅は x 0.20〜0.78・y 0.28〜0.66、
+ * タコの頭の下端は y 0.53）。
+ * ------------------------------------------------------------------ */
+
+export interface Box {
+  readonly x: number
+  readonly y: number
+  readonly w: number
+  readonly h: number
+}
+
+export interface SpritePart {
+  /** 元画像の中の切り出す範囲 */
+  readonly box: Box
+  /** 回す軸。`swing` が 0 のときは使わない */
+  readonly pivot: { readonly x: number; readonly y: number }
+  /** 振れ幅（ラジアン）。0 なら動かさない */
+  readonly swing: number
+  /** 拍のずれ（0〜1）。前足と後ろ足を逆に動かすのに使う */
+  readonly beat: number
+}
+
+const KAME_SIDE = 0.19
+const KAME_FRONT = 0.23
+const KAME_BACK = 0.77
+
+/*
+ * タコの足はここで分けない（R-033）。
+ *
+ * 足を縦4組に切って回したら、**頭のすぐ下に縦の裂け目**が出た。
+ * あのあたりは8本の足が1つの塊につながっていて、そこを切って別々に回せば
+ * 必ず開く。切る位置を足の隙間に合わせても、隙間があるのは足先だけだった。
+ * タコは既存の「横帯＋せん断」（`drifts`）のままにする。
+ * 帯は隣と傾きでつながるので、どれだけ動かしても開かない。
+ */
+
+/**
+ * ウミガメ: 四隅のひれだけを回す。甲羅は切らない。
+ * 前足と後ろ足は逆の拍にして、漕いでいるように見せる。
+ */
+const KAME_PARTS: readonly SpritePart[] = [
+  { box: { x: 0, y: 0, w: KAME_SIDE, h: KAME_FRONT }, pivot: { x: KAME_SIDE, y: KAME_FRONT }, swing: 0.13, beat: 0 },
+  { box: { x: KAME_SIDE, y: 0, w: 1 - KAME_SIDE * 2, h: KAME_FRONT }, pivot: { x: 0.5, y: 0 }, swing: 0, beat: 0 },
+  { box: { x: 1 - KAME_SIDE, y: 0, w: KAME_SIDE, h: KAME_FRONT }, pivot: { x: 1 - KAME_SIDE, y: KAME_FRONT }, swing: 0.13, beat: 0.5 },
+  { box: { x: 0, y: KAME_FRONT, w: 1, h: KAME_BACK - KAME_FRONT }, pivot: { x: 0.5, y: 0.5 }, swing: 0, beat: 0 },
+  { box: { x: 0, y: KAME_BACK, w: KAME_SIDE, h: 1 - KAME_BACK }, pivot: { x: KAME_SIDE, y: KAME_BACK }, swing: 0.13, beat: 0.5 },
+  { box: { x: KAME_SIDE, y: KAME_BACK, w: 1 - KAME_SIDE * 2, h: 1 - KAME_BACK }, pivot: { x: 0.5, y: 1 }, swing: 0, beat: 0 },
+  { box: { x: 1 - KAME_SIDE, y: KAME_BACK, w: KAME_SIDE, h: 1 - KAME_BACK }, pivot: { x: 1 - KAME_SIDE, y: KAME_BACK }, swing: 0.13, beat: 0 },
+]
+
+export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
+  umigame: KAME_PARTS,
+}
+
+/** 左右反転。 */
+function mirrorPart(part: SpritePart): SpritePart {
+  return {
+    box: { ...part.box, x: 1 - part.box.x - part.box.w },
+    pivot: { x: 1 - part.pivot.x, y: part.pivot.y },
+    // 鏡に映すと回る向きも逆になる
+    swing: -part.swing,
+    beat: part.beat,
+  }
+}
+
+/** 時計回りの回転を1つ戻す（`turnBack` と同じ向き）。 */
+function turnBackPart(part: SpritePart): SpritePart {
+  return {
+    box: { x: part.box.y, y: 1 - part.box.x - part.box.w, w: part.box.h, h: part.box.w },
+    pivot: { x: part.pivot.y, y: 1 - part.pivot.x },
+    swing: part.swing,
+    beat: part.beat,
+  }
+}
+
+/**
+ * 台紙に書いた分割を、取り込んだ絵の中の位置に直す。
+ *
+ * `turns` と `mirrored` は `matchTemplates` が返したもの。
+ * スキャナならどちらも 0 / false になるが、
+ * 紙を回して置いても崩れないようにしておく。
+ */
+export function partsForPiece(
+  id: SpeciesId | undefined,
+  turns = 0,
+  mirrored = false,
+): readonly SpritePart[] {
+  if (!id) return []
+  const parts = PARTITION[id]
+  if (!parts) return []
+  return parts.map((part) => {
+    let out = mirrored ? mirrorPart(part) : part
+    for (let index = 0; index < ((turns % 4) + 4) % 4; index++) out = turnBackPart(out)
+    return out
+  })
 }

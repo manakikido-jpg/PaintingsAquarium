@@ -40,6 +40,8 @@ export type ProcessResult =
       species?: SpeciesId
       /** 絵の中で頭が向いている向き（台紙に一致した絵だけ） */
       head?: { readonly x: number; readonly y: number }
+      /** 台紙に合わせるために絵を何回まわしたか・反転したか */
+      fit?: { readonly turns: number; readonly mirrored: boolean }
     }
   | { ok: false; message: string }
 
@@ -175,5 +177,6 @@ export async function processPhoto(
     paperValue: chosen,
     species: found?.id,
     head: found?.head,
+    fit: found ? { turns: found.turns, mirrored: found.mirrored } : undefined,
   }
 }

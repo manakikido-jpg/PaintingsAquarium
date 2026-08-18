@@ -6,6 +6,7 @@ import {
   TEMPLATES,
   directionInPiece,
   identifySpecies,
+  partsForPiece,
   type SpeciesId,
 } from '../templates'
 import { TEMPLATE_BITS, TEMPLATE_GRID } from '../templates.generated'
@@ -127,5 +128,80 @@ describe('頭の向き', () => {
 
   it('上を向いている生き物（タコ）では、左右の答えを返さない', () => {
     expect(identifySpecies(pieceOf('tako'))?.headsRight).toBeNull()
+  })
+})
+
+describe('手足の分割', () => {
+  /** 分割が絵を隙間なく、重なりなく覆っているか。 */
+  function covers(parts: readonly { box: { x: number; y: number; w: number; h: number } }[]): {
+    area: number
+    overlap: number
+  } {
+    let area = 0
+    let overlap = 0
+    for (let index = 0; index < parts.length; index++) {
+      const a = parts[index].box
+      area += a.w * a.h
+      for (let other = index + 1; other < parts.length; other++) {
+        const b = parts[other].box
+        const wide = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
+        const tall = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+        if (wide > 0.0001 && tall > 0.0001) overlap += wide * tall
+      }
+    }
+    return { area, overlap }
+  }
+
+  it('ウミガメは、絵を隙間なく重なりなく分けている', () => {
+    for (const id of ['umigame'] as const) {
+      const { area, overlap } = covers(partsForPiece(id))
+      // 面積の合計が絵ぜんぶ（1）で、重なりが無い＝同じ画素を2度描かない
+      expect(area).toBeCloseTo(1, 5)
+      expect(overlap).toBeCloseTo(0, 5)
+    }
+  })
+
+  it('回しても反転しても、隙間なく重なりなくのまま', () => {
+    for (const id of ['umigame'] as const) {
+      for (const turns of [0, 1, 2, 3]) {
+        for (const mirrored of [false, true]) {
+          const { area, overlap } = covers(partsForPiece(id, turns, mirrored))
+          expect(area).toBeCloseTo(1, 5)
+          expect(overlap).toBeCloseTo(0, 5)
+        }
+      }
+    }
+  })
+
+  it('全部が絵の中に収まっている', () => {
+    for (const id of ['umigame'] as const) {
+      for (const turns of [0, 1, 2, 3]) {
+        for (const part of partsForPiece(id, turns, true)) {
+          expect(part.box.x).toBeGreaterThanOrEqual(-0.0001)
+          expect(part.box.y).toBeGreaterThanOrEqual(-0.0001)
+          expect(part.box.x + part.box.w).toBeLessThanOrEqual(1.0001)
+          expect(part.box.y + part.box.h).toBeLessThanOrEqual(1.0001)
+        }
+      }
+    }
+  })
+
+  it('ウミガメはひれが4枚だけ動く', () => {
+    expect(partsForPiece('umigame').filter((part) => part.swing !== 0)).toHaveLength(4)
+  })
+
+  it('タコは分割しない（回すと足の付け根が裂ける・R-033）', () => {
+    expect(partsForPiece('tako')).toEqual([])
+  })
+
+  it('ウミガメの前足と後ろ足は逆の拍で動く', () => {
+    const moving = partsForPiece('umigame').filter((part) => part.swing !== 0)
+    const beats = new Set(moving.map((part) => part.beat))
+    expect(beats).toEqual(new Set([0, 0.5]))
+  })
+
+  it('分割を持たない生き物では空を返す', () => {
+    expect(partsForPiece('fish')).toEqual([])
+    expect(partsForPiece(undefined)).toEqual([])
   })
 })
