@@ -72,13 +72,9 @@ describe('タコ', () => {
 })
 
 describe('クラゲ', () => {
-  it('魚より遅く、ふわふわ上下する', () => {
-    const jelly = run(creature('kurage', { vy: 0 }), 12)
-    const fish = run(creature('fish', { vy: 0 }), 12)
-    const jellyMoved = Math.abs(jelly[jelly.length - 1].x - 800)
-    const fishMoved = Math.abs(fish[fish.length - 1].x - 800)
-    expect(jellyMoved).toBeLessThan(fishMoved / 2)
-
+  it('ふわふわ上下する', () => {
+    // 速さは取り込み時に種類から決まる（`CROSS_SECONDS`）ので、ここでは上下だけ見る
+    const jelly = run(creature('kurage', { vx: 12, vy: 0 }), 12)
     const ys = jelly.map((one) => one.y)
     expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(10)
   })

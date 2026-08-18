@@ -63,6 +63,8 @@ export interface Fish {
   readonly jumpUntil?: number
   /** いまの速さの倍率（サメ） */
   readonly speedScale?: number
+  /** この時刻までは追いかけない（サメ。すれ違った直後） */
+  readonly ignoreUntil?: number
 }
 
 /** 描画に使う実際の Y。ゆらぎを足したもの。 */

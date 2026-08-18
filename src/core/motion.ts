@@ -17,7 +17,7 @@ import {
   type Walker,
 } from './walk'
 import type { MotionKind } from './theme'
-import { steer, type Prey } from './behaviour'
+import { speedRange, steer, type Prey } from './behaviour'
 import type { SpeciesId } from './templates'
 
 /**
@@ -85,11 +85,17 @@ export function spawnCreature(
    */
   const swimsAcross = species === 'fish' || species === 'iruka' || species === 'same'
 
+  /*
+   * 速さは種類ごとに決める（`CROSS_SECONDS`）。種類が分からない絵だけ、
+   * 今までどおり「魚なら 30〜90、足のある生き物なら 12〜38」にする。
+   */
+  const speed = speedRange(tank.width, species) ?? (drifts ? { minSpeed: 12, maxSpeed: 38 } : {})
+
   return {
     kind: 'float',
     fish: spawnFish(seed, tank, imageWidth, imageHeight, {
       targetSize: creatureSize(tank, FISH_SIZE_RATIO, sizeScale),
-      ...(drifts ? { minSpeed: 12, maxSpeed: 38 } : {}),
+      ...speed,
       species,
       wall: swimsAcross || species === undefined ? 'turnOutside' : 'bounce',
     }),

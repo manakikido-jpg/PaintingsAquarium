@@ -1,4 +1,5 @@
 import type { RgbaImage } from './image'
+import type { CreatureKind } from './rig'
 import { MATCH_THRESHOLD, matchTemplates, type Template } from './match'
 import { TEMPLATE_BITS, TEMPLATE_GRID } from './templates.generated'
 
@@ -229,4 +230,72 @@ export function partsForPiece(
     for (let index = 0; index < ((turns % 4) + 4) % 4; index++) out = turnBackPart(out)
     return out
   })
+}
+
+
+/* ------------------------------------------------------------------
+ * 台紙ごとの正解（種類・尾びれ・背びれ）
+ *
+ * **台紙が分かったら、形からの推定はやめる。**
+ * 実際、イルカが「足のある生き物」と判定され、尾も背びれも動いていなかった。
+ * 数字は台紙の輪郭を実測して決めた（厚みの谷＝尾の付け根、上へ飛び出す区間＝背びれ）。
+ * ------------------------------------------------------------------ */
+
+/** その台紙の生き物が、魚のように泳ぐか、足で漂うか。 */
+export const KIND_OF: Record<SpeciesId, CreatureKind> = {
+  fish: 'fish',
+  iruka: 'fish',
+  same: 'fish',
+  tako: 'tentacled',
+  kurage: 'tentacled',
+  umigame: 'tentacled',
+}
+
+/**
+ * 台紙ごとの尾の位置。
+ *
+ * **ひれ（背びれ・胸びれ）はここに書かない。** 手で置いた矩形は、
+ * 弓なりのイルカでは胴を横切ってしまい、**背びれと腹のあたりが裂けた**（実機で確認）。
+ * ひれは絵から実測したもの（`findFins`）だけを使う。あちらは実際の
+ * 突き出しを測っているので、体の形に合う。
+ */
+interface TemplateRig {
+  /** 尾の付け根。頭からの割合（台紙は全部、頭が左） */
+  readonly tailFrom: number
+  /** 付け根の高さ（0〜1） */
+  readonly tailY: number
+}
+
+const TEMPLATE_RIG: Partial<Record<SpeciesId, TemplateRig>> = {
+  // まる魚: 厚みの谷が x=0.78、そこから先がうちわ型の尾。背びれは x=0.36〜0.55
+  fish: { tailFrom: 0.78, tailY: 0.55 },
+  // サメ: 谷が x=0.80。背びれは大きく x=0.38〜0.53、胸びれは下 x=0.53〜0.62
+  same: { tailFrom: 0.8, tailY: 0.55 },
+  // イルカ: 弓なりで、尾は右下へ抜ける。背びれは弧の頂点 x=0.62〜0.80
+  iruka: { tailFrom: 0.82, tailY: 0.6 },
+}
+
+export interface SpeciesRig {
+  readonly kind: CreatureKind
+  readonly headsRight: boolean
+  readonly tail: { readonly from: number; readonly pivot: { readonly x: number; readonly y: number } } | null
+}
+
+/**
+ * 台紙に書いた正解を、取り込んだ絵の中の位置に直す。
+ *
+ * 台紙はすべて**頭が左**なので、左右反転していなければ
+ * 「頭からの割合」がそのまま絵の中の x になる。
+ */
+export function rigForSpecies(id: SpeciesId, mirrored: boolean): SpeciesRig {
+  const kind = KIND_OF[id]
+  const rig = TEMPLATE_RIG[id]
+  if (!rig) return { kind, headsRight: mirrored, tail: null }
+
+  const pivotX = mirrored ? 1 - rig.tailFrom : rig.tailFrom
+  return {
+    kind,
+    headsRight: mirrored,
+    tail: { from: rig.tailFrom, pivot: { x: pivotX, y: rig.tailY } },
+  }
 }

@@ -10,7 +10,7 @@ import { trimTransparent } from '../core/trim'
 import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
 import { orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
-import { identifySpecies, type SpeciesId } from '../core/templates'
+import { identifySpecies, rigForSpecies, type SpeciesId } from '../core/templates'
 
 /**
  * 切り抜きは画素数に比例して重い。会場の PC で 1 日 200 枚を捌くので、
@@ -172,10 +172,26 @@ export async function processPhoto(
     found = identifySpecies(image)
   }
 
-  const rig: Rig =
-    found && found.headsRight !== null
-      ? { ...oriented.rig, headsRight: found.headsRight, headKnown: true }
-      : oriented.rig
+  /*
+   * 台紙が分かったら、**種類も尾びれも背びれも台紙の正解を使う**。
+   *
+   * 形からの推定は外れる。実際、イルカが「足のある生き物」と判定され、
+   * 尾も背びれも動いていなかった（会場からの指摘）。
+   * 正解が手元にあるのに推定を信じ続ける理由は無い（R-034 と同じ形の間違い）。
+   */
+  const answer = found ? rigForSpecies(found.id, found.mirrored) : null
+  const rig: Rig = answer
+    ? {
+        ...oriented.rig,
+        kind: answer.kind,
+        headsRight: answer.headsRight,
+        headKnown: true,
+        tail: answer.tail,
+        // ひれは絵から実測したものを使う（台紙の手置きの矩形は胴を裂いた）
+        // 台紙どおりなので推定ではない。動きに使ってよい
+        confidence: 1,
+      }
+    : oriented.rig
 
   const blob = await new Promise<Blob | null>((resolve) =>
     toCanvas(image).toBlob(resolve, 'image/png'),
