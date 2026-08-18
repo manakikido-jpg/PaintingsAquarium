@@ -149,7 +149,15 @@ export function spawnFish(
     x: marginX + random() * usableWidth,
     y: marginY + random() * usableHeight,
     vx: towardsRight ? speed : -speed,
-    vy: (random() - 0.5) * speed * 0.3,
+    /*
+     * 縦の速さ。横の 0.55 倍まで持たせる。
+     *
+     * 以前は 0.3 倍で、実測すると縦 4.3px/秒（横は 56.3px/秒）しか出ていなかった。
+     * ほとんど動かないので**最初に決まった高さのまま並びが固定**され、
+     * 少ない枚数だと偏りがそのまま残って「真ん中に集まっている」ように見えた。
+     * 大きくしすぎると斜めに滑って見える（絵は傾かないため）ので、ここが上限。
+     */
+    vy: (random() - 0.5) * speed * 0.55,
     width,
     height,
     phase: random() * Math.PI * 2,
