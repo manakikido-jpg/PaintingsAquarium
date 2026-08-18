@@ -13,6 +13,8 @@ import {
   orientForSwimming,
   rotateQuarter,
   rigIsUsable,
+  headIsKnown,
+  HEAD_MARGIN,
   runsAlongColumn,
   runsAlongRow,
   tentacleSignal,
@@ -198,6 +200,56 @@ describe('estimateRig', () => {
     fill(image, 5, 5, 75, 55)
     const rig = estimateRig(image)
     expect(rigIsUsable(rig)).toBe(false)
+  })
+})
+
+describe('頭が分かったかどうか（R-030）', () => {
+  it('片側だけ広がる魚は、頭が分かったことにする', () => {
+    const rig = estimateRig(fishFacingRight())
+    expect(rig.headKnown).toBe(true)
+    expect(headIsKnown(rig)).toBe(true)
+  })
+
+  it('ただの四角では、頭が分からないと答える', () => {
+    const image = createImage(80, 60)
+    fill(image, 5, 5, 75, 55)
+    const rig = estimateRig(image)
+    // ここが true になると、右端を頭と決め打ちして頭が振れる
+    expect(rig.headKnown).toBe(false)
+    expect(headIsKnown(rig)).toBe(false)
+  })
+
+  it('両端が同じように広がる形（蝶ネクタイ）でも、頭が分からないと答える', () => {
+    const image = createImage(120, 60)
+    fill(image, 0, 12, 24, 48) // 左のひれ
+    fill(image, 24, 26, 44, 34) // 左のくびれ
+    fill(image, 44, 20, 76, 40) // 胴
+    fill(image, 76, 26, 96, 34) // 右のくびれ
+    fill(image, 96, 12, 120, 48) // 右のひれ
+    const rig = estimateRig(image)
+    expect(rig.headKnown).toBe(false)
+  })
+
+  it('僅差では頭が分かったことにしない', () => {
+    // 両側の広がりが HEAD_MARGIN 倍未満なら「分からない」に倒す
+    expect(HEAD_MARGIN).toBeGreaterThan(1)
+  })
+
+  it('古い絵（headKnown が無い）は、尾びれが見つかっていたかで代用する', () => {
+    const withTail = { ...estimateRig(fishFacingRight()) } as Record<string, unknown>
+    delete withTail.headKnown
+    expect(headIsKnown(withTail as never)).toBe(true)
+
+    const square = createImage(80, 60)
+    fill(square, 5, 5, 75, 55)
+    const withoutTail = { ...estimateRig(square) } as Record<string, unknown>
+    delete withoutTail.headKnown
+    expect(headIsKnown(withoutTail as never)).toBe(false)
+  })
+
+  it('リグそのものが無い絵は、頭が分からない扱い', () => {
+    expect(headIsKnown(null)).toBe(false)
+    expect(headIsKnown(undefined)).toBe(false)
   })
 })
 

@@ -29,8 +29,16 @@ export interface Rig {
     /** 頭からの割合。ここから先が尾びれ */
     readonly from: number
   } | null
-  /** 頭が絵の右側にあるか */
+  /** 頭が絵の右側にあるか。`headKnown` が false のときは当てにならない */
   readonly headsRight: boolean
+  /**
+   * 頭がどちら側かを、絵から本当に決められたか。
+   *
+   * 決められないのに決め打ちすると、**頭を振りながら尾から進む**絵になる
+   *（会場で実際にそう見えた・R-030）。分からないときは分からないと言う。
+   * 古い絵には入っていないので、読むときは `headIsKnown()` を使う。
+   */
+  readonly headKnown?: boolean
   /** 推定の確からしさ。低いときは使わない */
   readonly confidence: number
   /** 誰が出したか。AI と比べるために残す */
@@ -51,6 +59,15 @@ export interface Rig {
 
 /** リグを使うかどうかの境目。これ未満なら今まで通りの動きにする。 */
 export const RIG_MIN_CONFIDENCE = 0.35
+
+/**
+ * 勝ったほうの広がりが、負けたほうの何倍あれば「頭が分かった」とみなすか。
+ *
+ * 両端とも同じくらい広がっている絵（両端にひれがある・左右対称）は、
+ * 形だけでは頭を決められない。僅差で勝ったほうを採ると、半分は外れる。
+ * **外れると頭が振れる**ので、僅差なら「分からない」に倒す。
+ */
+export const HEAD_MARGIN = 1.25
 
 /** 縦の並び。絵を横に区切って、その区間に絵が写っている範囲を測ったもの。 */
 export interface ColumnSpan {
@@ -176,6 +193,18 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
   const headsRight = leftScore >= rightScore
   const guess = headsRight ? headLeft : headRight
 
+  /*
+   * 頭を決められたか。**片側だけがはっきり広がっているとき**だけ。
+   *
+   * 実測（実物3枚）: 魚は 1.77 対 0.00 ではっきり付くが、
+   * タコとイカは 0.00 対 0.00 で、それでも従来は「右が頭」を返していた。
+   * その決め打ちが、会場での「頭がくねくねする」「尾から進む」の原因だった。
+   */
+  const strong = Math.max(leftScore, rightScore)
+  const weak = Math.min(leftScore, rightScore)
+  const headKnown =
+    flareConfidence(strong) >= RIG_MIN_CONFIDENCE && (weak === 0 || strong / weak >= HEAD_MARGIN)
+
   const spineLeftToRight = midline(spans)
   const spine = headsRight ? [...spineLeftToRight].reverse() : spineLeftToRight
 
@@ -188,6 +217,7 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
       spine,
       tail: null,
       headsRight,
+      headKnown,
       confidence: 0,
       source: 'shape',
       kind,
@@ -216,6 +246,7 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
       pivot: { x: pivotX, y: span.height > 0 ? (span.top + span.bottom) / 2 : 0.5 },
     },
     headsRight,
+    headKnown,
     confidence: flareConfidence(guess.flare),
     source: 'shape',
     kind,
@@ -226,6 +257,20 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
 /** リグを動きに使ってよいか。 */
 export function rigIsUsable(rig: Rig | null | undefined): rig is Rig {
   return !!rig && rig.tail !== null && rig.confidence >= RIG_MIN_CONFIDENCE
+}
+
+/**
+ * 頭がどちら側かを当てにしてよいか。
+ *
+ * ここが false の絵は、**しならせない・左右反転もしない**。
+ * 頭が分からないまま動かすと、頭を振りながら尾から進むことになる（R-030）。
+ *
+ * `headKnown` が入っていない古い絵は、尾びれが見つかっていたかどうかで代用する。
+ * 尾が見つかっていれば、その反対側が頭だと分かっていたということ。
+ */
+export function headIsKnown(rig: Rig | null | undefined): boolean {
+  if (!rig) return false
+  return rig.headKnown ?? rigIsUsable(rig)
 }
 
 /* ------------------------------------------------------------------

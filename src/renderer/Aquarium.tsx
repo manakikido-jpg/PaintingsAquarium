@@ -20,7 +20,7 @@ import {
   stripOffset,
   tailAngle,
 } from '../core/undulate'
-import { rigIsUsable, type CreatureKind } from '../core/rig'
+import { headIsKnown, rigIsUsable, type CreatureKind } from '../core/rig'
 import type { ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
@@ -216,6 +216,15 @@ export function Aquarium({
         const rig = rigIsUsable(swimmer.piece.rig) ? swimmer.piece.rig : null
         const kind: CreatureKind = swimmer.piece.rig?.kind ?? 'unknown'
         const drifts = kind === 'tentacled'
+        /*
+         * 頭がどちら側か分かっている絵か。
+         *
+         * 分かっていないのに動かすと、**頭を振りながら尾から進む**（R-030）。
+         * 会場で実際にそう見えた。分からない絵は、しならせず・反転もしない。
+         * 止まって見えるほうが、間違った向きに泳ぐより良い
+         *（`undulate.ts` の冒頭に書いた原則そのもの）。
+         */
+        const headKnown = headIsKnown(swimmer.piece.rig)
 
         context.save()
         context.globalAlpha = appearAlpha(progress)
@@ -227,7 +236,7 @@ export function Aquarium({
          * 正面を向いた絵（タコ・イカ）は左右が対称に近いので、反転しても見た目は
          * ほとんど変わらない。揃えておいたほうが規則が1つ減る。
          */
-        const mirror = place.facingRight !== (rig?.headsRight ?? true)
+        const mirror = headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
         context.scale(mirror ? -scale : scale, scale)
 
         const sway = swayRef.current
@@ -235,8 +244,12 @@ export function Aquarium({
         const left = -place.width / 2
         const top = -place.height / 2
 
-        if (strips <= 1) {
-          // しなり 0。描画命令が1回に戻るので、重いときの逃げ道になる。
+        if (strips <= 1 || (!headKnown && !drifts)) {
+          /*
+           * そのまま1枚で描く。
+           * - しなり 0（描画命令が1回に戻るので、重いときの逃げ道）
+           * - 頭が分からない絵（どちらを止めればよいか決められない）
+           */
           context.drawImage(swimmer.element, left, top, place.width, place.height)
         } else {
           const source = swimmer.element.naturalWidth
