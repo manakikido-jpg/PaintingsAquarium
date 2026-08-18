@@ -1,5 +1,6 @@
 import { creatureSize, DEFAULT_SIZE_SCALE, FISH_SIZE_RATIO } from './size'
 import { seededRandom } from './random'
+import type { SpeciesId } from './templates'
 /**
  * 水槽の中を泳ぐ動き。純粋関数にしてあるのは、
  * 「絵が画面の外に出てしまう」類の不具合を目視ではなくテストで止めるため。
@@ -31,6 +32,37 @@ export interface Fish {
    * その間は壁で跳ね返らない。跳ね返ると画面から出られない。
    */
   readonly exiting?: boolean
+
+  /* ---- 生き物ごとの動きに使うもの（`behaviour.ts`）---- */
+
+  /** どの台紙の絵か。台紙に一致しなかった絵には入らない */
+  readonly species?: SpeciesId
+  /** 生まれてからの秒数。跳ねる周期や波の位相に使う */
+  readonly age: number
+  /**
+   * 生き物ごとの動きの位相（ラジアン・**変わらない**）。
+   *
+   * `phase` は上下のゆらぎ用で毎フレーム進むので、波の位相には使えない。
+   * 使うと `phase` の進む速さが波の速さに足し込まれ、**周期が4倍速**になる
+   *（実際にそうなり、ウミガメのS字が小刻みな揺れになった）。
+   */
+  readonly wavePhase: number
+  /** 生まれたときの速さ（ピクセル/秒）。速さを変える生き物が基準に使う */
+  readonly baseSpeed?: number
+  /**
+   * 横の壁での振る舞い。
+   * `bounce` はその場で跳ね返る。`turnOutside` は**画面の外へ1体ぶん出てから**
+   * 向きを変えて戻る（魚に使う。壁で跳ね返ると水槽のガラスに見える）。
+   */
+  readonly wall?: 'bounce' | 'turnOutside'
+  /** 次に何かが起きる時刻（`age` と同じ単位）。イルカの跳ね、サメの速さの切り替え */
+  readonly nextEventAt?: number
+  /** 跳ね始めたときの高さ（イルカ） */
+  readonly jumpFrom?: number
+  /** 跳ね終わる時刻（イルカ） */
+  readonly jumpUntil?: number
+  /** いまの速さの倍率（サメ） */
+  readonly speedScale?: number
 }
 
 /** 描画に使う実際の Y。ゆらぎを足したもの。 */
@@ -60,9 +92,11 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
   let vx = fish.vx
   let vy = fish.vy
 
+  const age = fish.age + dt
+
   // 去る途中は壁を無視してそのまま進む。跳ね返ると永遠に出て行けない
   if (fish.exiting) {
-    return { ...fish, x, y, phase: fish.phase + fish.phaseSpeed * dt }
+    return { ...fish, x, y, age, phase: fish.phase + fish.phaseSpeed * dt }
   }
 
   const halfWidth = fish.width / 2
@@ -76,7 +110,21 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
   const minY = Math.min(marginY, tank.height / 2)
   const maxY = Math.max(tank.height - marginY, tank.height / 2)
 
-  if (x < minX) {
+  /*
+   * 横の壁。`turnOutside` は画面の外へ**1体ぶん**出てから向きを変える。
+   * 会場からの指摘「画面外に出たら反転してまた進むように」に合わせたもの。
+   * 端で跳ね返ると、水槽のガラスに当たっているように見える。
+   */
+  if (fish.wall === 'turnOutside') {
+    const outside = fish.width
+    if (x < -outside) {
+      x = -outside
+      vx = Math.abs(vx)
+    } else if (x > tank.width + outside) {
+      x = tank.width + outside
+      vx = -Math.abs(vx)
+    }
+  } else if (x < minX) {
     x = minX
     vx = Math.abs(vx)
   } else if (x > maxX) {
@@ -92,11 +140,15 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
     vy = -Math.abs(vy)
   }
 
-  return { ...fish, x, y, vx, vy, phase: fish.phase + fish.phaseSpeed * dt }
+  return { ...fish, x, y, vx, vy, age, phase: fish.phase + fish.phaseSpeed * dt }
 }
 
 
 export interface SpawnOptions {
+  /** どの台紙の絵か。生き物ごとの動きに使う */
+  species?: SpeciesId
+  /** 横の壁での振る舞い。既定は跳ね返り */
+  wall?: 'bounce' | 'turnOutside'
   /**
    * 絵の長辺をこの長さに合わせる（ピクセル）。
    * 既定は画面幅に対する割合で決まる（下記）。
@@ -125,8 +177,13 @@ export function spawnFish(
    * 実測（1280px 幅・50匹）では 180px 固定が画面を埋め、
    * **自分の絵を探せない**状態になった（R-015）。
    */
-  const { targetSize = creatureSize(tank, FISH_SIZE_RATIO, DEFAULT_SIZE_SCALE), minSpeed = 30, maxSpeed = 90 } =
-    options
+  const {
+    targetSize = creatureSize(tank, FISH_SIZE_RATIO, DEFAULT_SIZE_SCALE),
+    minSpeed = 30,
+    maxSpeed = 90,
+    species,
+    wall,
+  } = options
   const random = seededRandom(seed)
   const longestSide = Math.max(imageWidth, imageHeight, 1)
   const scale = targetSize / longestSide
@@ -163,6 +220,11 @@ export function spawnFish(
     phase: random() * Math.PI * 2,
     phaseSpeed: 1.2 + random() * 1.6,
     amplitude,
+    age: 0,
+    wavePhase: random() * Math.PI * 2,
+    baseSpeed: speed,
+    species,
+    wall,
   }
 }
 

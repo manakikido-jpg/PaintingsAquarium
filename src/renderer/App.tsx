@@ -72,6 +72,7 @@ export function App(): React.JSX.Element {
           theme: current.theme,
           rig: result.rig,
           species: result.species,
+          head: result.head,
         })
         setPieces((current) => [...current, piece])
       })

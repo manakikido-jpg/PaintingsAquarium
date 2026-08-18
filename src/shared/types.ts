@@ -1,7 +1,7 @@
 import type { CutoutOptions } from '../core/cutout'
 import type { ThemeId } from '../core/theme'
 import type { Rig } from '../core/rig'
-import type { SpeciesId } from '../core/templates'
+import type { Direction, SpeciesId } from '../core/templates'
 
 /** 水槽を泳いでいる絵 1 枚。 */
 export interface Piece {
@@ -29,6 +29,11 @@ export interface Piece {
    * 種類ごとの動きに使う（`docs/設計-生き物ごとの動き.md`）。
    */
   readonly species?: SpeciesId
+  /**
+   * 絵の中で頭が向いている向き（台紙に一致した絵だけ）。
+   * 上から見た生き物を、進む向きへ回して描くために使う。
+   */
+  readonly head?: Direction
 }
 
 export interface Settings {
@@ -82,6 +87,7 @@ export interface SavePieceInput {
   readonly theme: ThemeId
   readonly rig?: Rig
   readonly species?: SpeciesId
+  readonly head?: Direction
 }
 
 /** 絵と設定の保存先。別PCへ移すときに運営者がコピーする場所。 */

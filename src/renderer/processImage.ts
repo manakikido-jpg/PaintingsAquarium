@@ -38,6 +38,8 @@ export type ProcessResult =
        * 種類ごとの動きに使う（`docs/設計-生き物ごとの動き.md`）。
        */
       species?: SpeciesId
+      /** 絵の中で頭が向いている向き（台紙に一致した絵だけ） */
+      head?: { readonly x: number; readonly y: number }
     }
   | { ok: false; message: string }
 
@@ -172,5 +174,6 @@ export async function processPhoto(
     turned: oriented.turns !== 0 || oriented.flipped,
     paperValue: chosen,
     species: found?.id,
+    head: found?.head,
   }
 }

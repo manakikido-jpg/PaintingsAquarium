@@ -24,6 +24,8 @@ function fishAt(overrides: Partial<Fish> = {}): Fish {
     phase: 0,
     phaseSpeed: 1.5,
     amplitude: 10,
+    age: 0,
+    wavePhase: 0,
     ...overrides,
   }
 }

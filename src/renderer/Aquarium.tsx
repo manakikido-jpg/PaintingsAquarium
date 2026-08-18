@@ -189,6 +189,7 @@ export function Aquarium({
             scene.lanes,
             sizeRef.current,
             piece.rig?.kind ?? 'unknown',
+            piece.species,
           ),
         })
       }
@@ -236,7 +237,20 @@ export function Aquarium({
          * 正面を向いた絵（タコ・イカ）は左右が対称に近いので、反転しても見た目は
          * ほとんど変わらない。揃えておいたほうが規則が1つ減る。
          */
-        const mirror = headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
+        /*
+         * 上から見た絵（ウミガメ）は、**進む向きへ回して**描く。
+         * 頭を上に向けたまま横へ動くと、泳いでいるのではなく
+         * 板が滑っているように見える。
+         * 横向きの絵（魚・イルカ・サメ）は今までどおり左右反転で向きを合わせる。
+         */
+        const head = swimmer.piece.head
+        const turnsToHeading = swimmer.piece.species === 'umigame' && head
+        if (turnsToHeading) {
+          context.rotate(place.heading - Math.atan2(head.y, head.x))
+        }
+
+        const mirror =
+          !turnsToHeading && headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
         context.scale(mirror ? -scale : scale, scale)
 
         const sway = swayRef.current

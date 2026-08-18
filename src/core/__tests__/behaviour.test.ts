@@ -1,0 +1,171 @@
+import { describe, expect, it } from 'vitest'
+import { spawnFish, stepFish, type Fish, type Tank } from '../swim'
+import {
+  IRUKA_GAP,
+  IRUKA_JUMP_SECONDS,
+  IRUKA_TOP,
+  isJumping,
+  jumpLift,
+  steer,
+  type Prey,
+} from '../behaviour'
+import type { SpeciesId } from '../templates'
+
+const tank: Tank = { width: 1600, height: 900 }
+
+function creature(species: SpeciesId | undefined, overrides: Partial<Fish> = {}): Fish {
+  return spawnFish(7, tank, 200, 120, { species, wall: species === 'fish' ? 'turnOutside' : 'bounce' }) &&
+    {
+      ...spawnFish(7, tank, 200, 120, { species }),
+      x: 800,
+      y: 450,
+      vx: 60,
+      vy: 0,
+      width: 160,
+      height: 100,
+      age: 0,
+      baseSpeed: 60,
+      ...overrides,
+    }
+}
+
+/** 何秒か動かして、通った場所を返す。 */
+function run(fish: Fish, seconds: number, prey: readonly Prey[] = [], dt = 1 / 60): Fish[] {
+  const path: Fish[] = []
+  let current = fish
+  for (let step = 0; step < Math.round(seconds / dt); step++) {
+    current = stepFish(steer(current, tank, prey), dt, tank)
+    path.push(current)
+  }
+  return path
+}
+
+describe('魚', () => {
+  it('画面の外へ出てから向きを変えて戻ってくる', () => {
+    const fish = creature('fish', { x: tank.width - 100, vx: 200, wall: 'turnOutside' })
+    const path = run(fish, 20)
+    // 画面の外まで出る
+    expect(Math.max(...path.map((one) => one.x))).toBeGreaterThan(tank.width)
+    // そのあと向きを変えて、画面の中に戻ってくる
+    const turned = path.findIndex((one) => one.vx < 0)
+    expect(turned).toBeGreaterThan(0)
+    expect(path.slice(turned).some((one) => one.x < tank.width * 0.5)).toBe(true)
+  })
+
+  it('端で跳ね返る設定なら、画面の中に留まる', () => {
+    const fish = creature('fish', { x: tank.width - 100, vx: 200, wall: 'bounce' })
+    const path = run(fish, 20)
+    expect(Math.max(...path.map((one) => one.x))).toBeLessThanOrEqual(tank.width)
+  })
+})
+
+describe('タコ', () => {
+  it('上下に上がり下がりしながら、横へ進む', () => {
+    const path = run(creature('tako', { vy: 0 }), 12)
+    const ys = path.map((one) => one.y)
+    const rise = Math.max(...ys) - Math.min(...ys)
+    // 画面の高さの1割以上、上下する
+    expect(rise).toBeGreaterThan(tank.height * 0.1)
+    // 横にも進んでいる
+    expect(Math.abs(path[path.length - 1].x - 800)).toBeGreaterThan(100)
+  })
+})
+
+describe('クラゲ', () => {
+  it('魚より遅く、ふわふわ上下する', () => {
+    const jelly = run(creature('kurage', { vy: 0 }), 12)
+    const fish = run(creature('fish', { vy: 0 }), 12)
+    const jellyMoved = Math.abs(jelly[jelly.length - 1].x - 800)
+    const fishMoved = Math.abs(fish[fish.length - 1].x - 800)
+    expect(jellyMoved).toBeLessThan(fishMoved / 2)
+
+    const ys = jelly.map((one) => one.y)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(10)
+  })
+})
+
+describe('ウミガメ', () => {
+  it('横へ進みながら、上下が入れ替わる（S字）', () => {
+    const path = run(creature('umigame', { vy: 0 }), 20)
+    const ys = path.map((one) => one.y)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(tank.height * 0.15)
+    // 上下の向きが2回以上入れ替わる＝S字になっている
+    let flips = 0
+    for (let index = 1; index < path.length; index++) {
+      if (Math.sign(path[index].vy) !== Math.sign(path[index - 1].vy)) flips++
+    }
+    expect(flips).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('イルカ', () => {
+  it('跳ねる高さは、上がって下りる山の形', () => {
+    expect(jumpLift(0)).toBe(0)
+    expect(jumpLift(1)).toBe(0)
+    expect(jumpLift(0.5)).toBeCloseTo(1)
+    expect(jumpLift(0.25)).toBeLessThan(jumpLift(0.5))
+  })
+
+  it('決めた時刻が来たら跳ね、画面の上のほうまで届く', () => {
+    const dolphin = creature('iruka', { y: 700, nextEventAt: 1 })
+    const path = run(dolphin, IRUKA_GAP[0])
+    const highest = Math.min(...path.map((one) => one.y))
+    expect(highest).toBeLessThan(tank.height * (IRUKA_TOP + 0.12))
+    // 跳ね終わったら元の高さのあたりに戻る
+    expect(path[path.length - 1].y).toBeGreaterThan(tank.height * 0.3)
+  })
+
+  it('跳ねている間だけ「跳んでいる」と答える', () => {
+    const dolphin = creature('iruka', { y: 700, nextEventAt: 0 })
+    const started = steer(dolphin, tank)
+    expect(isJumping(started)).toBe(true)
+    expect(isJumping({ ...started, age: started.age + IRUKA_JUMP_SECONDS + 0.1 })).toBe(false)
+  })
+
+  it('跳ねる間隔は 20〜30 秒', () => {
+    expect(IRUKA_GAP[0]).toBe(20)
+    expect(IRUKA_GAP[1]).toBe(30)
+  })
+})
+
+describe('サメ', () => {
+  it('魚のほうへ向きを寄せる', () => {
+    const shark = creature('same', { x: 200, y: 450, vx: 60, vy: 0 })
+    const target: Prey[] = [{ x: 1400, y: 800 }]
+    const path = run(shark, 6, target)
+    // 下（相手のいる側）へ向かっている
+    expect(path[path.length - 1].y).toBeGreaterThan(450)
+  })
+
+  it('近づきすぎたら離れる（追いつかない）', () => {
+    const shark = creature('same', { x: 800, y: 450, vx: 60, vy: 0 })
+    const target: Prey[] = [{ x: 820, y: 450 }]
+    const path = run(shark, 4, target)
+    const distances = path.map((one) => Math.hypot(one.x - 820, one.y - 450))
+    // 重ならない。最初より離れている
+    expect(distances[distances.length - 1]).toBeGreaterThan(distances[0])
+    expect(distances[distances.length - 1]).toBeGreaterThan(shark.width * 0.5)
+  })
+
+  it('速さが変わる', () => {
+    const shark = creature('same', { x: 800, y: 450, vx: 60, vy: 0 })
+    const path = run(shark, 12, [{ x: 1500, y: 450 }])
+    const speeds = path.map((one) => Math.hypot(one.vx, one.vy))
+    expect(Math.max(...speeds) / Math.max(1, Math.min(...speeds))).toBeGreaterThan(1.5)
+  })
+
+  it('追う相手がいなくても止まらない', () => {
+    const shark = creature('same', { x: 800, y: 450, vx: 60, vy: 0 })
+    const path = run(shark, 6, [])
+    expect(Math.abs(path[path.length - 1].x - 800)).toBeGreaterThan(50)
+  })
+})
+
+describe('台紙に一致しなかった絵', () => {
+  it('今までどおりの泳ぎ（速度をいじらない）', () => {
+    const free = creature(undefined, { vx: 60, vy: 20 })
+    const next = steer(free, tank)
+    expect(next.vx).toBe(free.vx)
+    expect(next.vy).toBe(free.vy)
+  })
+})

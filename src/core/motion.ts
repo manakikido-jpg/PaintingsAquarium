@@ -17,6 +17,8 @@ import {
   type Walker,
 } from './walk'
 import type { MotionKind } from './theme'
+import { steer, type Prey } from './behaviour'
+import type { SpeciesId } from './templates'
 
 /**
  * テーマごとに違う動きを、画面側から同じ扱いにするための層。
@@ -36,6 +38,11 @@ export interface Placement {
   readonly width: number
   readonly height: number
   readonly facingRight: boolean
+  /**
+   * 進んでいる向き（ラジアン。0 が右、下が +）。
+   * 上から見た絵（ウミガメ）を、進む向きへ回して描くために使う。
+   */
+  readonly heading: number
 }
 
 /** 浮遊系は列を持たないので、常に 0 番の列にいる扱いにする。 */
@@ -52,6 +59,7 @@ export function spawnCreature(
   lanes: readonly Lane[],
   sizeScale = DEFAULT_SIZE_SCALE,
   kind: CreatureKind = 'unknown',
+  species?: SpeciesId,
 ): Creature {
   if (motion === 'walk') {
     return {
@@ -70,11 +78,20 @@ export function spawnCreature(
    */
   const drifts = kind === 'tentacled'
 
+  /*
+   * 魚・イルカ・サメは、画面の端で跳ね返らずに**外へ出てから向きを変える**。
+   * 端で跳ね返ると水槽のガラスに当たったように見える（会場からの指摘）。
+   * 上から見た生き物（タコ・クラゲ・ウミガメ）は画面内で折り返す。
+   */
+  const swimsAcross = species === 'fish' || species === 'iruka' || species === 'same'
+
   return {
     kind: 'float',
     fish: spawnFish(seed, tank, imageWidth, imageHeight, {
       targetSize: creatureSize(tank, FISH_SIZE_RATIO, sizeScale),
       ...(drifts ? { minSpeed: 12, maxSpeed: 38 } : {}),
+      species,
+      wall: swimsAcross || species === undefined ? 'turnOutside' : 'bounce',
     }),
   }
 }
@@ -95,7 +112,17 @@ export function stepCreatures(
     else walkers.push(creature.walker)
   }
 
-  const steppedFloats = separateFish(floats, dtSeconds).map((fish) => stepFish(fish, dtSeconds, tank))
+  /*
+   * サメが追う相手。魚と、台紙に一致しなかった絵（自由画）を相手にする。
+   * サメどうしは追わない。
+   */
+  const prey: Prey[] = floats
+    .filter((fish) => fish.species === 'fish' || fish.species === undefined)
+    .map((fish) => ({ x: fish.x, y: fish.y }))
+
+  const steppedFloats = separateFish(floats, dtSeconds)
+    .map((fish) => steer(fish, tank, prey))
+    .map((fish) => stepFish(fish, dtSeconds, tank))
   const steppedWalkers = separateWalkers(walkers).map((walker) => stepWalker(walker, dtSeconds, tank))
 
   let floatIndex = 0
@@ -116,6 +143,7 @@ export function placeCreature(creature: Creature, lanes: readonly Lane[]): Place
       width: walker.width,
       height: walker.height,
       facingRight: walker.vx >= 0,
+      heading: walker.vx >= 0 ? 0 : Math.PI,
     }
   }
 
@@ -126,6 +154,7 @@ export function placeCreature(creature: Creature, lanes: readonly Lane[]): Place
     width: fish.width,
     height: fish.height,
     facingRight: facesRight(fish),
+    heading: Math.atan2(fish.vy, fish.vx),
   }
 }
 
