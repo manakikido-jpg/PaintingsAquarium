@@ -9,7 +9,7 @@ import {
 import { trimTransparent } from '../core/trim'
 import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
-import { orientForSwimming, type Rig } from '../core/rig'
+import { orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
 import { identifySpecies, type SpeciesId } from '../core/templates'
 
 /**
@@ -31,6 +31,8 @@ export type ProcessResult =
       rig: Rig
       /** 向きを直したか。直したときだけ画面に知らせる */
       turned: boolean
+      /** 台紙の向きに合わせて起こしたか。文言を分けるために別に持つ */
+      straightened: boolean
       /** 実際に使ったしきい値。自動で選んだ値を運営者が見られるようにする */
       paperValue: number
       /**
@@ -151,14 +153,32 @@ export async function processPhoto(
    * 一致したら、頭の向きは推定ではなく**台紙の正解**を使う。
    * 形から当てる推定は、当たらないことがある（R-030）。
    */
-  const found = identifySpecies(oriented.image)
+  let image = oriented.image
+  let found = identifySpecies(image)
+
+  /*
+   * 台紙が分かったら、**絵そのものを台紙の向きへ起こす**。
+   *
+   * 向き直し（`orientForSwimming`）は形の性質で決めているので、外すことがある。
+   * 実際、サメが**上下逆さま**で保存されていた（照合は「180度回して左右反転すれば
+   * 合う」と正しく報告していたのに、絵は裏返したままだった）。
+   * 台紙という正解がある以上、報告で済ませず絵を直す。
+   *
+   * 左右反転はしない。反転は描画側が進む向きに合わせてやるので、
+   * ここで子どもの塗った絵を鏡に映す必要はない。
+   */
+  if (found && found.turns !== 0) {
+    image = rotateQuarter(image, found.turns)
+    found = identifySpecies(image)
+  }
+
   const rig: Rig =
     found && found.headsRight !== null
       ? { ...oriented.rig, headsRight: found.headsRight, headKnown: true }
       : oriented.rig
 
   const blob = await new Promise<Blob | null>((resolve) =>
-    toCanvas(oriented.image).toBlob(resolve, 'image/png'),
+    toCanvas(image).toBlob(resolve, 'image/png'),
   )
   if (!blob) return { ok: false, message: `${fileName}: PNG に変換できませんでした。` }
 
@@ -169,11 +189,12 @@ export async function processPhoto(
   return {
     ok: true,
     pngBase64: btoa(binary),
-    width: oriented.image.width,
-    height: oriented.image.height,
+    width: image.width,
+    height: image.height,
     touchedBorder,
     rig,
     turned: oriented.turns !== 0 || oriented.flipped,
+    straightened: image !== oriented.image,
     paperValue: chosen,
     species: found?.id,
     head: found?.head,

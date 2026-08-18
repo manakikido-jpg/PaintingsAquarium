@@ -47,7 +47,12 @@ export function App(): React.JSX.Element {
           return
         }
 
-        if (result.turned) {
+        if (result.straightened) {
+          pushNotice({
+            level: 'info',
+            message: `${photo.fileName}: 台紙の向きに合わせて起こしました。`,
+          })
+        } else if (result.turned) {
           pushNotice({
             level: 'info',
             message: `${photo.fileName}: 絵が縦向きだったので、横向きに直して泳がせました。`,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createImage, type RgbaImage } from '../image'
+import { rotateQuarter } from '../rig'
 import {
   SPECIES,
   SPECIES_IDS,
@@ -203,5 +204,38 @@ describe('手足の分割', () => {
   it('分割を持たない生き物では空を返す', () => {
     expect(partsForPiece('fish')).toEqual([])
     expect(partsForPiece(undefined)).toEqual([])
+  })
+})
+
+describe('台紙の向きへ起こす（R-034）', () => {
+  it('回した絵は、同じ回数だけ回し戻せば台紙の向きに戻る', () => {
+    for (const id of SPECIES_IDS) {
+      for (const turns of [1, 2, 3]) {
+        let image = pieceOf(id)
+        for (let index = 0; index < turns; index++) image = turned(image)
+
+        const found = identifySpecies(image)
+        expect(found?.id).toBe(id)
+
+        // 照合が言うとおりに回すと、もう回す必要が無くなる
+        const straightened = rotateQuarter(image, found!.turns)
+        const after = identifySpecies(straightened)
+        expect(after?.turns).toBe(0)
+      }
+    }
+  })
+
+  it('上下逆さまの絵（180度＋左右反転）も、起こすと上下が戻る', () => {
+    // サメが実際にこの形で保存されていた
+    const upsideDown = mirrored(turned(turned(pieceOf('same'))))
+    const found = identifySpecies(upsideDown)
+    expect(found?.turns).toBe(2)
+
+    const straightened = rotateQuarter(upsideDown, found!.turns)
+    const after = identifySpecies(straightened)
+    expect(after?.turns).toBe(0)
+    // 起こしたあとは左右の違いだけが残る
+    expect(after?.mirrored).toBe(true)
+    expect(after?.headsRight).toBe(true)
   })
 })
