@@ -12,6 +12,9 @@ import {
   type Seaweed,
   type Shell,
   type Shipwreck,
+  fanEdge,
+  fanRibs,
+  type Fan,
 } from '../core/decor'
 import type { Tank } from '../core/swim'
 
@@ -448,4 +451,49 @@ export function drawCorals(
   }
 
   context.restore()
+}
+
+/**
+ * 扇サンゴを描く。
+ *
+ * 骨を1本ずつ線で描き、その内側に薄い塗りを敷く。
+ * 塗りだけだと平たい板に、線だけだと透けすぎて存在感が出ない。
+ * **線と塗りの両方**でようやく「網目の扇」に見える。
+ */
+export function drawFans(
+  context: CanvasRenderingContext2D,
+  fans: readonly Fan[],
+  profile: readonly number[],
+  tank: Tank,
+  strength: number,
+  style: DecorStyle = MID_STYLE,
+): void {
+  if (strength <= 0) return
+
+  const sorted = [...fans].sort((a, b) => a.depth - b.depth)
+  for (const fan of sorted) {
+    const groundY = groundAt(profile, fan.x, tank)
+    const colour = coralColour(fan.seed, style)
+    const alpha = style.alpha * strength * (0.62 + fan.depth * 0.3)
+
+    // 内側の薄い塗り
+    const edge = fanEdge(fan, groundY)
+    context.beginPath()
+    context.moveTo(edge[0].x, edge[0].y)
+    for (const point of edge.slice(1)) context.lineTo(point.x, point.y)
+    context.closePath()
+    context.fillStyle = `rgba(${rgb(colour)}, ${alpha * 0.3})`
+    context.fill()
+
+    // 骨
+    context.lineCap = 'round'
+    context.strokeStyle = `rgba(${rgb(colour)}, ${alpha})`
+    context.lineWidth = Math.max(1.2, fan.height * 0.028)
+    for (const rib of fanRibs(fan, groundY)) {
+      context.beginPath()
+      context.moveTo(rib[0].x, rib[0].y)
+      for (const point of rib.slice(1)) context.lineTo(point.x, point.y)
+      context.stroke()
+    }
+  }
 }

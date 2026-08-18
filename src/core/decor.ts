@@ -87,6 +87,21 @@ export interface Rock {
  */
 export interface DecorHeight {
   readonly heightScale?: number
+  /** 飾りを寄せる位置（0=左端, 1=右端）。省略すると全体に散らす */
+  readonly clusterAt?: number
+  /** 寄せの広がり。小さいほど固まる */
+  readonly clusterSpread?: number
+}
+
+/** 置き場所を決める。寄せ先が指定されていればそちらへ固める。 */
+function placeAcross(
+  t: number,
+  avoid: Span | undefined,
+  clusterAt: number | undefined,
+  clusterSpread: number,
+): number {
+  if (clusterAt === undefined) return placeOutside(t, avoid)
+  return clusterAcross(t, clusterAt, clusterSpread)
 }
 
 export function spawnRocks(
@@ -94,7 +109,7 @@ export function spawnRocks(
   count: number,
   tank: Tank,
   avoid?: Span,
-  { heightScale = 1 }: DecorHeight = {},
+  { heightScale = 1, clusterAt, clusterSpread = 0.5 }: DecorHeight = {},
 ): Rock[] {
   const random = seededRandom(seed)
   const rocks: Rock[] = []
@@ -104,7 +119,7 @@ export function spawnRocks(
     // 岩場ではなく「1つの大きな塊」に見える。
     const slot = (index + 0.5) / count + (random() - 0.5) * 0.7 / count
     rocks.push({
-      x: tank.width * placeOutside(slot, avoid),
+      x: tank.width * placeAcross(slot, avoid, clusterAt, clusterSpread),
       halfWidth: tank.width * (0.026 + random() * 0.05),
       height: tank.height * (0.03 + random() * 0.075) * heightScale,
       depth: random(),
@@ -201,7 +216,7 @@ export function spawnSeaweed(
   clusters: number,
   tank: Tank,
   avoid?: Span,
-  { heightScale = 1 }: DecorHeight = {},
+  { heightScale = 1, clusterAt, clusterSpread = 0.5 }: DecorHeight = {},
 ): Seaweed[] {
   const random = seededRandom(seed)
   const weeds: Seaweed[] = []
@@ -217,7 +232,7 @@ export function spawnSeaweed(
   for (let index = 0; index < clusters; index++) {
     const depth = random()
     const slot = (index + 0.5) / clusters + (random() - 0.5) * 0.8 / clusters
-    const rootX = tank.width * placeOutside(slot, widened)
+    const rootX = tank.width * placeAcross(slot, widened, clusterAt, clusterSpread)
     const rootHeight = tank.height * (0.11 + depth * 0.2) * heightScale
     const blades = 3 + Math.floor(random() * 2)
 
@@ -460,7 +475,7 @@ export function spawnCorals(
   count: number,
   tank: Tank,
   avoid?: Span,
-  { heightScale = 1 }: DecorHeight = {},
+  { heightScale = 1, clusterAt, clusterSpread = 0.5 }: DecorHeight = {},
 ): Coral[] {
   const random = seededRandom(seed)
   const corals: Coral[] = []
@@ -469,7 +484,7 @@ export function spawnCorals(
     const slot = (index + 0.5) / count + (random() - 0.5) * 0.85 / count
     const depth = random()
     corals.push({
-      x: tank.width * placeOutside(slot, avoid),
+      x: tank.width * placeAcross(slot, avoid, clusterAt, clusterSpread),
       // 海藻より低く抑える。高いと絵の泳ぐ範囲に食い込む。
       height: tank.height * (0.07 + depth * 0.09 + random() * 0.04) * heightScale,
       halfWidth: tank.width * (0.004 + random() * 0.004),
@@ -534,4 +549,111 @@ export function coralBranches(coral: Coral, groundY: number): CoralBranch[] {
   )
 
   return branches
+}
+
+/* ------------------------------------------------------------------
+ * 扇サンゴ（ウミウチワ）
+ *
+ * 参考画像には「枝」と「房」のほかに、**扇のように平たく広がる**サンゴがある。
+ * 形の種類が2つしかないと、数を増やしても同じものが並んでいるようにしか
+ * 見えない。**賑やかさは数ではなく種類の差から出る。**
+ * ------------------------------------------------------------------ */
+
+export interface Fan {
+  readonly x: number
+  /** 扇の付け根から先端までの長さ */
+  readonly height: number
+  /** 扇が開く角度（ラジアン） */
+  readonly spread: number
+  /** 扇全体の傾き（ラジアン）。0 で真上 */
+  readonly tilt: number
+  /** 骨の本数 */
+  readonly ribs: number
+  /** 0〜1。大きいほど手前 */
+  readonly depth: number
+  readonly seed: number
+}
+
+export function spawnFans(
+  seed: number,
+  count: number,
+  tank: Tank,
+  avoid?: Span,
+  { heightScale = 1, clusterAt, clusterSpread = 0.5 }: DecorHeight = {},
+): Fan[] {
+  const random = seededRandom(seed)
+  const fans: Fan[] = []
+
+  for (let index = 0; index < count; index++) {
+    const depth = random()
+    fans.push({
+      x: placeAcross(random(), avoid, clusterAt, clusterSpread) * tank.width,
+      height: tank.height * (0.08 + depth * 0.1 + random() * 0.04) * heightScale,
+      // 開きすぎると扇ではなく半円の板に見える
+      spread: 0.7 + random() * 0.5,
+      // 少し傾けると、水の流れに向いているように見える
+      tilt: (random() - 0.5) * 0.5,
+      ribs: 7 + Math.floor(random() * 6),
+      depth,
+      seed: Math.floor(random() * 100000),
+    })
+  }
+  return fans
+}
+
+/**
+ * 扇の骨を1本ずつ返す。
+ *
+ * 骨は根元から放射状に伸ばし、**先端ほど外へ反らせる**。
+ * まっすぐ伸ばすと扇ではなく「串の束」に見える（海藻で同じ失敗をしている）。
+ * 中央の骨をいちばん長くするのは、扇の輪郭を丸くするため。
+ */
+export function fanRibs(fan: Fan, groundY: number, steps = 6): Point[][] {
+  const random = seededRandom(fan.seed)
+  const base: Point = { x: fan.x, y: groundY }
+  const ribs: Point[][] = []
+
+  for (let index = 0; index < fan.ribs; index++) {
+    // -1（左端）〜 +1（右端）
+    const across = fan.ribs === 1 ? 0 : (index / (fan.ribs - 1)) * 2 - 1
+    // 中央が長く、端が短い
+    const length = fan.height * (0.62 + 0.38 * Math.cos((across * Math.PI) / 2))
+    const angle = fan.tilt + (across * fan.spread) / 2
+    const curl = across * (0.25 + random() * 0.2)
+
+    const points: Point[] = []
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps
+      // 先端ほど外へ反る
+      const at = angle + curl * t * t
+      points.push({
+        x: base.x + Math.sin(at) * length * t,
+        y: base.y - Math.cos(at) * length * t,
+      })
+    }
+    ribs.push(points)
+  }
+  return ribs
+}
+
+/** 扇の外周（骨の先端をつないだ線）。塗りに使う。 */
+export function fanEdge(fan: Fan, groundY: number): Point[] {
+  const ribs = fanRibs(fan, groundY)
+  return [ribs[0][0], ...ribs.map((rib) => rib[rib.length - 1])]
+}
+
+/**
+ * 飾りを片側へ寄せる。
+ *
+ * 参考画像の構図は**左右対称ではない**。片側に大きな塊があり、
+ * 反対側は開けた青で、そこに絵が浮いている。
+ * 均一な帯にすると、賑やかでも「壁紙」に見えてしまう。
+ *
+ * `centre` に寄せ、`spread` で広がりを決める。返す値は 0〜1。
+ */
+export function clusterAcross(t: number, centre: number, spread: number): number {
+  // 0〜1 を -1〜1 に直し、両端ほど薄くなる曲線にする（中央が濃い）
+  const signed = t * 2 - 1
+  const eased = Math.sign(signed) * Math.pow(Math.abs(signed), 1.7)
+  return Math.min(1, Math.max(0, centre + eased * spread))
 }

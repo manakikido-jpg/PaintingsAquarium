@@ -4,9 +4,11 @@ import {
   spawnRocks,
   spawnSeaweed,
   spawnCorals,
+  spawnFans,
   spawnShells,
   spawnShipwreck,
   type Coral,
+  type Fan,
   type Rock,
   type Seaweed,
 } from '../../core/decor'
@@ -14,6 +16,7 @@ import { spawnBubbles, spawnRays, stepBubble, type Bubble } from '../../core/sce
 import { drawBubbles, drawLightRays, drawVignette, drawWater } from '../drawScenery'
 import {
   drawCorals,
+  drawFans,
   drawRocks,
   drawSand,
   drawSeaweed,
@@ -46,12 +49,24 @@ const FRONT_BUBBLE_COUNT = 8
 const ROCK_HEIGHT = 2.4
 const SEAWEED_HEIGHT = 1.5
 const CORAL_HEIGHT = 2.2
+const FAN_HEIGHT = 2.0
 
-const ROCK_COUNT = 9
+/*
+ * 塊を寄せる位置。参考画像の構図は左右対称ではなく、
+ * **片側に大きな塊、反対側は開けた青**で、そこに絵が浮いている。
+ * 均一な帯にすると、どれだけ賑やかにしても「壁紙」に見える。
+ * 0.62 は少し右寄り。左側を絵の見せ場として空ける。
+ */
+const CLUSTER_AT = 0.62
+const CLUSTER_SPREAD = 0.46
+
+const ROCK_COUNT = 12
 const SHELL_COUNT = 6
-const CORAL_COUNT = 9
+const CORAL_COUNT = 14
+// 扇サンゴ。形の種類が増えるほど、同じ数でも賑やかに見える
+const FAN_COUNT = 9
 // 「株」の数。1 株から数枚の葉が生える。
-const SEAWEED_COUNT = 10
+const SEAWEED_COUNT = 13
 
 /** 水族館。絵は水中を自由に泳ぐので、奥行きの列は持たない。 */
 export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
@@ -61,13 +76,26 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
   const wreck = spawnShipwreck(tank)
   // 沈没船の前には生やさない。重ねると輪郭が消えて塊になる（R-006）。
   const wreckSpan = shipwreckSpan(wreck, tank)
-  const allRocks = spawnRocks(8823, many(ROCK_COUNT), tank, wreckSpan, { heightScale: ROCK_HEIGHT })
+  const allRocks = spawnRocks(8823, many(ROCK_COUNT), tank, wreckSpan, {
+    heightScale: ROCK_HEIGHT,
+    clusterAt: CLUSTER_AT,
+    clusterSpread: CLUSTER_SPREAD,
+  })
   const allSeaweed = spawnSeaweed(5507, many(SEAWEED_COUNT), tank, wreckSpan, {
     heightScale: SEAWEED_HEIGHT,
+    clusterAt: CLUSTER_AT,
+    clusterSpread: CLUSTER_SPREAD,
   })
   const shells = spawnShells(6619, many(SHELL_COUNT), tank)
   const allCorals = spawnCorals(3271, many(CORAL_COUNT), tank, wreckSpan, {
     heightScale: CORAL_HEIGHT,
+    clusterAt: CLUSTER_AT,
+    clusterSpread: CLUSTER_SPREAD,
+  })
+  const allFans = spawnFans(4139, many(FAN_COUNT), tank, wreckSpan, {
+    heightScale: FAN_HEIGHT,
+    clusterAt: CLUSTER_AT,
+    clusterSpread: CLUSTER_SPREAD,
   })
 
   /*
@@ -78,14 +106,26 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
   const pick = <T extends { depth: number }>(items: readonly T[], from: number, to: number): T[] =>
     items.filter((item) => item.depth >= from && item.depth < to)
 
-  const farRocks: Rock[] = pick(allRocks, 0, 0.4)
-  const midRocks: Rock[] = pick(allRocks, 0.4, 0.72)
-  const nearRocks: Rock[] = pick(allRocks, 0.72, 1.01)
-  const farSeaweed: Seaweed[] = pick(allSeaweed, 0, 0.45)
-  const nearSeaweed: Seaweed[] = pick(allSeaweed, 0.45, 1.01)
-  const farCorals: Coral[] = pick(allCorals, 0, 0.4)
-  const midCorals: Coral[] = pick(allCorals, 0.4, 0.72)
-  const nearCorals: Coral[] = pick(allCorals, 0.72, 1.01)
+  /*
+   * 層の境目。中景を厚くしてある。
+   * 参考画像の賑やかさは「手前に大きいものが1つある」ではなく、
+   * **中くらいのものが何層も重なっている**ことから出ている。
+   */
+  const farRocks: Rock[] = pick(allRocks, 0, 0.34)
+  const midRocks: Rock[] = pick(allRocks, 0.34, 0.88)
+  const nearRocks: Rock[] = pick(allRocks, 0.88, 1.01)
+  /*
+   * 手前の層だけが毎フレーム描かれる。奥と中は起動時に1枚へ焼くので、
+   * **数を増やしても費用が増えない**。賑やかさを足すときは焼く側へ寄せる。
+   * 手前を 0.76 → 0.88 に絞って 12fps から戻した。
+   */
+  const farSeaweed: Seaweed[] = pick(allSeaweed, 0, 0.62)
+  const nearSeaweed: Seaweed[] = pick(allSeaweed, 0.62, 1.01)
+  const farCorals: Coral[] = pick(allCorals, 0, 0.34)
+  const midCorals: Coral[] = pick(allCorals, 0.34, 0.88)
+  const nearCorals: Coral[] = pick(allCorals, 0.88, 1.01)
+  const farFans: Fan[] = pick(allFans, 0, 0.45)
+  const nearFans: Fan[] = pick(allFans, 0.45, 1.01)
 
   /*
    * 遠景と中景は動かないので、起動時に 1 回だけ焼いておく。
@@ -98,6 +138,7 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
     (context) => {
       drawShipwreck(context, wreck, sand, tank, 1, FAR_STYLE)
       drawSeaweed(context, farSeaweed, sand, tank, 0, 1, FAR_STYLE)
+      drawFans(context, farFans, sand, tank, 1, FAR_STYLE)
       drawCorals(context, farCorals, sand, tank, 1, FAR_STYLE)
       drawRocks(context, farRocks, sand, tank, 1, FAR_STYLE)
     },
@@ -109,6 +150,7 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
     tank,
     (context) => {
       drawRocks(context, midRocks, sand, tank, 1, MID_STYLE)
+      drawFans(context, nearFans, sand, tank, 1, MID_STYLE)
       drawCorals(context, midCorals, sand, tank, 1, MID_STYLE)
       drawShells(context, shells, sand, tank, 1, MID_STYLE)
     },

@@ -15,6 +15,10 @@ import {
   spawnCorals,
   spawnShells,
   spawnShipwreck,
+  spawnFans,
+  fanRibs,
+  fanEdge,
+  clusterAcross,
 } from '../decor'
 import type { Tank } from '../swim'
 
@@ -438,5 +442,89 @@ describe('飾りの高さの倍率', () => {
       ...seaweed.map((one) => ground - one.height),
     )
     expect(highest).toBeGreaterThan(tank.height * 0.25)
+  })
+})
+
+describe('扇サンゴ', () => {
+  const tank: Tank = { width: 1600, height: 900 }
+
+  it('骨の本数だけ線を返す', () => {
+    const fan = spawnFans(5, 1, tank)[0]
+    expect(fanRibs(fan, 800)).toHaveLength(fan.ribs)
+  })
+
+  it('骨はすべて同じ根元から始まる', () => {
+    const fan = spawnFans(6, 1, tank)[0]
+    const ribs = fanRibs(fan, 800)
+    for (const rib of ribs) {
+      expect(rib[0].x).toBeCloseTo(fan.x)
+      expect(rib[0].y).toBeCloseTo(800)
+    }
+  })
+
+  it('中央の骨がいちばん長い。端まで同じ長さだと扇ではなく板に見える', () => {
+    const fan = { ...spawnFans(7, 1, tank)[0], ribs: 9, tilt: 0, spread: 1 }
+    const ribs = fanRibs(fan, 800)
+    const length = (rib: { x: number; y: number }[]): number =>
+      Math.hypot(rib[rib.length - 1].x - rib[0].x, rib[rib.length - 1].y - rib[0].y)
+    const middle = length(ribs[4])
+    expect(middle).toBeGreaterThan(length(ribs[0]))
+    expect(middle).toBeGreaterThan(length(ribs[8]))
+  })
+
+  it('先端は根元より必ず上にある。地面へ潜らない', () => {
+    for (const fan of spawnFans(8, 20, tank)) {
+      for (const rib of fanRibs(fan, 800)) {
+        expect(rib[rib.length - 1].y).toBeLessThan(800)
+      }
+    }
+  })
+
+  it('先端ほど外へ反る。まっすぐだと串の束に見える', () => {
+    const fan = { ...spawnFans(9, 1, tank)[0], ribs: 5, tilt: 0, spread: 1.2 }
+    const rib = fanRibs(fan, 800)[0] // 左端の骨
+    // 根元付近の傾きより、先端付近の傾きのほうが外へ向いている
+    const early = Math.atan2(rib[1].x - rib[0].x, rib[0].y - rib[1].y)
+    const late = Math.atan2(
+      rib[rib.length - 1].x - rib[rib.length - 2].x,
+      rib[rib.length - 2].y - rib[rib.length - 1].y,
+    )
+    expect(Math.abs(late)).toBeGreaterThan(Math.abs(early))
+  })
+
+  it('外周は骨の本数＋根元の点', () => {
+    const fan = spawnFans(10, 1, tank)[0]
+    expect(fanEdge(fan, 800)).toHaveLength(fan.ribs + 1)
+  })
+
+  it('高さの倍率が効く', () => {
+    const plain = spawnFans(11, 5, tank)
+    const tall = spawnFans(11, 5, tank, undefined, { heightScale: 2 })
+    for (let index = 0; index < plain.length; index++) {
+      expect(tall[index].height).toBeCloseTo(plain[index].height * 2)
+    }
+  })
+})
+
+describe('clusterAcross', () => {
+  it('寄せ先の周りに集まる', () => {
+    const values = Array.from({ length: 100 }, (_, index) =>
+      clusterAcross((index + 0.5) / 100, 0.62, 0.46),
+    )
+    const near = values.filter((v) => Math.abs(v - 0.62) < 0.2).length
+    expect(near).toBeGreaterThan(45)
+  })
+
+  it('0〜1 の外へ出ない', () => {
+    for (let index = 0; index <= 100; index++) {
+      const v = clusterAcross(index / 100, 0.9, 0.8)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('反対側にも少しは置く。片側が完全に空だと切り取ったように見える', () => {
+    const values = Array.from({ length: 60 }, (_, index) => clusterAcross(index / 59, 0.62, 0.46))
+    expect(Math.min(...values)).toBeLessThan(0.35)
   })
 })
