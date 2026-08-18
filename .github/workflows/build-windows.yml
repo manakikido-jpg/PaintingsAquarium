@@ -15,6 +15,10 @@ on:
       - claude/product-dev-guidelines-85ic9x
   workflow_dispatch:
 
+permissions:
+  # 「最新版」の置き場（Release）を書き換えるために要る
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -43,3 +47,34 @@ jobs:
           # 会期をまたいで取りに来られるだけの余裕を持たせる
           retention-days: 60
           if-no-files-found: error
+
+      # 「最新版」の固定の置き場に上書きする。
+      #
+      # Artifacts は **GitHub にログインしないと落とせず、60日で消える**。
+      # 会場PCから毎回ログインするのは現実的でないので、
+      # ログイン不要の固定URLに常に最新の exe を置いておく。
+      #   https://github.com/<owner>/<repo>/releases/tag/latest
+      #
+      # アプリ側には何も足していない（外部通信なし・要件定義 §4 のまま）。
+      # 更新は「人が落として上書きする」ままで、置き場が変わるだけ。
+      - name: 最新版として置く
+        if: github.ref_name == github.event.repository.default_branch
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: 最新版（自動ビルド）
+          body: |
+            **会場PCへはこの2つのどちらかを落として使ってください。**
+
+            | ファイル | 使いどころ |
+            |---|---|
+            | `PaintingsAquarium Setup *.exe` | 会場PCに入れて使う（ふつうはこちら） |
+            | `PaintingsAquarium-*-portable.exe` | インストールできないPC用。USBから直接動く |
+
+            上書きしても**絵と設定は消えません**。
+            保存先はアプリとは別（インストール版は `%APPDATA%`、持ち運び版は exe の隣）。
+
+            未署名のため「WindowsによってPCが保護されました」が出ます。
+            「詳細情報」→「実行」で進めてください。
+          prerelease: true
+          files: release/*.exe
