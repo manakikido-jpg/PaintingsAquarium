@@ -5,6 +5,9 @@ import { drawCorals, drawRocks, drawSand, FAR_STYLE, MID_STYLE, NEAR_STYLE } fro
 import { createCausticsLayer } from '../drawCaustics'
 import { bakeLayer, type BakedLayer } from '../bake'
 import type { Tank } from '../../core/swim'
+import { placeParts } from '../../core/parts'
+import { drawParts, loadParts, type PartImages } from '../drawParts'
+import { DECOR_PARTS } from '../parts'
 import type { Scene } from './types'
 
 /*
@@ -29,7 +32,13 @@ const RAY_COUNT = 9
 const BACK_BUBBLE_COUNT = 22
 const FRONT_BUBBLE_COUNT = 6
 
-/** 大きな石。これが背景の主役。 */
+/**
+ * 敷くパーツの数。
+ * パーツ画像（`assets/decor/`）がある場合はこちらを使う。
+ */
+const PART_COUNT = 16
+
+/** 大きな石。これが背景の主役。パーツ画像が無いときの代わり。 */
 const ROCK_COUNT = 13
 /** 枝サンゴ。石の間に少しだけ。多いと尖った形が増えて元に戻る。 */
 const CORAL_COUNT = 5
@@ -53,6 +62,25 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
   const allCorals = spawnCorals(3271, many(CORAL_COUNT), tank, undefined, {
     heightScale: CORAL_HEIGHT,
   })
+
+  /*
+   * パーツ画像があればそれを敷き、無ければ図形で描く。
+   *
+   * 図形で描く方式は残しておく。**画像が1枚も無い状態でも背景が出る**必要がある
+   *（`assets/decor/` を空にしたまま配ってしまったときに、真っ青な画面になると
+   * 不具合に見える）。
+   */
+  const useParts = DECOR_PARTS.length > 0
+  let partImages: PartImages = { images: [], ready: false }
+  const parts = useParts
+    ? placeParts(7717, PART_COUNT, DECOR_PARTS.length, tank, {
+        groundAt: (x) => {
+          const at = Math.min(sand.length - 1, Math.max(0, Math.round((x / tank.width) * (sand.length - 1))))
+          return sand[at]
+        },
+      })
+    : []
+  if (useParts) partImages = loadParts(DECOR_PARTS, () => undefined)
 
   const pick = <T extends { depth: number }>(items: readonly T[], from: number, to: number): T[] =>
     items.filter((item) => item.depth >= from && item.depth < to)
@@ -139,10 +167,15 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
       drawLightRays(context, rays, elapsed, tank, strength)
 
       drawSand(context, sand, tank, strength)
-      farLayer?.draw(context, tank, strength)
-      midLayer?.draw(context, tank, strength)
-      drawCorals(context, nearCorals, sand, tank, strength, NEAR_STYLE)
-      drawRocks(context, nearRocks, sand, tank, strength, NEAR_STYLE)
+
+      if (useParts) {
+        drawParts(context, parts, partImages, tank, strength)
+      } else {
+        farLayer?.draw(context, tank, strength)
+        midLayer?.draw(context, tank, strength)
+        drawCorals(context, nearCorals, sand, tank, strength, NEAR_STYLE)
+        drawRocks(context, nearRocks, sand, tank, strength, NEAR_STYLE)
+      }
 
       drawVignette(context, tank, strength)
       drawBubbles(context, backBubbles, strength)
