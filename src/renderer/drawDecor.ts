@@ -328,24 +328,71 @@ export function drawRocks(
   // 奥の岩から先に描く。手前の岩が奥に隠れると重なりがおかしく見える。
   const sorted = [...rocks].sort((a, b) => a.depth - b.depth)
   sorted.forEach((rock, index) => {
-    // 少し砂に埋める。砂の線にちょうど乗せると置物のように浮いて見える。
-    const outline = rockOutline(rock, groundAt(profile, rock.x, tank) + rock.height * 0.08)
-    /*
-     * 塊は発光して見せる。参考画像では、白い塊が水の中でいちばん光っている。
-     * 房の集まりは面積が大きいので、halo を強めると
-     * 「後ろから照らされた珊瑚」に見える。
-     */
+    const groundY = groundAt(profile, rock.x, tank) + rock.height * 0.08
+    const outline = rockOutline(rock, groundY)
     const colour = mix(
       HEAD_COLOURS[Math.floor(rock.seed) % HEAD_COLOURS.length],
       style.water,
       style.fade * 0.45,
     )
+
     /*
-     * 光らせすぎると輪郭が溶けて**雲**に見える。
-     * 一度 2.1倍＋0.03 まで上げて失敗した。形が読める範囲に戻す。
+     * 接地の影。石の下に濃い影を1枚敷く。
+     *
+     * これが無いと、石が**地面に貼り付いた紙**に見える。
+     * 影は物の存在ではなく「そこに乗っていること」を伝える部品で、
+     * 1枚あるだけで浮きが止まる。
      */
-    const glowing: DecorStyle = { ...style, halo: style.halo * 1.15 }
-    paintSilhouette(context, outline, glowing, strength, colour, 0.92 + rock.depth * 0.08)
+    context.save()
+    const shadow = context.createRadialGradient(
+      rock.x,
+      groundY,
+      0,
+      rock.x,
+      groundY,
+      rock.halfWidth * 1.25,
+    )
+    shadow.addColorStop(0, `rgba(6, 26, 76, ${0.42 * strength})`)
+    shadow.addColorStop(1, 'rgba(6, 26, 76, 0)')
+    context.fillStyle = shadow
+    context.beginPath()
+    context.ellipse(rock.x, groundY, rock.halfWidth * 1.25, rock.height * 0.18, 0, 0, Math.PI * 2)
+    context.fill()
+    context.restore()
+
+    paintSilhouette(context, outline, style, strength, colour, 0.92 + rock.depth * 0.08)
+
+    /*
+     * 厚み。**光を左上から当て、右下を落とす。**
+     *
+     * 一度これを忘れて平らな一色で塗り、「安っぽい」と言われた。
+     * 規則には R-011 で「単色で塗ると切り絵に見える」と書いてあったのに、
+     * 作り直すときに戻してしまった。
+     *
+     * 上下のグラデーションでは足りない。**光の向きが要る。**
+     * 縦だけだと、どの石も同じ明暗になって並んだ置物に見える。
+     */
+    let left = outline[0].x
+    let right = outline[0].x
+    let top = outline[0].y
+    for (const point of outline) {
+      if (point.x < left) left = point.x
+      if (point.x > right) right = point.x
+      if (point.y < top) top = point.y
+    }
+    const lit = context.createLinearGradient(left, top, right, groundY)
+    lit.addColorStop(0, `rgba(255, 255, 255, ${0.34 * strength * style.alpha})`)
+    lit.addColorStop(0.42, 'rgba(255, 255, 255, 0)')
+    lit.addColorStop(0.62, 'rgba(4, 20, 70, 0)')
+    lit.addColorStop(1, `rgba(4, 20, 70, ${0.4 * strength * style.alpha})`)
+
+    context.save()
+    tracePolygon(context, outline)
+    context.clip()
+    context.fillStyle = lit
+    context.fillRect(left, top, right - left, groundY - top)
+    context.restore()
+
     void index
   })
 }

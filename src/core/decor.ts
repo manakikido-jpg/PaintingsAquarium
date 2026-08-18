@@ -67,6 +67,13 @@ export function placeOutside(t: number, avoid?: Span): number {
 // ---------------------------------------------------------------- 岩
 
 export interface Rock {
+  /**
+   * 頂点の左右のずれ（-1〜1）。0 なら真ん中。
+   *
+   * これが無いと**左右対称の半円**になり、石ではなく「ドーム」に見える。
+   * 自然の石で左右対称のものは無い。
+   */
+  readonly skew: number
   readonly x: number
   readonly halfWidth: number
   readonly height: number
@@ -121,8 +128,10 @@ export function spawnRocks(
     rocks.push({
       x: tank.width * placeAcross(slot, avoid, clusterAt, clusterSpread),
       // 参考の塊は横に長い大きな石。細く高くすると柱に見える
-      halfWidth: tank.width * (0.055 + random() * 0.075),
-      height: tank.height * (0.035 + random() * 0.055) * heightScale,
+      // 大きさのばらつきを広く取る。揃っていると並べた置物に見える
+      halfWidth: tank.width * (0.035 + random() * random() * 0.16),
+      skew: (random() - 0.5) * 1.2,
+      height: tank.height * (0.028 + random() * random() * 0.11) * heightScale,
       depth: random(),
       seed: Math.floor(random() * 100000) + 1,
     })
@@ -171,13 +180,21 @@ export function rockOutline(rock: Rock, groundY: number, steps = 40): Point[] {
   const points: Point[] = []
 
   for (let index = 0; index <= steps; index++) {
-    const angle = Math.PI * (index / steps)
+    const t = index / steps
+    const angle = Math.PI * t
     let radius = 1
     for (const lump of lumps) radius += Math.sin(angle * lump.waves + lump.phase) * lump.size
 
+    /*
+     * 頂点を左右へずらす。`t` を歪ませると、片側が急で片側がなだらかになる。
+     * 左右対称の半円は石に見えない。
+     */
+    const skewed = t + rock.skew * Math.sin(Math.PI * t) * 0.22
+    const at = Math.PI * Math.min(1, Math.max(0, skewed))
+
     points.push({
       x: rock.x - Math.cos(angle) * rock.halfWidth * radius,
-      y: groundY - Math.sin(angle) * rock.height * radius,
+      y: groundY - Math.sin(at) * rock.height * radius,
     })
   }
 
