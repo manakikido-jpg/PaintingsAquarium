@@ -45,12 +45,12 @@ export type Rgb = readonly [number, number, number]
  * 絵が泳ぐ中央は、情報の少ない綺麗な青のまま残すこと。
  */
 export const CORAL_COLOURS: readonly Rgb[] = [
-  [242, 108, 156], // 桃
-  [252, 160, 92], // 珊瑚
-  [250, 214, 108], // 山吹
-  [116, 224, 190], // 若草
-  [124, 186, 250], // 水
-  [186, 140, 246], // 藤
+  [255, 56, 148], // 濃桃
+  [255, 112, 64], // 朱
+  [255, 214, 64], // 山吹
+  [72, 244, 196], // 碧
+  [255, 250, 232], // 生成り
+  [178, 96, 255], // 菫
 ]
 
 /** その層で色をどれだけ水に溶かすか、という設定。 */
@@ -73,38 +73,40 @@ export interface DecorStyle {
 }
 
 /** その層の水の色。奥ほど明るい青に溶ける。 */
-const NEAR_WATER: Rgb = [12, 96, 156]
-const MID_WATER: Rgb = [16, 116, 180]
-const FAR_WATER: Rgb = [26, 142, 204]
+const NEAR_WATER: Rgb = [18, 62, 192]
+const MID_WATER: Rgb = [26, 86, 224]
+const FAR_WATER: Rgb = [42, 123, 240]
 
 /** 手前（色がはっきり出る）。 */
 export const NEAR_STYLE: DecorStyle = {
-  rim: 'rgba(226, 250, 255, 0.5)',
+  rim: 'rgba(255, 255, 255, 0.62)',
   rimWidth: 1.8,
-  alpha: 0.95,
-  halo: 0.055,
-  fade: 0.16,
+  alpha: 0.97,
+  // 飾りを光らせる。参考にした見え方では、飾り自体が発光している
+  halo: 0.085,
+  // 水へ溶かす割合を下げて、色を濃く残す
+  fade: 0.08,
   water: NEAR_WATER,
 }
 
 /** 中景。 */
 export const MID_STYLE: DecorStyle = {
-  rim: 'rgba(214, 244, 255, 0.32)',
+  rim: 'rgba(240, 252, 255, 0.4)',
   rimWidth: 1.5,
-  alpha: 0.9,
-  halo: 0.04,
-  fade: 0.42,
+  alpha: 0.93,
+  halo: 0.065,
+  fade: 0.26,
   water: MID_WATER,
 }
 
 /** 遠景（ほとんど水に溶ける）。 */
 export const FAR_STYLE: DecorStyle = {
-  rim: 'rgba(206, 240, 255, 0.18)',
+  rim: 'rgba(226, 246, 255, 0.24)',
   rimWidth: 1.2,
-  alpha: 0.85,
+  alpha: 0.88,
   // 遠景は焼き付けるときに本物のぼかしを掛けるので、こちらは要らない
   halo: 0,
-  fade: 0.72,
+  fade: 0.5,
   water: FAR_WATER,
 }
 
@@ -127,7 +129,7 @@ function coralColour(index: number, style: DecorStyle): Rgb {
   return mix(CORAL_COLOURS[index % CORAL_COLOURS.length], style.water, style.fade)
 }
 
-const SAND = '196, 232, 245'
+const SAND = '214, 242, 255'
 
 /** 砂地の高さの列から、指定 X での高さを線形に求める。 */
 export function groundAt(profile: readonly number[], x: number, tank: Tank): number {

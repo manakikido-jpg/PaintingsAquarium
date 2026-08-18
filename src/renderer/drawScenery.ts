@@ -24,10 +24,18 @@ export function drawWater(
    * ここを濁らせると、絵と背景がどちらも中途半端になる。
    */
   const gradient = context.createLinearGradient(0, 0, 0, tank.height)
-  gradient.addColorStop(0, '#1ea2e0')
-  gradient.addColorStop(0.32, '#0f7cc2')
-  gradient.addColorStop(0.68, '#0a5695')
-  gradient.addColorStop(1, '#063a6f')
+  /*
+   * 深く濃い青。参考にした見え方（teamLab のお絵かき水族館）は、
+   * **水そのものは彩度の高い群青**で、そこに蛍光色の飾りが浮かんでいる。
+   *
+   * 前は水色に寄せていた（#1ea2e0）。明るいこと自体は悪くないが、
+   * 水が薄いと飾りの色との差が付かず、全体がぼんやりする。
+   * 「POP」の正体は明るさではなく、**水の濃さと飾りの鮮やかさの差**だった。
+   */
+  gradient.addColorStop(0, '#2a7bf0')
+  gradient.addColorStop(0.3, '#1a56e0')
+  gradient.addColorStop(0.66, '#123ec0')
+  gradient.addColorStop(1, '#0d2a92')
   context.fillStyle = gradient
   context.fillRect(0, 0, tank.width, tank.height)
 
@@ -125,8 +133,8 @@ export function drawVignette(
     tank.height / 2,
     radius,
   )
-  gradient.addColorStop(0, 'rgba(4, 44, 78, 0)')
-  gradient.addColorStop(1, `rgba(4, 44, 78, ${0.3 * strength})`)
+  gradient.addColorStop(0, 'rgba(6, 20, 72, 0)')
+  gradient.addColorStop(1, `rgba(6, 20, 72, ${0.3 * strength})`)
   context.fillStyle = gradient
   context.fillRect(0, 0, tank.width, tank.height)
 }
