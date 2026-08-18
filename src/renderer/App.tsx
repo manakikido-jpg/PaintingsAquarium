@@ -47,6 +47,13 @@ export function App(): React.JSX.Element {
           return
         }
 
+        if (result.turned) {
+          pushNotice({
+            level: 'info',
+            message: `${photo.fileName}: 絵が縦向きだったので、横向きに直して泳がせました。`,
+          })
+        }
+
         if (result.touchedBorder) {
           pushNotice({
             level: 'warn',
@@ -63,6 +70,7 @@ export function App(): React.JSX.Element {
           // 取り込んだ時点のテーマを絵に記録する。あとでテーマを変えても、
           // その会期の絵だけを出せるようにするため。
           theme: current.theme,
+          rig: result.rig,
         })
         setPieces((current) => [...current, piece])
       })

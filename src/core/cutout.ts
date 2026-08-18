@@ -17,7 +17,16 @@ export interface CutoutOptions {
 }
 
 export const DEFAULT_CUTOUT_OPTIONS: CutoutOptions = {
-  paperValue: 0.78,
+  /*
+   * 実物の絵1枚（新聞紙に青のマーカー）で測った安全域は 0.50〜0.66 だった。
+   * 0.68 以上にすると**絵が丸ごと消え、紙の裏写りだけが残る**（R-018）。
+   * 安全域の真ん中を採る。下げすぎると薄い色（黄色のクレヨンなど）まで
+   * 紙とみなして消してしまうので、これ以上は下げない。
+   *
+   * **標本は1枚。** 紙も画材も1種類しか試せていないので、
+   * 会場の紙で必ず測り直すこと（`docs/リハーサル手順.md` ③）。
+   */
+  paperValue: 0.62,
   paperSaturation: 0.18,
   feather: 0.1,
 }
@@ -155,4 +164,31 @@ export function diagnoseCutout(image: RgbaImage): CutoutDiagnosis {
   }
 
   return { ok: true, opaqueRatio: ratio }
+}
+
+/**
+ * 切り抜いたあとの絵が「中身のある絵」になっているか。
+ *
+ * しきい値が高すぎると、絵そのものが消えて**紙の裏写りや影だけ**が残る。
+ * 外接矩形は大きいのに中身がほとんど無い、という形で現れる。
+ * `diagnoseCutout` は切り抜き直後を見るのでこれを検出できない。
+ * ここを通さないと、**何も言わないまま紙の模様が泳ぐ**。
+ */
+export const MIN_FILL_RATIO = 0.16
+
+export function diagnoseResult(image: RgbaImage): { ok: true } | { ok: false; message: string } {
+  let opaque = 0
+  for (let index = 3; index < image.data.length; index += 4) {
+    if (image.data[index] > 12) opaque++
+  }
+  const fill = opaque / (image.width * image.height)
+  if (fill >= MIN_FILL_RATIO) return { ok: true }
+  return {
+    ok: false,
+    message:
+      `絵がほとんど残らず、紙の模様や影だけが残りました（中身 ${Math.round(fill * 100)}%）。` +
+      '設定の「紙とみなす明るさ」を下げてください。' +
+      '罫線や印刷のある紙（新聞紙・チラシの裏）を使っていると、この状態になりやすいので、' +
+      '無地の紙に描いたものを撮り直すのが確実です。',
+  }
 }

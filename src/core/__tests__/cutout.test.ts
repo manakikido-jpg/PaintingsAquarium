@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cutoutPaper, diagnoseCutout, opaqueRatio, DEFAULT_CUTOUT_OPTIONS } from '../cutout'
+import { cutoutPaper, diagnoseCutout, opaqueRatio, DEFAULT_CUTOUT_OPTIONS, diagnoseResult } from '../cutout'
 import { createImage } from '../image'
 import {
   AGED_PAPER,
@@ -151,5 +151,28 @@ describe('diagnoseCutout', () => {
 describe('opaqueRatio', () => {
   it('全部透明なら 0', () => {
     expect(opaqueRatio(createImage(4, 4))).toBe(0)
+  })
+})
+
+describe('diagnoseResult', () => {
+  it('中身のある絵は通す', () => {
+    const image = createImage(20, 20)
+    for (let index = 3; index < image.data.length; index += 4) image.data[index] = 255
+    expect(diagnoseResult(image).ok).toBe(true)
+  })
+
+  it('外接矩形は大きいのに中身がほとんど無いものを止める', () => {
+    // 紙の裏写りだけが残った状態。まばらな点しか無い
+    const image = createImage(40, 40)
+    for (let y = 0; y < 40; y += 8) {
+      for (let x = 0; x < 40; x += 8) image.data[(y * 40 + x) * 4 + 3] = 255
+    }
+    const result = diagnoseResult(image)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      // 「できません」で終わらせず、何をすればよいかまで書く
+      expect(result.message).toContain('明るさ')
+      expect(result.message).toContain('無地の紙')
+    }
   })
 })

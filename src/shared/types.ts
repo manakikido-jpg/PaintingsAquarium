@@ -1,5 +1,6 @@
 import type { CutoutOptions } from '../core/cutout'
 import type { ThemeId } from '../core/theme'
+import type { Rig } from '../core/rig'
 
 /** 水槽を泳いでいる絵 1 枚。 */
 export interface Piece {
@@ -16,6 +17,12 @@ export interface Piece {
    * テーマ機能より前の絵には入っていないので、読むときは `themeOf()` を使う。
    */
   readonly theme?: ThemeId
+  /**
+   * 体の芯と尾びれの位置。取り込み時に一度だけ求めて保存する。
+   * 動くたびに測り直さないのは、毎フレームやると成立しないため
+   *（`docs/設計-AI.md`）。古い絵には入っていない。
+   */
+  readonly rig?: Rig
 }
 
 export interface Settings {
@@ -61,6 +68,7 @@ export interface SavePieceInput {
   /** 透過・トリミング済み PNG の base64（data URL の接頭辞なし） */
   readonly pngBase64: string
   readonly theme: ThemeId
+  readonly rig?: Rig
 }
 
 /** 絵と設定の保存先。別PCへ移すときに運営者がコピーする場所。 */

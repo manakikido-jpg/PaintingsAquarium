@@ -1,7 +1,8 @@
-import { cutoutPaper, diagnoseCutout, type CutoutOptions } from '../core/cutout'
+import { cutoutPaper, diagnoseCutout, diagnoseResult, type CutoutOptions } from '../core/cutout'
 import { trimTransparent } from '../core/trim'
 import { keepMainRegions } from '../core/regions'
 import type { RgbaImage } from '../core/image'
+import { orientForSwimming, type Rig } from '../core/rig'
 
 /**
  * 切り抜きは画素数に比例して重い。会場の PC で 1 日 200 枚を捌くので、
@@ -18,6 +19,10 @@ export type ProcessResult =
       height: number
       /** 絵が写真の縁に接していた。撮り方の助言を出すために画面へ返す */
       touchedBorder: boolean
+      /** 体の芯と尾びれ。あとで動きに使う */
+      rig: Rig
+      /** 向きを直したか。直したときだけ画面に知らせる */
+      turned: boolean
     }
   | { ok: false; message: string }
 
@@ -82,8 +87,20 @@ export async function processPhoto(
     return { ok: false, message: `${fileName}: 絵が残りませんでした。設定のしきい値を見直してください。` }
   }
 
+  // 外接矩形は大きいのに中身が無い＝絵が消えて紙の裏写りだけが残った状態。
+  // ここで止めないと、紙の模様が黙って泳ぎ出す（R-018）。
+  const content = diagnoseResult(trimmed.image)
+  if (!content.ok) return { ok: false, message: `${fileName}: ${content.message}` }
+
+  /*
+   * 紙の向きは子どもが決める。実物は縦向き（頭が上）に描かれていた。
+   * そのまま出すと頭を上に向けたまま横へ滑るので、ここで横向きに直す。
+   * 自信が無ければ触らない（`orientForSwimming`）。
+   */
+  const oriented = orientForSwimming(trimmed.image)
+
   const blob = await new Promise<Blob | null>((resolve) =>
-    toCanvas(trimmed.image).toBlob(resolve, 'image/png'),
+    toCanvas(oriented.image).toBlob(resolve, 'image/png'),
   )
   if (!blob) return { ok: false, message: `${fileName}: PNG に変換できませんでした。` }
 
@@ -94,8 +111,10 @@ export async function processPhoto(
   return {
     ok: true,
     pngBase64: btoa(binary),
-    width: trimmed.image.width,
-    height: trimmed.image.height,
+    width: oriented.image.width,
+    height: oriented.image.height,
     touchedBorder,
+    rig: oriented.rig,
+    turned: oriented.turns !== 0 || oriented.flipped,
   }
 }
