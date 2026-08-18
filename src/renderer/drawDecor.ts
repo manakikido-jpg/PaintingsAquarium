@@ -44,6 +44,20 @@ export type Rgb = readonly [number, number, number]
  * ここは**絵より一段くすませた色**にしてあり、置き場所も画面の下に限っている。
  * 絵が泳ぐ中央は、情報の少ない綺麗な青のまま残すこと。
  */
+/**
+ * サンゴの塊（房の集まり）の色。
+ *
+ * 参考画像では、大きな塊は**生成り・淡い桃・淡い杏**で、枝サンゴの原色とは
+ * 役割が違う。ここまで原色にすると下が騒がしくなり、絵が埋もれる。
+ * 塊は面積が大きいので、彩度を落として明るさで見せる。
+ */
+export const HEAD_COLOURS: readonly Rgb[] = [
+  [255, 250, 238], // 生成り
+  [255, 232, 236], // 淡桃
+  [255, 240, 220], // 淡杏
+  [240, 246, 255], // 淡藍
+]
+
 export const CORAL_COLOURS: readonly Rgb[] = [
   [255, 56, 148], // 濃桃
   [255, 112, 64], // 朱
@@ -275,9 +289,22 @@ export function drawRocks(
   sorted.forEach((rock, index) => {
     // 少し砂に埋める。砂の線にちょうど乗せると置物のように浮いて見える。
     const outline = rockOutline(rock, groundAt(profile, rock.x, tank) + rock.height * 0.08)
-    // 岩は色を持たせず、明るい砂色に寄せる。全部が原色だと下が騒がしくなる。
-    const stone = mix([214, 238, 250], style.water, style.fade * 0.8)
-    paintSilhouette(context, outline, style, strength, stone, 0.9 + rock.depth * 0.1)
+    /*
+     * 塊は発光して見せる。参考画像では、白い塊が水の中でいちばん光っている。
+     * 房の集まりは面積が大きいので、halo を強めると
+     * 「後ろから照らされた珊瑚」に見える。
+     */
+    const colour = mix(
+      HEAD_COLOURS[Math.floor(rock.seed) % HEAD_COLOURS.length],
+      style.water,
+      style.fade * 0.55,
+    )
+    /*
+     * 光らせすぎると輪郭が溶けて**雲**に見える。
+     * 一度 2.1倍＋0.03 まで上げて失敗した。形が読める範囲に戻す。
+     */
+    const glowing: DecorStyle = { ...style, halo: style.halo * 1.15 }
+    paintSilhouette(context, outline, glowing, strength, colour, 0.92 + rock.depth * 0.08)
     void index
   })
 }

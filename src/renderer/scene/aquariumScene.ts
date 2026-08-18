@@ -43,7 +43,7 @@ const FRONT_BUBBLE_COUNT = 8
  * 飾りの高さの倍率。参考画像に合わせて、画面の 1/3 ほどまで立ち上げる。
  * 岩は塚なので伸ばしすぎると柱に見える。サンゴをいちばん高くする。
  */
-const ROCK_HEIGHT = 1.6
+const ROCK_HEIGHT = 2.4
 const SEAWEED_HEIGHT = 1.5
 const CORAL_HEIGHT = 2.2
 

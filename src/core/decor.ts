@@ -105,7 +105,7 @@ export function spawnRocks(
     const slot = (index + 0.5) / count + (random() - 0.5) * 0.7 / count
     rocks.push({
       x: tank.width * placeOutside(slot, avoid),
-      halfWidth: tank.width * (0.035 + random() * 0.075),
+      halfWidth: tank.width * (0.026 + random() * 0.05),
       height: tank.height * (0.03 + random() * 0.075) * heightScale,
       depth: random(),
       seed: Math.floor(random() * 100000) + 1,
@@ -135,11 +135,21 @@ export interface Point {
  * 岩ではなく**ノコギリ**になる。角度に対して波長の長い波を 2 本足し、
  * 「なだらかだが左右非対称」な形にしている。
  */
-export function rockOutline(rock: Rock, groundY: number, steps = 24): Point[] {
+export function rockOutline(rock: Rock, groundY: number, steps = 64): Point[] {
   const random = seededRandom(rock.seed)
+  /*
+   * 丸い房がいくつも重なった形にする（脳サンゴのような塊）。
+   *
+   * もとは波2本の**なめらかな塚**だった。参考画像の白い部分は塚ではなく
+   * **房の集まったサンゴの塊**で、そこがいちばん印象を分けていた。
+   *
+   * 波の本数は 3 / 5 / 8 と互いに割り切れない値にする。
+   * 整数比で重ねると同じ房が規則正しく並び、生き物ではなく模様に見える（R-010）。
+   */
   const lumps = [
-    { waves: 2, size: 0.07, phase: random() * Math.PI * 2 },
-    { waves: 3, size: 0.05, phase: random() * Math.PI * 2 },
+    { waves: 3, size: 0.24, phase: random() * Math.PI * 2 },
+    { waves: 5, size: 0.15, phase: random() * Math.PI * 2 },
+    { waves: 9, size: 0.085, phase: random() * Math.PI * 2 },
   ]
   const points: Point[] = []
 
