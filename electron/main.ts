@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog, ipcMain, net, protocol } from 'electron'
+import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -109,6 +109,20 @@ function startWatching(folder: string | null): void {
 }
 
 function createWindow(): void {
+  /*
+   * 会場ではメニューバーを出さない。
+   *
+   * 全画面にすればタイトルバーは消えるが、**Windows ではメニューバーが残る**。
+   * 大画面に水槽だけを映したいので、配布版ではメニューそのものを作らない。
+   * 「全画面のあいだだけ隠す」も試したが、**窓に戻したときに戻らなかった**
+   *（`setMenuBarVisibility(true)` が効かない）。出し入れするより、
+   * 最初から持たないほうが壊れようがない。
+   * このアプリの操作は F キー・S キーと設定画面だけで、メニューに用は無い。
+   *
+   * 開発中（`npm run dev`）は残す。開発者ツールの呼び出しに要る。
+   */
+  if (!DEV_SERVER_URL) Menu.setApplicationMenu(null)
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -130,6 +144,7 @@ function createWindow(): void {
   mainWindow.webContents.once('did-finish-load', () => {
     startWatching(storage.readSettings().watchFolder)
   })
+
 
   mainWindow.on('closed', () => {
     mainWindow = null

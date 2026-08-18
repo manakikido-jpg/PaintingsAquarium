@@ -18,37 +18,52 @@ export interface PartImages {
 }
 
 /**
+ * 読み込んだ画像を覚えておく。
+ *
+ * 画面の大きさが変わるたびに世界を作り直すので、覚えておかないと
+ * **そのたびに18枚を読み直す**。読み終わるまで背景が描かれないため、
+ * 全画面にした直後の数秒、背景が抜けて見えた（実機で確認）。
+ * 同じ URL の画像は1枚だけ持てばよい。
+ */
+const loaded = new Map<string, HTMLImageElement>()
+
+/**
  * パーツ画像を読み込む。
  *
  * 1枚でも足りないうちは `ready` を立てない。
  * 途中で描き始めると、抜けたところだけ空いた背景が一瞬映る。
+ * すでに読み終わっている画像しか無ければ、その場で `ready` にする。
  */
 export function loadParts(files: readonly string[], onReady: () => void): PartImages {
   const images: HTMLImageElement[] = []
   const state = { images, ready: false }
   if (files.length === 0) return { images: [], ready: true }
 
-  let left = files.length
-  for (const file of files) {
-    const image = new Image()
-    image.src = file
-    image.onload = () => {
-      left--
-      if (left === 0) {
-        ;(state as { ready: boolean }).ready = true
-        onReady()
-      }
+  let waiting = 0
+  const finished = (): void => {
+    waiting--
+    if (waiting === 0) {
+      ;(state as { ready: boolean }).ready = true
+      onReady()
     }
-    image.onerror = () => {
-      // 読めない画像があっても止めない。その1枚を諦めて先へ進む
-      left--
-      if (left === 0) {
-        ;(state as { ready: boolean }).ready = true
-        onReady()
-      }
+  }
+
+  for (const file of files) {
+    let image = loaded.get(file)
+    if (!image) {
+      image = new Image()
+      image.src = file
+      loaded.set(file, image)
     }
     images.push(image)
+    if (image.complete && image.naturalWidth > 0) continue
+    waiting++
+    // 読めない画像があっても止めない。その1枚を諦めて先へ進む
+    image.addEventListener('load', finished, { once: true })
+    image.addEventListener('error', finished, { once: true })
   }
+
+  if (waiting === 0) (state as { ready: boolean }).ready = true
   return state
 }
 
