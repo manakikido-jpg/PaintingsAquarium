@@ -133,6 +133,8 @@ export interface AquariumApi {
   deletePiece(id: string): Promise<void>
   rescan(): Promise<void>
   toggleFullscreen(): Promise<boolean>
+  /** いまの版（`0.1.38` のような番号）。配布したファイル名には入れていない */
+  getVersion(): Promise<string>
   /** 新しい版があるか見に行く。押したときだけ通信する */
   checkForUpdate(): Promise<UpdateStatus>
   /** 新しい版を落として入れ替える。落とし終えたら再起動でいれかわる */

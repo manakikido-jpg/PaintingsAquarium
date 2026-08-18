@@ -41,13 +41,17 @@ win:
   # 会場PC1台に対して年数万円の証明書は見合わないと判断した（要件定義 §8）。
   signAndEditExecutable: true
 
+# ファイル名に版番号を入れない。
+#
+# 入れると「最新版」の置き場に**ビルドのたびに別名のファイルが積み上がり**、
+# 会場で「どれを落とすのか」が分からなくなる（実際に 0.1.0 と 0.1.38 が並んだ）。
+# 名前を固定すれば、毎回同じ2つが上書きされる。
+# いまの版は設定画面（S キー）に出る。
 portable:
-  # 既定名は「PaintingsAquarium 0.1.0.exe」で、インストーラの
-  # 「PaintingsAquarium Setup 0.1.0.exe」と 1 語しか違わない。
-  # 会場で取り違えると原因が分かりにくいので、はっきり分ける。
-  artifactName: PaintingsAquarium-${version}-portable.${ext}
+  artifactName: PaintingsAquarium-portable.${ext}
 
 nsis:
+  artifactName: PaintingsAquarium-Setup.${ext}
   oneClick: false
   # 会場PCが管理者権限で使えないことがあるため、ユーザー単位で入れられるようにする。
   perMachine: false

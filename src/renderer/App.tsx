@@ -20,6 +20,7 @@ export function App(): React.JSX.Element {
    * 起動時には見に行かない）。
    */
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
+  const [version, setVersion] = useState('')
   const [updating, setUpdating] = useState(false)
   const [pieces, setPieces] = useState<Piece[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
@@ -41,6 +42,7 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     void window.aquarium.getSettings().then(setSettings)
     void window.aquarium.getStorageLocation().then(setStorage)
+    void window.aquarium.getVersion().then(setVersion)
     void window.aquarium.listPieces().then(setPieces)
   }, [])
 
@@ -256,6 +258,14 @@ export function App(): React.JSX.Element {
               更新の確認。押したときだけ外へ通信する。
               会期中は誰も押さないので、これまでどおりオフラインで動く。
             */}
+            <div className="row">
+              <span>アプリの版</span>
+              <code>{version || '—'}</code>
+              {/*
+                配るファイル名には版番号を入れていない（毎回同じ名前で上書きするため）。
+                いまどの版で動いているかは、ここで見る。
+              */}
+            </div>
             <div className="row">
               <span>アプリの更新</span>
               <button

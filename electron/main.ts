@@ -217,6 +217,8 @@ app.whenReady().then(() => {
       '最新版のページから新しい exe を落として、いまの exe と差し替えてください。',
   })
 
+  ipcMain.handle('aquarium:getVersion', (): string => app.getVersion())
+
   ipcMain.handle('aquarium:checkForUpdate', async (): Promise<UpdateStatus> => {
     if (portable()) return cannotUpdate()
     if (!app.isPackaged) {

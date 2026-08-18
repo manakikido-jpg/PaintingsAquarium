@@ -70,14 +70,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: 最新版（自動ビルド）
+          name: 最新版 0.1.${{ github.run_number }}（自動ビルド）
           body: |
             **会場PCへはこの2つのどちらかを落として使ってください。**
 
             | ファイル | 使いどころ |
             |---|---|
-            | `PaintingsAquarium Setup *.exe` | 会場PCに入れて使う（ふつうはこちら） |
-            | `PaintingsAquarium-*-portable.exe` | インストールできないPC用。USBから直接動く |
+            | `PaintingsAquarium-Setup.exe` | 会場PCに入れて使う（ふつうはこちら） |
+            | `PaintingsAquarium-portable.exe` | インストールできないPC用。USBから直接動く |
+
+            **ファイル名は毎回同じです。** いまの版は設定画面（`S` キー）に出ます。
 
             上書きしても**絵と設定は消えません**。
             保存先はアプリとは別（インストール版は `%APPDATA%`、持ち運び版は exe の隣）。
@@ -92,3 +94,21 @@ jobs:
           files: |
             release/*.exe
             release/latest.yml
+
+      # 古い版のファイルを消す。
+      #
+      # 名前に版番号が入っていた頃のファイルが残ると、会場で
+      # 「どれを落とすのか」が分からなくなる。置くのは常にこの3つだけにする。
+      - name: 古いファイルを消す
+        if: github.ref_name == github.event.repository.default_branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          keep="PaintingsAquarium-Setup.exe PaintingsAquarium-portable.exe latest.yml"
+          for name in $(gh release view latest --json assets -q '.assets[].name'); do
+            case " $keep " in
+              *" $name "*) ;;
+              *) echo "消す: $name"; gh release delete-asset latest "$name" -y ;;
+            esac
+          done
