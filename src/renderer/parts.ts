@@ -6,8 +6,12 @@
  *
  * Vite の `import.meta.glob` で集めるので、ファイルを足したら自動で増える。
  * 名前順に並ぶので、`part-01.png` のような連番にしておくこと。
+ *
+ * **拾うのは `part-*.png` だけ。** `*.png` にしていたら、同じ場所に置いた
+ * 切り出し前の一覧画像（2MB）まで背景パーツとして読み込むところだった。
+ * 元画像は `assets/decor/source/` に置く。
  */
-const found = import.meta.glob('../../assets/decor/*.png', {
+const found = import.meta.glob('../../assets/decor/part-*.png', {
   eager: true,
   query: '?url',
   import: 'default',

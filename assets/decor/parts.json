@@ -1,124 +1,110 @@
-{
-  "parts": [
-    {
-      "file": "part-00.png",
-      "kind": "rock",
-      "width": 800,
-      "height": 255
-    },
-    {
-      "file": "part-01.png",
-      "kind": "rock",
-      "width": 740,
-      "height": 293
-    },
-    {
-      "file": "part-02.png",
-      "kind": "rock",
-      "width": 797,
-      "height": 253
-    },
-    {
-      "file": "part-03.png",
-      "kind": "rock",
-      "width": 800,
-      "height": 333
-    },
-    {
-      "file": "part-04.png",
-      "kind": "rock",
-      "width": 758,
-      "height": 290
-    },
-    {
-      "file": "part-05.png",
-      "kind": "rock",
-      "width": 711,
-      "height": 284
-    },
-    {
-      "file": "part-06.png",
-      "kind": "branch",
-      "width": 310,
-      "height": 391
-    },
-    {
-      "file": "part-07.png",
-      "kind": "branch",
-      "width": 280,
-      "height": 379
-    },
-    {
-      "file": "part-08.png",
-      "kind": "branch",
-      "width": 326,
-      "height": 421
-    },
-    {
-      "file": "part-09.png",
-      "kind": "branch",
-      "width": 317,
-      "height": 411
-    },
-    {
-      "file": "part-10.png",
-      "kind": "brain",
-      "width": 459,
-      "height": 348
-    },
-    {
-      "file": "part-11.png",
-      "kind": "brain",
-      "width": 482,
-      "height": 281
-    },
-    {
-      "file": "part-12.png",
-      "kind": "brain",
-      "width": 467,
-      "height": 276
-    },
-    {
-      "file": "part-13.png",
-      "kind": "brain",
-      "width": 438,
-      "height": 297
-    },
-    {
-      "file": "part-14.png",
-      "kind": "weed",
-      "width": 309,
-      "height": 393
-    },
-    {
-      "file": "part-15.png",
-      "kind": "weed",
-      "width": 512,
-      "height": 416
-    },
-    {
-      "file": "part-16.png",
-      "kind": "weed",
-      "width": 444,
-      "height": 449
-    },
-    {
-      "file": "part-17.png",
-      "kind": "pebble",
-      "width": 435,
-      "height": 160
-    },
-    {
-      "file": "part-18.png",
-      "kind": "pebble",
-      "width": 334,
-      "height": 116
-    },
-    {
-      "file": "part-19.png",
-      "kind": "pebble",
-      "width": 538,
-      "height": 154
-    }
-  ]
-}
+[
+  {
+    "file": "part-01.png",
+    "width": 435,
+    "height": 216,
+    "ratio": 2.014
+  },
+  {
+    "file": "part-02.png",
+    "width": 415,
+    "height": 230,
+    "ratio": 1.804
+  },
+  {
+    "file": "part-03.png",
+    "width": 438,
+    "height": 235,
+    "ratio": 1.864
+  },
+  {
+    "file": "part-04.png",
+    "width": 370,
+    "height": 195,
+    "ratio": 1.897
+  },
+  {
+    "file": "part-05.png",
+    "width": 331,
+    "height": 206,
+    "ratio": 1.607
+  },
+  {
+    "file": "part-06.png",
+    "width": 320,
+    "height": 195,
+    "ratio": 1.641
+  },
+  {
+    "file": "part-07.png",
+    "width": 356,
+    "height": 207,
+    "ratio": 1.72
+  },
+  {
+    "file": "part-08.png",
+    "width": 213,
+    "height": 224,
+    "ratio": 0.951
+  },
+  {
+    "file": "part-09.png",
+    "width": 215,
+    "height": 219,
+    "ratio": 0.982
+  },
+  {
+    "file": "part-10.png",
+    "width": 218,
+    "height": 221,
+    "ratio": 0.986
+  },
+  {
+    "file": "part-11.png",
+    "width": 176,
+    "height": 225,
+    "ratio": 0.782
+  },
+  {
+    "file": "part-12.png",
+    "width": 274,
+    "height": 151,
+    "ratio": 1.815
+  },
+  {
+    "file": "part-13.png",
+    "width": 244,
+    "height": 156,
+    "ratio": 1.564
+  },
+  {
+    "file": "part-14.png",
+    "width": 286,
+    "height": 170,
+    "ratio": 1.682
+  },
+  {
+    "file": "part-15.png",
+    "width": 285,
+    "height": 171,
+    "ratio": 1.667
+  },
+  {
+    "file": "part-16.png",
+    "width": 198,
+    "height": 219,
+    "ratio": 0.904
+  },
+  {
+    "file": "part-17.png",
+    "width": 225,
+    "height": 223,
+    "ratio": 1.009
+  },
+  {
+    "file": "part-18.png",
+    "width": 253,
+    "height": 217,
+    "ratio": 1.166
+  }
+]

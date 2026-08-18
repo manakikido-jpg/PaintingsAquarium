@@ -9,6 +9,7 @@
 ## 入れ方
 
 1枚にまとまった一覧画像で受け取ったら、切り出してからここへ置く。
+**透過済みで届くことがある。** その場合はアルファをそのまま使う（自動で判別する）。
 
 ```sh
 python3 tools/split-parts.py <一覧画像のパス> assets/decor
@@ -18,14 +19,15 @@ python3 tools/split-parts.py <一覧画像のパス> assets/decor
 
 ## いま入っているもの
 
-`tools/make-parts.py` で生成した20個（岩6・枝サンゴ4・脳サンゴ4・海藻3・小石3）。
-**外から絵をもらったら、それで置き換えてよい。** 作り直すときは
+もらった一覧画像（`source/parts-sheet.png`）から切り出した18個。
+岩7・枝サンゴ4・脳サンゴ4・海藻3。作り直すときは
 
 ```sh
-python3 tools/make-parts.py assets/decor
+python3 tools/split-parts.py assets/decor/source/parts-sheet.png assets/decor
 ```
 
-同じ種を使うので、何度動かしても同じ絵が出る。
+**切り出し前の画像は `source/` に置く。** アプリが拾うのは `part-*.png` だけなので、
+同じ場所に置いても背景として読み込まれることはない。
 
 ## 作り方
 
