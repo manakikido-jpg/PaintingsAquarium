@@ -8,6 +8,13 @@ import {
   type Creature,
 } from '../core/motion'
 import { appearAlpha, appearProgress, appearScale, isNewlyArrived } from '../core/appear'
+import {
+  DEFAULT_UNDULATE as UNDULATE,
+  beatPhase,
+  beatRate,
+  stripCount,
+  stripOffset,
+} from '../core/undulate'
 import type { ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
@@ -18,6 +25,8 @@ interface Swimmer {
   readonly element: HTMLImageElement
   /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
   readonly bornAt: number
+  /** しなりの拍。絵ごとにずらさないと、群れが1枚の布のように揃って見える */
+  readonly beat: { readonly rate: number; readonly phase: number }
   creature: Creature
 }
 
@@ -33,11 +42,13 @@ export function Aquarium({
   theme,
   sceneryStrength,
   decorDensity,
+  swayStrength,
 }: {
   pieces: Piece[]
   theme: ThemeId
   sceneryStrength: number
   decorDensity: number
+  swayStrength: number
 }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const swimmersRef = useRef<Map<string, Swimmer>>(new Map())
@@ -50,6 +61,8 @@ export function Aquarium({
   themeRef.current = theme
   const densityRef = useRef(decorDensity)
   densityRef.current = decorDensity
+  const swayRef = useRef(swayStrength)
+  swayRef.current = swayStrength
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -137,6 +150,7 @@ export function Aquarium({
           // 起動前からある絵は演出しない。起動のたびに全部が一斉に現れると
           // 不具合に見えるため。
           bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? elapsed : -Infinity,
+          beat: { rate: beatRate(seedOf(piece.id)), phase: beatPhase(seedOf(piece.id)) },
           creature: spawnCreature(
             scene.motion,
             seedOf(piece.id),
@@ -173,13 +187,55 @@ export function Aquarium({
         context.translate(place.x, place.y)
         // 進む向きに合わせて左右反転する。後ろ向きに進んで見えるのを避けるため。
         context.scale(place.facingRight ? scale : -scale, scale)
-        context.drawImage(
-          swimmer.element,
-          -place.width / 2,
-          -place.height / 2,
-          place.width,
-          place.height,
-        )
+
+        const sway = swayRef.current
+        const strips = stripCount(sway)
+        const left = -place.width / 2
+        const top = -place.height / 2
+
+        if (strips <= 1) {
+          // しなり 0。描画命令が1回に戻るので、重いときの逃げ道になる。
+          context.drawImage(swimmer.element, left, top, place.width, place.height)
+        } else {
+          const source = swimmer.element.naturalWidth
+          const time = elapsed * swimmer.beat.rate
+          const options = { ...UNDULATE, amplitude: UNDULATE.amplitude * sway }
+          /*
+           * 帯の「中心」ではなく「両端」のずれを求め、帯ごとに縦の傾き（せん断）を
+           * 掛ける。中心の値だけで平行移動すると、隣の帯との境目に段差が出て
+           * 絵が階段状に割れて見える。傾ければ端の高さが隣と一致して段差が消える。
+           */
+          const offsetAt = (fromHead: number): number =>
+            stripOffset(fromHead, time, swimmer.beat.phase, options) * place.height
+
+          for (let index = 0; index < strips; index++) {
+            const headSide = index / strips
+            const tailSide = (index + 1) / strips
+            // 頭は進行方向の側＝絵の右。だから頭に近い帯ほど元画像の右を使う。
+            const fromLeft = 1 - tailSide
+            const x = left + place.width * fromLeft
+            const width = place.width / strips
+            const atLeft = offsetAt(tailSide)
+            const atRight = offsetAt(headSide)
+            const slope = (atRight - atLeft) / width
+
+            context.save()
+            context.transform(1, slope, 0, 1, 0, atLeft - slope * x)
+            context.drawImage(
+              swimmer.element,
+              source * fromLeft,
+              0,
+              source / strips,
+              swimmer.element.naturalHeight,
+              x,
+              top,
+              // わずかに広げて、帯の継ぎ目に髪の毛ほどの隙間が出るのを防ぐ
+              width + width * 0.02,
+              place.height,
+            )
+            context.restore()
+          }
+        }
         context.restore()
       }
 
@@ -210,6 +266,9 @@ export function Aquarium({
           measure.frames = 0
           measure.total = now
         }
+        // 外から読めるようにしておく。fps は会場と開発機で最も食い違う数字なので、
+        // 目で読むだけでなく機械で取れる形が要る（R-012）。`?measure` のときだけ。
+        ;(window as unknown as { __aquaFps?: number }).__aquaFps = measure.last
         if (measure.last > 0) {
           context.save()
           context.fillStyle = 'rgba(0,0,0,0.6)'

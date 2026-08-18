@@ -108,6 +108,7 @@ export function App(): React.JSX.Element {
         theme={settings?.theme ?? 'aquarium'}
         sceneryStrength={settings?.sceneryStrength ?? 1}
         decorDensity={settings?.decorDensity ?? 2}
+        swayStrength={settings?.swayStrength ?? 1}
       />
 
       {settings && settings.watchFolder !== null && forTheme.length === 0 && pieces.length > 0 && (
@@ -291,6 +292,27 @@ export function App(): React.JSX.Element {
                 }
               />
             </label>
+            <label>
+              ひれの動き: {settings.swayStrength.toFixed(1)}
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={settings.swayStrength}
+                onChange={(event) =>
+                  void window.aquarium
+                    .updateSettings({ swayStrength: Number(event.target.value) })
+                    .then(setSettings)
+                }
+              />
+            </label>
+            <p className="note">
+              絵が魚のようにしなります。0 にすると完全に止まります。
+              動きがカクつくときは、まずここを 0 にしてください。
+              1枚あたりの描画が増えるので、「背景の強さ」より先に効くことがあります。
+            </p>
+
             <label>
               飾りの多さ: {settings.decorDensity.toFixed(1)} 倍
               <input

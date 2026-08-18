@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   sceneryStrength: 1,
   theme: DEFAULT_THEME,
   decorDensity: 2,
+  swayStrength: 1,
 }
 
 export function dataRoot(): string {
