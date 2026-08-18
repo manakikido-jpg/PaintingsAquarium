@@ -82,6 +82,33 @@ def load_silhouette_mask(path):
     return inside, ink, filled
 
 
+def mask_image(mask):
+    """外形を白黒画像にする。傾けたり伸ばしたりする試験に使う。"""
+    height, width = len(mask), len(mask[0])
+    image = Image.new('L', (width, height), 0)
+    px = image.load()
+    for y in range(height):
+        row = mask[y]
+        for x in range(width):
+            if row[x]:
+                px[x, y] = 255
+    return image
+
+
+def cells_from_image(image, size=GRID):
+    """白黒画像を升目に落とす。"""
+    box = image.getbbox()
+    if box is None:
+        return None
+    cropped = image.crop(box)
+    longest = max(cropped.size)
+    square = Image.new('L', (longest, longest), 0)
+    square.paste(cropped, ((longest - cropped.width) // 2, (longest - cropped.height) // 2))
+    small = square.resize((size, size), Image.NEAREST)
+    data = small.load()
+    return [data[column, row] > 127 for row in range(size) for column in range(size)]
+
+
 def to_cells(mask, size=GRID):
     """外形を正方形の升目に落とす（match.ts の silhouette と同じ）。"""
     ys = [y for y, row in enumerate(mask) if any(row)]
@@ -160,6 +187,7 @@ def main():
 
     names = []
     shapes = []
+    images = []
     bad = 0
     print('== 1枚ずつの確認 ==')
     for path in files:
@@ -182,6 +210,7 @@ def main():
         )
         names.append(path.stem)
         shapes.append(cells)
+        images.append(mask_image(mask))
 
     print('\n== 総当たりの重なり（8通りの向きで一番高い値）==')
     header = ' ' * 16 + ''.join(f'{n[:10]:>12s}' for n in names)
@@ -199,12 +228,55 @@ def main():
                 worst.append((score, names[i], names[j]))
         print(row)
 
+    # ---- 実際に見分けられるかの試験 ----
+    #
+    # 総当たりの重なりが高くても、**自分の台紙との重なりのほうが高ければ**
+    # 見分けはつく（照合は一番よく重なった台紙を選ぶ）。
+    # そこで、塗った紙を撮ったときに起きる程度のゆがみ（少し傾く・少し伸びる）を
+    # 掛けて、正しい台紙が1位になるかを数える。**ここが本当の合否**。
+    print('\n== 見分けの試験（少し傾ける・少し伸ばす）==')
+    trials = [(0, 1.0, 1.0), (-6, 1.0, 1.0), (6, 1.0, 1.0), (-3, 1.06, 1.0),
+              (3, 1.0, 1.06), (0, 1.08, 1.0), (0, 1.0, 1.08), (10, 1.0, 1.0)]
+    total = 0
+    wrong = 0
+    worst_margin = (9.9, '', '')
+    for index, name in enumerate(names):
+        image = images[index]
+        margins = []
+        for angle, scale_x, scale_y in trials:
+            turned = image.rotate(angle, expand=True, resample=Image.BILINEAR, fillcolor=0)
+            stretched = turned.resize(
+                (max(1, int(turned.width * scale_x)), max(1, int(turned.height * scale_y))),
+                Image.BILINEAR,
+            ).point(lambda value: 255 if value >= 128 else 0)
+            cells = cells_from_image(stretched)
+            if cells is None:
+                continue
+            scores = [(best_overlap(cells, shapes[other]), names[other]) for other in range(len(names))]
+            scores.sort(reverse=True)
+            total += 1
+            mine = next(score for score, who in scores if who == name)
+            rival, rival_name = next((score, who) for score, who in scores if who != name)
+            margins.append(mine - rival)
+            if scores[0][1] != name:
+                wrong += 1
+                print(f'  [NG] {name} が {scores[0][1]} と judged（自分 {mine:.2f} / 相手 {scores[0][0]:.2f}）')
+            if mine - rival < worst_margin[0]:
+                worst_margin = (mine - rival, name, rival_name)
+        print(f'  {name[:22]:22s} 自分との差の最小 {min(margins):+.2f}  平均 {sum(margins)/len(margins):+.2f}')
+
+    print(f'\n  {total - wrong}/{total} 回、正しい台紙が1位になった')
+    print(f'  いちばん際どい組: {worst_margin[1]} ↔ {worst_margin[2]}  差 {worst_margin[0]:+.2f}')
+
     print(f'\n== 判定（どの2種も {MAX_OVERLAP} 未満なら合格）==')
     worst.sort(reverse=True)
     for score, a, b in worst[:5]:
         mark = 'NG' if score >= MAX_OVERLAP else 'ok'
         print(f'  [{mark}] {a} ↔ {b}  {score:.2f}')
     over = [w for w in worst if w[0] >= MAX_OVERLAP]
+    if wrong:
+        print(f'\n**見分けに失敗した回が {wrong} 回ある。形を直す必要がある**')
+        return 1
     if over or bad:
         print(f'\n**作り直しが要る**: 閉じていない {bad} 枚 / 似すぎている組 {len(over)}')
         print('しきい値を下げて逃げないこと。本番で別の生き物として判定される。')

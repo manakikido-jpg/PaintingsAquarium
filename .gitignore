@@ -4,3 +4,6 @@ dist-electron/
 release/
 data/
 .DS_Store
+
+# Python の中間ファイル
+__pycache__/
