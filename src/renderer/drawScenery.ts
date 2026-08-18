@@ -102,9 +102,14 @@ export function drawLightRays(
       // 画面全体を暗く塗って光を沈める方法だと、水の色まで潰れて下半分が死ぬ。
       const down = context.createLinearGradient(0, 0, 0, tank.height)
       const peak = alpha * layer.alphaScale
-      down.addColorStop(0, `rgba(186, 236, 255, ${peak})`)
-      down.addColorStop(0.45, `rgba(186, 236, 255, ${peak * 0.34})`)
-      down.addColorStop(0.85, 'rgba(186, 236, 255, 0)')
+      /*
+       * 上から差し込む光。デフォルメした絵では、光は「そこに光源がある説明」
+       * ではなく**飾りそのもの**なので、写実より強く、下まで届かせる。
+       * 前は 0.85 の高さで完全に消していたが、それだと上端の帯にしか見えなかった。
+       */
+      down.addColorStop(0, `rgba(196, 240, 255, ${peak * 1.8})`)
+      down.addColorStop(0.4, `rgba(186, 236, 255, ${peak * 0.9})`)
+      down.addColorStop(0.75, `rgba(186, 236, 255, ${peak * 0.3})`)
       down.addColorStop(1, 'rgba(186, 236, 255, 0)')
 
       const top = shape.halfWidth * layer.widthScale
