@@ -19,6 +19,10 @@ import {
   fanRibs,
   fanEdge,
   clusterAcross,
+  spawnTubeCorals,
+  tubeShapes,
+  spawnAnemones,
+  anemoneArms,
 } from '../decor'
 import type { Tank } from '../swim'
 
@@ -526,5 +530,70 @@ describe('clusterAcross', () => {
   it('反対側にも少しは置く。片側が完全に空だと切り取ったように見える', () => {
     const values = Array.from({ length: 60 }, (_, index) => clusterAcross(index / 59, 0.62, 0.46))
     expect(Math.min(...values)).toBeLessThan(0.35)
+  })
+})
+
+describe('管サンゴ', () => {
+  const tank: Tank = { width: 1600, height: 900 }
+
+  it('本数だけ管を返す', () => {
+    const coral = spawnTubeCorals(3, 1, tank)[0]
+    expect(tubeShapes(coral, 800)).toHaveLength(coral.tubes)
+  })
+
+  it('高さを揃えない。揃えると柵に見える', () => {
+    const coral = { ...spawnTubeCorals(4, 1, tank)[0], tubes: 6 }
+    const heights = tubeShapes(coral, 800).map((tube) => tube.bottom - tube.top)
+    expect(new Set(heights.map((h) => Math.round(h))).size).toBeGreaterThan(3)
+  })
+
+  it('中央の管がいちばん高い。束として見せるため', () => {
+    const coral = { ...spawnTubeCorals(5, 1, tank)[0], tubes: 5 }
+    const tubes = tubeShapes(coral, 800)
+    const height = (tube: { top: number; bottom: number }): number => tube.bottom - tube.top
+    expect(height(tubes[2])).toBeGreaterThan(height(tubes[0]))
+    expect(height(tubes[2])).toBeGreaterThan(height(tubes[4]))
+  })
+
+  it('地面から生える。上端は必ず地面より上', () => {
+    for (const coral of spawnTubeCorals(6, 15, tank)) {
+      for (const tube of tubeShapes(coral, 800)) {
+        expect(tube.top).toBeLessThan(800)
+        expect(tube.bottom).toBe(800)
+      }
+    }
+  })
+})
+
+describe('イソギンチャク', () => {
+  const tank: Tank = { width: 1600, height: 900 }
+
+  it('触手の本数だけ返す', () => {
+    const anemone = spawnAnemones(7, 1, tank)[0]
+    expect(anemoneArms(anemone, 800)).toHaveLength(anemone.arms)
+  })
+
+  it('すべて同じ根元から生える', () => {
+    const anemone = spawnAnemones(8, 1, tank)[0]
+    for (const arm of anemoneArms(anemone, 800)) {
+      expect(arm[0].x).toBeCloseTo(anemone.x)
+      expect(arm[0].y).toBeCloseTo(800)
+    }
+  })
+
+  it('地面へ潜らない。全周に生やすと埋まる', () => {
+    for (const anemone of spawnAnemones(9, 15, tank)) {
+      for (const arm of anemoneArms(anemone, 800)) {
+        for (const point of arm) expect(point.y).toBeLessThanOrEqual(800.001)
+      }
+    }
+  })
+
+  it('長さを1本ずつ変える。揃えるとウニに見える', () => {
+    const anemone = spawnAnemones(10, 1, tank)[0]
+    const lengths = anemoneArms(anemone, 800).map((arm) =>
+      Math.hypot(arm[arm.length - 1].x - arm[0].x, arm[arm.length - 1].y - arm[0].y),
+    )
+    expect(new Set(lengths.map((l) => Math.round(l))).size).toBeGreaterThan(5)
   })
 })

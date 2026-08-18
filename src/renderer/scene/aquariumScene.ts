@@ -4,11 +4,15 @@ import {
   spawnRocks,
   spawnSeaweed,
   spawnCorals,
+  spawnAnemones,
   spawnFans,
+  spawnTubeCorals,
   spawnShells,
   spawnShipwreck,
   type Coral,
+  type Anemone,
   type Fan,
+  type TubeCoral,
   type Rock,
   type Seaweed,
 } from '../../core/decor'
@@ -16,7 +20,9 @@ import { spawnBubbles, spawnRays, stepBubble, type Bubble } from '../../core/sce
 import { drawBubbles, drawLightRays, drawVignette, drawWater } from '../drawScenery'
 import {
   drawCorals,
+  drawAnemones,
   drawFans,
+  drawTubeCorals,
   drawRocks,
   drawSand,
   drawSeaweed,
@@ -50,6 +56,8 @@ const ROCK_HEIGHT = 2.4
 const SEAWEED_HEIGHT = 1.5
 const CORAL_HEIGHT = 2.2
 const FAN_HEIGHT = 2.0
+const TUBE_HEIGHT = 2.0
+const ANEMONE_HEIGHT = 1.8
 
 /*
  * 塊を寄せる位置。参考画像の構図は左右対称ではなく、
@@ -65,6 +73,9 @@ const SHELL_COUNT = 6
 const CORAL_COUNT = 14
 // 扇サンゴ。形の種類が増えるほど、同じ数でも賑やかに見える
 const FAN_COUNT = 9
+// 管サンゴとイソギンチャク。どちらも焼き付ける層にだけ置く（毎フレームの費用を増やさない）
+const TUBE_COUNT = 8
+const ANEMONE_COUNT = 9
 // 「株」の数。1 株から数枚の葉が生える。
 const SEAWEED_COUNT = 13
 
@@ -97,6 +108,16 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
     clusterAt: CLUSTER_AT,
     clusterSpread: CLUSTER_SPREAD,
   })
+  const allTubes = spawnTubeCorals(5231, many(TUBE_COUNT), tank, wreckSpan, {
+    heightScale: TUBE_HEIGHT,
+    clusterAt: CLUSTER_AT,
+    clusterSpread: CLUSTER_SPREAD,
+  })
+  const allAnemones = spawnAnemones(6427, many(ANEMONE_COUNT), tank, wreckSpan, {
+    heightScale: ANEMONE_HEIGHT,
+    clusterAt: CLUSTER_AT,
+    clusterSpread: CLUSTER_SPREAD,
+  })
 
   /*
    * 飾りを奥行きで3つに分ける。
@@ -126,6 +147,10 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
   const nearCorals: Coral[] = pick(allCorals, 0.88, 1.01)
   const farFans: Fan[] = pick(allFans, 0, 0.45)
   const nearFans: Fan[] = pick(allFans, 0.45, 1.01)
+  const farTubes: TubeCoral[] = pick(allTubes, 0, 0.45)
+  const midTubes: TubeCoral[] = pick(allTubes, 0.45, 1.01)
+  const farAnemones: Anemone[] = pick(allAnemones, 0, 0.45)
+  const midAnemones: Anemone[] = pick(allAnemones, 0.45, 1.01)
 
   /*
    * 遠景と中景は動かないので、起動時に 1 回だけ焼いておく。
@@ -139,6 +164,8 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
       drawShipwreck(context, wreck, sand, tank, 1, FAR_STYLE)
       drawSeaweed(context, farSeaweed, sand, tank, 0, 1, FAR_STYLE)
       drawFans(context, farFans, sand, tank, 1, FAR_STYLE)
+      drawAnemones(context, farAnemones, sand, tank, 1, FAR_STYLE)
+      drawTubeCorals(context, farTubes, sand, tank, 1, FAR_STYLE)
       drawCorals(context, farCorals, sand, tank, 1, FAR_STYLE)
       drawRocks(context, farRocks, sand, tank, 1, FAR_STYLE)
     },
@@ -151,6 +178,8 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
     (context) => {
       drawRocks(context, midRocks, sand, tank, 1, MID_STYLE)
       drawFans(context, nearFans, sand, tank, 1, MID_STYLE)
+      drawAnemones(context, midAnemones, sand, tank, 1, MID_STYLE)
+      drawTubeCorals(context, midTubes, sand, tank, 1, MID_STYLE)
       drawCorals(context, midCorals, sand, tank, 1, MID_STYLE)
       drawShells(context, shells, sand, tank, 1, MID_STYLE)
     },

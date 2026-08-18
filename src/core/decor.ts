@@ -657,3 +657,141 @@ export function clusterAcross(t: number, centre: number, spread: number): number
   const eased = Math.sign(signed) * Math.pow(Math.abs(signed), 1.7)
   return Math.min(1, Math.max(0, centre + eased * spread))
 }
+
+/* ------------------------------------------------------------------
+ * 管サンゴ と イソギンチャク
+ *
+ * 参考画像には、枝・房・扇のほかに
+ * **丸い口の管が束になったもの**と、**細い触手が密に生えた塊**がある。
+ * 形が増えるほど、同じ数でも「群れ」に見える。
+ *
+ * どちらも**焼き付ける層にだけ置く**。毎フレームの描画を増やさないため
+ *（50匹で 10.5fps しか出ていない）。
+ * ------------------------------------------------------------------ */
+
+export interface TubeCoral {
+  readonly x: number
+  readonly height: number
+  readonly halfWidth: number
+  /** 管の本数 */
+  readonly tubes: number
+  readonly depth: number
+  readonly seed: number
+}
+
+export function spawnTubeCorals(
+  seed: number,
+  count: number,
+  tank: Tank,
+  avoid?: Span,
+  { heightScale = 1, clusterAt, clusterSpread = 0.5 }: DecorHeight = {},
+): TubeCoral[] {
+  const random = seededRandom(seed)
+  const corals: TubeCoral[] = []
+  for (let index = 0; index < count; index++) {
+    const depth = random()
+    corals.push({
+      x: tank.width * placeAcross((index + 0.5) / count, avoid, clusterAt, clusterSpread),
+      height: tank.height * (0.05 + depth * 0.06 + random() * 0.03) * heightScale,
+      halfWidth: tank.width * (0.012 + random() * 0.016),
+      tubes: 3 + Math.floor(random() * 4),
+      depth,
+      seed: Math.floor(random() * 100000),
+    })
+  }
+  return corals
+}
+
+export interface Tube {
+  readonly x: number
+  readonly halfWidth: number
+  readonly top: number
+  readonly bottom: number
+}
+
+/**
+ * 管を1本ずつ返す。
+ *
+ * 高さを揃えないのは、揃えると**柵**に見えるため。
+ * 中央を高く、端を低くして、束として見えるようにする。
+ */
+export function tubeShapes(coral: TubeCoral, groundY: number): Tube[] {
+  const random = seededRandom(coral.seed)
+  const tubes: Tube[] = []
+  for (let index = 0; index < coral.tubes; index++) {
+    const across = coral.tubes === 1 ? 0 : (index / (coral.tubes - 1)) * 2 - 1
+    const height = coral.height * (0.55 + 0.45 * Math.cos((across * Math.PI) / 2)) * (0.85 + random() * 0.3)
+    tubes.push({
+      x: coral.x + across * coral.halfWidth,
+      halfWidth: (coral.halfWidth / coral.tubes) * (0.8 + random() * 0.5),
+      top: groundY - height,
+      bottom: groundY,
+    })
+  }
+  return tubes
+}
+
+export interface Anemone {
+  readonly x: number
+  readonly radius: number
+  /** 触手の本数 */
+  readonly arms: number
+  readonly depth: number
+  readonly seed: number
+}
+
+export function spawnAnemones(
+  seed: number,
+  count: number,
+  tank: Tank,
+  avoid?: Span,
+  { heightScale = 1, clusterAt, clusterSpread = 0.5 }: DecorHeight = {},
+): Anemone[] {
+  const random = seededRandom(seed)
+  const anemones: Anemone[] = []
+  for (let index = 0; index < count; index++) {
+    const depth = random()
+    anemones.push({
+      x: tank.width * placeAcross((index + 0.5) / count, avoid, clusterAt, clusterSpread),
+      radius: tank.height * (0.035 + depth * 0.04 + random() * 0.02) * heightScale,
+      arms: 14 + Math.floor(random() * 12),
+      depth,
+      seed: Math.floor(random() * 100000),
+    })
+  }
+  return anemones
+}
+
+/**
+ * 触手を1本ずつ返す。
+ *
+ * 根元から放射状に**上半分だけ**に生やす。全周に生やすと地面へ潜る。
+ * 長さを1本ずつ変えるのは、揃えると**ウニ**に見えるため。
+ */
+export function anemoneArms(anemone: Anemone, groundY: number, steps = 4): Point[][] {
+  const random = seededRandom(anemone.seed)
+  const arms: Point[][] = []
+  for (let index = 0; index < anemone.arms; index++) {
+    // -80度 〜 +80度。真横まで倒すと地面に埋まる
+    const angle = (index / Math.max(1, anemone.arms - 1) - 0.5) * (Math.PI * 0.89)
+    const length = anemone.radius * (0.7 + random() * 0.6)
+    const curl = (random() - 0.5) * 0.7
+
+    const points: Point[] = []
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps
+      /*
+       * 反りを足すと 90 度を超えることがあり、そのぶん先端が**地面より下**へ出る。
+       * 単体テストが 0.6px の潜り込みを捕まえた。ここで角度を頭打ちにする。
+       */
+      const limit = Math.PI / 2 - 0.02
+      const at = Math.min(limit, Math.max(-limit, angle + curl * t * t))
+      points.push({
+        x: anemone.x + Math.sin(at) * length * t,
+        y: groundY - Math.cos(at) * length * t,
+      })
+    }
+    arms.push(points)
+  }
+  return arms
+}

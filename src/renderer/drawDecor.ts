@@ -15,6 +15,10 @@ import {
   fanEdge,
   fanRibs,
   type Fan,
+  tubeShapes,
+  anemoneArms,
+  type TubeCoral,
+  type Anemone,
 } from '../core/decor'
 import type { Tank } from '../core/swim'
 
@@ -524,6 +528,85 @@ export function drawFans(
       context.beginPath()
       context.moveTo(rib[0].x, rib[0].y)
       for (const point of rib.slice(1)) context.lineTo(point.x, point.y)
+      context.stroke()
+    }
+  }
+}
+
+/**
+ * 管サンゴを描く。丸い口が並んだ束。
+ * 口を明るい輪で描くのは、参考にした見え方でここが光って見えていたため。
+ */
+export function drawTubeCorals(
+  context: CanvasRenderingContext2D,
+  corals: readonly TubeCoral[],
+  profile: readonly number[],
+  tank: Tank,
+  strength: number,
+  style: DecorStyle = MID_STYLE,
+): void {
+  if (strength <= 0) return
+
+  const sorted = [...corals].sort((a, b) => a.depth - b.depth)
+  for (const coral of sorted) {
+    const groundY = groundAt(profile, coral.x, tank)
+    const colour = coralColour(coral.seed, style)
+    const alpha = style.alpha * strength * (0.7 + coral.depth * 0.25)
+
+    for (const tube of tubeShapes(coral, groundY)) {
+      // 管の胴
+      context.fillStyle = `rgba(${rgb(colour)}, ${alpha})`
+      context.beginPath()
+      context.moveTo(tube.x - tube.halfWidth, tube.bottom)
+      context.lineTo(tube.x - tube.halfWidth, tube.top + tube.halfWidth)
+      context.quadraticCurveTo(tube.x, tube.top - tube.halfWidth * 0.4, tube.x + tube.halfWidth, tube.top + tube.halfWidth)
+      context.lineTo(tube.x + tube.halfWidth, tube.bottom)
+      context.closePath()
+      context.fill()
+
+      // 口の光
+      context.strokeStyle = style.rim
+      context.lineWidth = Math.max(1, tube.halfWidth * 0.5)
+      context.beginPath()
+      context.ellipse(tube.x, tube.top + tube.halfWidth * 0.4, tube.halfWidth * 0.72, tube.halfWidth * 0.34, 0, 0, Math.PI * 2)
+      context.stroke()
+    }
+  }
+}
+
+/**
+ * イソギンチャクを描く。
+ * 触手は線、根元は塗り。線だけだと浮いて見え、塗りだけだと饅頭に見える。
+ */
+export function drawAnemones(
+  context: CanvasRenderingContext2D,
+  anemones: readonly Anemone[],
+  profile: readonly number[],
+  tank: Tank,
+  strength: number,
+  style: DecorStyle = MID_STYLE,
+): void {
+  if (strength <= 0) return
+
+  const sorted = [...anemones].sort((a, b) => a.depth - b.depth)
+  for (const anemone of sorted) {
+    const groundY = groundAt(profile, anemone.x, tank)
+    const colour = coralColour(anemone.seed, style)
+    const alpha = style.alpha * strength * (0.62 + anemone.depth * 0.3)
+
+    // 根元の塊
+    context.fillStyle = `rgba(${rgb(colour)}, ${alpha * 0.85})`
+    context.beginPath()
+    context.ellipse(anemone.x, groundY, anemone.radius * 0.42, anemone.radius * 0.3, 0, Math.PI, Math.PI * 2)
+    context.fill()
+
+    context.lineCap = 'round'
+    context.strokeStyle = `rgba(${rgb(colour)}, ${alpha})`
+    context.lineWidth = Math.max(1.1, anemone.radius * 0.055)
+    for (const arm of anemoneArms(anemone, groundY)) {
+      context.beginPath()
+      context.moveTo(arm[0].x, arm[0].y)
+      for (const point of arm.slice(1)) context.lineTo(point.x, point.y)
       context.stroke()
     }
   }
