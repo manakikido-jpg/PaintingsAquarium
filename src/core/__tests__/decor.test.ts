@@ -404,3 +404,39 @@ describe('枝サンゴ', () => {
     expect(spawnCorals(21, 0, tank)).toEqual([])
   })
 })
+
+describe('飾りの高さの倍率', () => {
+  const tank: Tank = { width: 1600, height: 900 }
+
+  it('倍率をかけると、その分だけ高くなる', () => {
+    const plain = spawnCorals(11, 8, tank)
+    const tall = spawnCorals(11, 8, tank, undefined, { heightScale: 2 })
+    for (let index = 0; index < plain.length; index++) {
+      expect(tall[index].height).toBeCloseTo(plain[index].height * 2)
+    }
+  })
+
+  it('倍率を指定しなければ、これまでと同じ高さ', () => {
+    const plain = spawnRocks(3, 6, tank)
+    const same = spawnRocks(3, 6, tank, undefined, {})
+    expect(same.map((one) => one.height)).toEqual(plain.map((one) => one.height))
+  })
+
+  it('置く場所は倍率で変わらない。高さだけを変える', () => {
+    const plain = spawnSeaweed(7, 6, tank)
+    const tall = spawnSeaweed(7, 6, tank, undefined, { heightScale: 1.5 })
+    expect(tall.map((one) => one.baseX)).toEqual(plain.map((one) => one.baseX))
+  })
+
+  it('いちばん高い飾りでも、画面の上 1/4 には入らない。絵を探せなくなるため', () => {
+    // 実際に使っている倍率（`aquariumScene.ts`）で確かめる
+    const corals = spawnCorals(21, 40, tank, undefined, { heightScale: 2.2 })
+    const seaweed = spawnSeaweed(22, 40, tank, undefined, { heightScale: 1.5 })
+    const ground = tank.height * 0.9
+    const highest = Math.min(
+      ...corals.map((one) => ground - one.height),
+      ...seaweed.map((one) => ground - one.height),
+    )
+    expect(highest).toBeGreaterThan(tank.height * 0.25)
+  })
+})

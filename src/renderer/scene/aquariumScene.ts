@@ -39,6 +39,14 @@ const FRONT_BUBBLE_COUNT = 8
  * 絵が泳ぐのは中央で、そこが混むと自分の絵を見つけられなくなる。
  * 増えるぶんは画面の下に積む（それぞれの `spawn` が下に置くようになっている）。
  */
+/*
+ * 飾りの高さの倍率。参考画像に合わせて、画面の 1/3 ほどまで立ち上げる。
+ * 岩は塚なので伸ばしすぎると柱に見える。サンゴをいちばん高くする。
+ */
+const ROCK_HEIGHT = 1.6
+const SEAWEED_HEIGHT = 1.5
+const CORAL_HEIGHT = 2.2
+
 const ROCK_COUNT = 9
 const SHELL_COUNT = 6
 const CORAL_COUNT = 9
@@ -53,10 +61,14 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
   const wreck = spawnShipwreck(tank)
   // 沈没船の前には生やさない。重ねると輪郭が消えて塊になる（R-006）。
   const wreckSpan = shipwreckSpan(wreck, tank)
-  const allRocks = spawnRocks(8823, many(ROCK_COUNT), tank, wreckSpan)
-  const allSeaweed = spawnSeaweed(5507, many(SEAWEED_COUNT), tank, wreckSpan)
+  const allRocks = spawnRocks(8823, many(ROCK_COUNT), tank, wreckSpan, { heightScale: ROCK_HEIGHT })
+  const allSeaweed = spawnSeaweed(5507, many(SEAWEED_COUNT), tank, wreckSpan, {
+    heightScale: SEAWEED_HEIGHT,
+  })
   const shells = spawnShells(6619, many(SHELL_COUNT), tank)
-  const allCorals = spawnCorals(3271, many(CORAL_COUNT), tank, wreckSpan)
+  const allCorals = spawnCorals(3271, many(CORAL_COUNT), tank, wreckSpan, {
+    heightScale: CORAL_HEIGHT,
+  })
 
   /*
    * 飾りを奥行きで3つに分ける。

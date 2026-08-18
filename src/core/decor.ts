@@ -75,7 +75,27 @@ export interface Rock {
   readonly seed: number
 }
 
-export function spawnRocks(seed: number, count: number, tank: Tank, avoid?: Span): Rock[] {
+/**
+ * 飾りの高さの倍率。
+ *
+ * 参考画像（teamLab のお絵かき水族館）では、飾りが**画面の1/3ほどまで
+ * 立ち上がる大きな塊**になっている。低い帯のままだと、賑やかさが出ない。
+ *
+ * 高くしても**絵は隠れない**。飾りは絵より先に描くので、絵は必ず上に乗る。
+ * 隠れないが**見つけにくくはなる**ので、絵が泳ぐ中央は空けたまま
+ * （それぞれの `spawn` が画面の下と左右に置くようになっている）。
+ */
+export interface DecorHeight {
+  readonly heightScale?: number
+}
+
+export function spawnRocks(
+  seed: number,
+  count: number,
+  tank: Tank,
+  avoid?: Span,
+  { heightScale = 1 }: DecorHeight = {},
+): Rock[] {
   const random = seededRandom(seed)
   const rocks: Rock[] = []
 
@@ -86,7 +106,7 @@ export function spawnRocks(seed: number, count: number, tank: Tank, avoid?: Span
     rocks.push({
       x: tank.width * placeOutside(slot, avoid),
       halfWidth: tank.width * (0.035 + random() * 0.075),
-      height: tank.height * (0.03 + random() * 0.075),
+      height: tank.height * (0.03 + random() * 0.075) * heightScale,
       depth: random(),
       seed: Math.floor(random() * 100000) + 1,
     })
@@ -171,6 +191,7 @@ export function spawnSeaweed(
   clusters: number,
   tank: Tank,
   avoid?: Span,
+  { heightScale = 1 }: DecorHeight = {},
 ): Seaweed[] {
   const random = seededRandom(seed)
   const weeds: Seaweed[] = []
@@ -187,7 +208,7 @@ export function spawnSeaweed(
     const depth = random()
     const slot = (index + 0.5) / clusters + (random() - 0.5) * 0.8 / clusters
     const rootX = tank.width * placeOutside(slot, widened)
-    const rootHeight = tank.height * (0.11 + depth * 0.2)
+    const rootHeight = tank.height * (0.11 + depth * 0.2) * heightScale
     const blades = 3 + Math.floor(random() * 2)
 
     for (let blade = 0; blade < blades; blade++) {
@@ -424,7 +445,13 @@ export interface Coral {
   readonly colour: number
 }
 
-export function spawnCorals(seed: number, count: number, tank: Tank, avoid?: Span): Coral[] {
+export function spawnCorals(
+  seed: number,
+  count: number,
+  tank: Tank,
+  avoid?: Span,
+  { heightScale = 1 }: DecorHeight = {},
+): Coral[] {
   const random = seededRandom(seed)
   const corals: Coral[] = []
 
@@ -434,7 +461,7 @@ export function spawnCorals(seed: number, count: number, tank: Tank, avoid?: Spa
     corals.push({
       x: tank.width * placeOutside(slot, avoid),
       // 海藻より低く抑える。高いと絵の泳ぐ範囲に食い込む。
-      height: tank.height * (0.07 + depth * 0.09 + random() * 0.04),
+      height: tank.height * (0.07 + depth * 0.09 + random() * 0.04) * heightScale,
       halfWidth: tank.width * (0.004 + random() * 0.004),
       depthLevels: 3 + Math.floor(random() * 2),
       depth,
