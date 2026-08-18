@@ -24,6 +24,13 @@ export interface Fish {
   readonly phaseSpeed: number
   /** ゆらぎの振れ幅（ピクセル） */
   readonly amplitude: number
+  /**
+   * 画面の外へ出て行く途中か。
+   *
+   * 同時に泳ぐ数を超えた絵は、その場で消すのではなく**泳いで画面の外へ去る**。
+   * その間は壁で跳ね返らない。跳ね返ると画面から出られない。
+   */
+  readonly exiting?: boolean
 }
 
 /** 描画に使う実際の Y。ゆらぎを足したもの。 */
@@ -52,6 +59,11 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
   let y = fish.y + fish.vy * dt
   let vx = fish.vx
   let vy = fish.vy
+
+  // 去る途中は壁を無視してそのまま進む。跳ね返ると永遠に出て行けない
+  if (fish.exiting) {
+    return { ...fish, x, y, phase: fish.phase + fish.phaseSpeed * dt }
+  }
 
   const halfWidth = fish.width / 2
   const halfHeight = fish.height / 2
@@ -228,4 +240,23 @@ export function separateFish(
     // 速さは元のまま。向きだけ変える。
     return { ...fish, vx: (vx / changed) * speed, vy: (vy / changed) * speed }
   })
+}
+
+/**
+ * 画面の外へ向かわせる。
+ *
+ * **近いほうの横の端**へ向ける。上下ではなく横に出すのは、
+ * 水槽の絵が横に泳ぐ形なので、そのまま進めば自然に見えるため。
+ * 速さは少し上げる。ゆっくり去られると、消えかけの絵が長く画面に残る。
+ */
+export function sendFishOut(fish: Fish, tank: Tank): Fish {
+  const speed = Math.max(60, Math.abs(fish.vx) * 1.5)
+  const goesLeft = fish.x < tank.width / 2
+  return { ...fish, exiting: true, vx: goesLeft ? -speed : speed, vy: fish.vy * 0.3 }
+}
+
+/** 絵が完全に画面の外へ出たか。 */
+export function isFishOutside(fish: Fish, tank: Tank): boolean {
+  const half = fish.width / 2 + fish.amplitude
+  return fish.x < -half || fish.x > tank.width + half
 }

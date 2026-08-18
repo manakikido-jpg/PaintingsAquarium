@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react'
 import type { Tank } from '../core/swim'
 import {
   creatureLane,
+  isCreatureOutside,
   placeCreature,
+  sendCreatureOut,
   spawnCreature,
   stepCreatures,
   type Creature,
@@ -30,6 +32,8 @@ interface Swimmer {
   readonly bornAt: number
   /** しなりの拍。絵ごとにずらさないと、群れが1枚の布のように揃って見える */
   readonly beat: { readonly rate: number; readonly phase: number }
+  /** 画面の外へ去ることが決まった時刻。まだ残る絵は null */
+  leavingAt: number | null
   creature: Creature
 }
 
@@ -146,8 +150,21 @@ export function Aquarium({
 
       const swimmers = swimmersRef.current
       const wanted = new Set(piecesRef.current.map((piece) => piece.id))
-      for (const id of swimmers.keys()) {
-        if (!wanted.has(id)) swimmers.delete(id)
+      for (const [id, swimmer] of swimmers) {
+        if (wanted.has(id)) continue
+        /*
+         * すぐには消さない。**画面の外へ泳いで行かせる**。
+         * その場で消すと、来場者から見て絵が突然消えたようにしか見えない。
+         * 1日200枚・同時50匹なら会期中に150回起きる。
+         */
+        if (swimmer.leavingAt === null) {
+          swimmer.leavingAt = elapsed
+          swimmer.creature = sendCreatureOut(swimmer.creature, tank)
+        }
+        // 画面の外に出たら取り除く。出られないまま長く残る場合の保険も付ける
+        if (isCreatureOutside(swimmer.creature, tank) || elapsed - swimmer.leavingAt > 20) {
+          swimmers.delete(id)
+        }
       }
 
       for (const piece of piecesRef.current) {
@@ -160,6 +177,7 @@ export function Aquarium({
           // 起動前からある絵は演出しない。起動のたびに全部が一斉に現れると
           // 不具合に見えるため。
           bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? elapsed : -Infinity,
+          leavingAt: null,
           beat: { rate: beatRate(seedOf(piece.id)), phase: beatPhase(seedOf(piece.id)) },
           creature: spawnCreature(
             scene.motion,

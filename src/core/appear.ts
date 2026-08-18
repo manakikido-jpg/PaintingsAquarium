@@ -50,3 +50,12 @@ export function isNewlyArrived(createdAtIso: string, appStartedAtMs: number): bo
   if (Number.isNaN(createdAt)) return false
   return createdAt >= appStartedAtMs
 }
+
+/*
+ * 去るときの演出について。
+ *
+ * 最初は「薄れながら小さくなって消える」を作ったが、**撤回した**。
+ * 水槽の中の出来事として一番自然なのは「画面の外へ泳いで行った」であって、
+ * 「その場で透明になった」ではない。
+ * いまは `motion.ts` の `sendCreatureOut` で端へ向かわせている。
+ */

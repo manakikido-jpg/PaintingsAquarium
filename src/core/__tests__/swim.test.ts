@@ -7,6 +7,8 @@ import {
   stepFish,
   type Fish,
   type Tank,
+  sendFishOut,
+  isFishOutside,
 } from '../swim'
 
 const tank: Tank = { width: 1920, height: 1080 }
@@ -256,5 +258,42 @@ describe('絵の大きさ', () => {
     // 隙間より絵のほうが多くなる境目が「画面の半分」。
     // 実測: 画面幅の 9% だと 54%（埋まる）、7% だと 33%（探せる）。
     expect(area).toBeLessThan(tank.width * tank.height * 0.5)
+  })
+})
+
+describe('sendFishOut / isFishOutside', () => {
+  const tank: Tank = { width: 1000, height: 600 }
+
+  it('近いほうの端へ向かう', () => {
+    const left = spawnFish(1, tank, 200, 100)
+    expect(sendFishOut({ ...left, x: 100 }, tank).vx).toBeLessThan(0)
+    expect(sendFishOut({ ...left, x: 900 }, tank).vx).toBeGreaterThan(0)
+  })
+
+  it('去る途中は壁で跳ね返らない。跳ね返ると画面から出られない', () => {
+    let fish = sendFishOut({ ...spawnFish(2, tank, 200, 100), x: 60 }, tank)
+    for (let step = 0; step < 200; step++) fish = stepFish(fish, 1 / 60, tank)
+    expect(isFishOutside(fish, tank)).toBe(true)
+  })
+
+  it('どこから出発しても、十分な時間で必ず画面の外へ出る', () => {
+    for (let seed = 0; seed < 25; seed++) {
+      let fish = sendFishOut(spawnFish(seed, tank, 300, 200), tank)
+      for (let step = 0; step < 60 * 20 && !isFishOutside(fish, tank); step++) {
+        fish = stepFish(fish, 1 / 60, tank)
+      }
+      expect(isFishOutside(fish, tank)).toBe(true)
+    }
+  })
+
+  it('去ると決める前は、これまで通り画面の中に留まる', () => {
+    let fish = spawnFish(7, tank, 200, 100)
+    for (let step = 0; step < 60 * 30; step++) fish = stepFish(fish, 1 / 60, tank)
+    expect(isFishOutside(fish, tank)).toBe(false)
+  })
+
+  it('速すぎず遅すぎない速さにする。ゆっくり去られると長く画面に残る', () => {
+    const slow = { ...spawnFish(3, tank, 200, 100), vx: 5 }
+    expect(Math.abs(sendFishOut(slow, tank).vx)).toBeGreaterThanOrEqual(60)
   })
 })

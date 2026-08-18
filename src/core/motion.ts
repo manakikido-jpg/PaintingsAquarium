@@ -5,8 +5,17 @@ import {
   WALKER_SIZE_RATIO,
 } from './size'
 import type { CreatureKind } from './rig'
-import { facesRight, renderY, separateFish, spawnFish, stepFish, type Fish, type Tank } from './swim'
-import { separateWalkers, spawnWalker, stepWalker, walkerY, type Lane, type Walker } from './walk'
+import { isFishOutside, sendFishOut, facesRight, renderY, separateFish, spawnFish, stepFish, type Fish, type Tank } from './swim'
+import {
+  isWalkerOutside,
+  sendWalkerOut,
+  separateWalkers,
+  spawnWalker,
+  stepWalker,
+  walkerY,
+  type Lane,
+  type Walker,
+} from './walk'
 import type { MotionKind } from './theme'
 
 /**
@@ -118,4 +127,24 @@ export function placeCreature(creature: Creature, lanes: readonly Lane[]): Place
     height: fish.height,
     facingRight: facesRight(fish),
   }
+}
+
+/**
+ * 画面の外へ去らせる。
+ *
+ * 同時に泳ぐ数を超えた絵を、その場で消さずに**泳いで（歩いて）出て行かせる**。
+ * 薄くして消す案もあったが、水槽の中の出来事として一番自然なのは
+ * 「画面の外へ行った」であって、「その場で透明になった」ではない。
+ */
+export function sendCreatureOut(creature: Creature, tank: Tank): Creature {
+  return creature.kind === 'walk'
+    ? { kind: 'walk', walker: sendWalkerOut(creature.walker, tank) }
+    : { kind: 'float', fish: sendFishOut(creature.fish, tank) }
+}
+
+/** 完全に画面の外へ出たか。ここで初めて取り除く。 */
+export function isCreatureOutside(creature: Creature, tank: Tank): boolean {
+  return creature.kind === 'walk'
+    ? isWalkerOutside(creature.walker, tank)
+    : isFishOutside(creature.fish, tank)
 }

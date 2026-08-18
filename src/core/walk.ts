@@ -75,6 +75,8 @@ export interface Walker {
    * すれ違うときに「ぶつかっている」ようにしか見えない。
    */
   readonly groundOffset: number
+  /** 画面の外へ歩いて去る途中か。その間は端で折り返さない */
+  readonly exiting?: boolean
 }
 
 
@@ -130,6 +132,11 @@ export function stepWalker(walker: Walker, dtSeconds: number, tank: Tank): Walke
   const dt = Math.max(0, dtSeconds)
   let x = walker.x + walker.vx * dt
   let vx = walker.vx
+
+  // 去る途中は折り返さない。折り返すと画面から出られない
+  if (walker.exiting) {
+    return { ...walker, x, stepPhase: walker.stepPhase + walker.stepSpeed * dt }
+  }
 
   const halfWidth = walker.width / 2
   // 端ちょうどではなく、1匹ずつ違う手前で折り返す。
@@ -196,4 +203,17 @@ export function separateWalkers(
   }
 
   return next
+}
+
+/** 画面の外へ歩いて去らせる。近いほうの端へ向ける。 */
+export function sendWalkerOut(walker: Walker, tank: Tank): Walker {
+  const speed = Math.max(45, Math.abs(walker.vx) * 1.5)
+  const goesLeft = walker.x < tank.width / 2
+  return { ...walker, exiting: true, vx: goesLeft ? -speed : speed }
+}
+
+/** 完全に画面の外へ出たか。 */
+export function isWalkerOutside(walker: Walker, tank: Tank): boolean {
+  const half = walker.width / 2
+  return walker.x < -half || walker.x > tank.width + half
 }
