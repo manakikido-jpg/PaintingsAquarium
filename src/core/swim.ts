@@ -1,3 +1,4 @@
+import { creatureSize, DEFAULT_SIZE_SCALE, FISH_SIZE_RATIO } from './size'
 import { seededRandom } from './random'
 /**
  * 水槽の中を泳ぐ動き。純粋関数にしてあるのは、
@@ -112,7 +113,8 @@ export function spawnFish(
    * 実測（1280px 幅・50匹）では 180px 固定が画面を埋め、
    * **自分の絵を探せない**状態になった（R-015）。
    */
-  const { targetSize = tank.width * 0.07, minSpeed = 30, maxSpeed = 90 } = options
+  const { targetSize = creatureSize(tank, FISH_SIZE_RATIO, DEFAULT_SIZE_SCALE), minSpeed = 30, maxSpeed = 90 } =
+    options
   const random = seededRandom(seed)
   const longestSide = Math.max(imageWidth, imageHeight, 1)
   const scale = targetSize / longestSide

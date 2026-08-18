@@ -117,6 +117,7 @@ export function App(): React.JSX.Element {
         sceneryStrength={settings?.sceneryStrength ?? 1}
         decorDensity={settings?.decorDensity ?? 2}
         swayStrength={settings?.swayStrength ?? 1}
+        sizeScale={settings?.sizeScale ?? 1}
       />
 
       {settings && settings.watchFolder !== null && forTheme.length === 0 && pieces.length > 0 && (
@@ -300,6 +301,27 @@ export function App(): React.JSX.Element {
                 }
               />
             </label>
+            <label>
+              絵の大きさ: {settings.sizeScale.toFixed(1)} 倍
+              <input
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={settings.sizeScale}
+                onChange={(event) =>
+                  void window.aquarium
+                    .updateSettings({ sizeScale: Number(event.target.value) })
+                    .then(setSettings)
+                }
+              />
+            </label>
+            <p className="note">
+              画面の大きさに対する倍率です。大きくすると遠くからでも見つけやすくなりますが、
+              絵どうしが重なりやすくなります。会場の画面と、来場者が立つ距離で決めてください。
+              変えると絵が置き直されるので、いちど散らばります。
+            </p>
+
             <label>
               ひれの動き: {settings.swayStrength.toFixed(1)}
               <input

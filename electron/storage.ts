@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS: Settings = {
   theme: DEFAULT_THEME,
   decorDensity: 2,
   swayStrength: 1,
+  sizeScale: 1,
 }
 
 export function dataRoot(): string {

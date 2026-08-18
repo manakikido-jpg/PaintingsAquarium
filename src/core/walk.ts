@@ -1,3 +1,4 @@
+import { creatureSize, DEFAULT_SIZE_SCALE, WALKER_SIZE_RATIO } from './size'
 import type { Tank } from './swim'
 import { seededRandom } from './random'
 
@@ -93,7 +94,8 @@ export function spawnWalker(
 ): Walker {
   // 泳ぐ側と同じ考え方。奥の列では列の倍率でさらに小さくなるので、
   // 基準は少し大きめに取る（R-015）。
-  const { targetSize = tank.width * 0.085, minSpeed = 22, maxSpeed = 62 } = options
+  const { targetSize = creatureSize(tank, WALKER_SIZE_RATIO, DEFAULT_SIZE_SCALE), minSpeed = 22, maxSpeed = 62 } =
+    options
   const random = seededRandom(seed)
   const laneIndex = lanes.length === 0 ? 0 : Math.min(lanes.length - 1, Math.floor(random() * lanes.length))
   const lane = lanes[laneIndex]

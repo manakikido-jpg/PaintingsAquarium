@@ -1,3 +1,9 @@
+import {
+  creatureSize,
+  DEFAULT_SIZE_SCALE,
+  FISH_SIZE_RATIO,
+  WALKER_SIZE_RATIO,
+} from './size'
 import { facesRight, renderY, separateFish, spawnFish, stepFish, type Fish, type Tank } from './swim'
 import { separateWalkers, spawnWalker, stepWalker, walkerY, type Lane, type Walker } from './walk'
 import type { MotionKind } from './theme'
@@ -34,13 +40,24 @@ export function spawnCreature(
   imageWidth: number,
   imageHeight: number,
   lanes: readonly Lane[],
+  sizeScale = DEFAULT_SIZE_SCALE,
 ): Creature {
   if (motion === 'walk') {
-    return { kind: 'walk', walker: spawnWalker(seed, tank, lanes, imageWidth, imageHeight) }
+    return {
+      kind: 'walk',
+      walker: spawnWalker(seed, tank, lanes, imageWidth, imageHeight, {
+        targetSize: creatureSize(tank, WALKER_SIZE_RATIO, sizeScale),
+      }),
+    }
   }
 
   // flutter / rise はまだ未実装。浮遊で代用する（テーマ側が ready: false なので選べない）。
-  return { kind: 'float', fish: spawnFish(seed, tank, imageWidth, imageHeight) }
+  return {
+    kind: 'float',
+    fish: spawnFish(seed, tank, imageWidth, imageHeight, {
+      targetSize: creatureSize(tank, FISH_SIZE_RATIO, sizeScale),
+    }),
+  }
 }
 
 /**

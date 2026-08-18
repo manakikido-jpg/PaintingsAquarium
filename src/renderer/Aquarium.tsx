@@ -46,12 +46,14 @@ export function Aquarium({
   sceneryStrength,
   decorDensity,
   swayStrength,
+  sizeScale,
 }: {
   pieces: Piece[]
   theme: ThemeId
   sceneryStrength: number
   decorDensity: number
   swayStrength: number
+  sizeScale: number
 }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const swimmersRef = useRef<Map<string, Swimmer>>(new Map())
@@ -66,6 +68,8 @@ export function Aquarium({
   densityRef.current = decorDensity
   const swayRef = useRef(swayStrength)
   swayRef.current = swayStrength
+  const sizeRef = useRef(sizeScale)
+  sizeRef.current = sizeScale
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -91,7 +95,7 @@ export function Aquarium({
         : null
 
     let scene: Scene | null = null
-    let builtFor = { width: -1, height: -1, theme: '', density: -1 }
+    let builtFor = { width: -1, height: -1, theme: '', density: -1, size: -1 }
 
     const resize = (): void => {
       // 4K の大画面でぼやけないように、実画素に合わせる。
@@ -108,16 +112,19 @@ export function Aquarium({
      * 毎フレーム作ると、泡や煙が進まず場所だけ変わってちらつく。
      * テーマが変わったら、動き方も変わるので絵も置き直す。
      */
-    const rebuild = (tank: Tank, theme: ThemeId, density: number): boolean => {
+    const rebuild = (tank: Tank, theme: ThemeId, density: number, size: number): boolean => {
       if (
         builtFor.width === tank.width &&
         builtFor.height === tank.height &&
         builtFor.theme === theme &&
-        builtFor.density === density
+        builtFor.density === density &&
+        builtFor.size === size
       ) {
         return false
       }
-      builtFor = { width: tank.width, height: tank.height, theme, density }
+      // 大きさを変えたら絵を置き直す。泳ぐ範囲が絵の大きさで決まるので、
+      // 大きくしただけだと画面の外に出たままの絵が残る。
+      builtFor = { width: tank.width, height: tank.height, theme, density, size }
       scene = createScene(theme, tank, density)
       swimmersRef.current.clear()
       return true
@@ -131,7 +138,7 @@ export function Aquarium({
 
       const tank: Tank = { width: canvas.clientWidth, height: canvas.clientHeight }
       const strength = strengthRef.current
-      rebuild(tank, themeRef.current, densityRef.current)
+      rebuild(tank, themeRef.current, densityRef.current, sizeRef.current)
       if (!scene) {
         animationId = requestAnimationFrame(frame)
         return
@@ -161,6 +168,7 @@ export function Aquarium({
             piece.width,
             piece.height,
             scene.lanes,
+            sizeRef.current,
           ),
         })
       }
