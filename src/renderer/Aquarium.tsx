@@ -17,7 +17,7 @@ import {
   stripOffset,
   tailAngle,
 } from '../core/undulate'
-import { rigIsUsable } from '../core/rig'
+import { rigIsUsable, type CreatureKind } from '../core/rig'
 import type { ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
@@ -169,6 +169,7 @@ export function Aquarium({
             piece.height,
             scene.lanes,
             sizeRef.current,
+            piece.rig?.kind ?? 'unknown',
           ),
         })
       }
@@ -194,14 +195,18 @@ export function Aquarium({
         context.globalAlpha = 1
 
         const rig = rigIsUsable(swimmer.piece.rig) ? swimmer.piece.rig : null
+        const kind: CreatureKind = swimmer.piece.rig?.kind ?? 'unknown'
+        const drifts = kind === 'tentacled'
 
         context.save()
         context.globalAlpha = appearAlpha(progress)
         context.translate(place.x, place.y)
         /*
-         * 頭が進む向きを向くように反転する。後ろ向きに進んで見えるのを避けるため。
-         * 絵の中で頭が右にあるとは限らない（実物は縦向きだった・R-019）ので、
+         * 頭が進む向きを向くように反転する。
+         * 絵の中で頭が右にあるとは限らないので（実物は縦向きだった・R-019）、
          * リグが分かっていればそれに従う。
+         * 正面を向いた絵（タコ・イカ）は左右が対称に近いので、反転しても見た目は
+         * ほとんど変わらない。揃えておいたほうが規則が1つ減る。
          */
         const mirror = place.facingRight !== (rig?.headsRight ?? true)
         context.scale(mirror ? -scale : scale, scale)
@@ -259,8 +264,44 @@ export function Aquarium({
             context.restore()
           }
 
+          /*
+           * 足のある生き物は、**横に切って左右へ**波打たせる。
+           * 魚と同じ縦の帯で上下に振ると、胴も足も一緒にずれるだけで、
+           * 足が漂っているようには見えない。
+           * 波は足の先へ向かって大きくなる。
+           */
+          const drawBand = (nearBody: number, farBody: number): void => {
+            const tipsDown = swimmer.piece.rig?.tipsDown ?? true
+            const topFrac = tipsDown ? nearBody : 1 - farBody
+            const height = place.height * (farBody - nearBody)
+            if (height <= 0) return
+            const y = top + place.height * topFrac
+            const atTop = offsetAt(tipsDown ? nearBody : farBody)
+            const atBottom = offsetAt(tipsDown ? farBody : nearBody)
+            // 横方向のずれ。絵の高さではなく幅に対する割合にする
+            const shiftTop = (atTop / place.height) * place.width
+            const shiftBottom = (atBottom / place.height) * place.width
+            const slope = (shiftBottom - shiftTop) / height
+
+            context.save()
+            context.transform(1, 0, slope, 1, shiftTop - slope * y, 0)
+            context.drawImage(
+              swimmer.element,
+              0,
+              sourceHeight * topFrac,
+              source,
+              sourceHeight * (farBody - nearBody),
+              left,
+              y,
+              place.width,
+              height + height * 0.02,
+            )
+            context.restore()
+          }
+
           for (let index = 0; index < strips; index++) {
-            drawStrip((index / strips) * bodyEnd, ((index + 1) / strips) * bodyEnd)
+            if (drifts) drawBand(index / strips, (index + 1) / strips)
+            else drawStrip((index / strips) * bodyEnd, ((index + 1) / strips) * bodyEnd)
           }
 
           if (rig?.tail) {

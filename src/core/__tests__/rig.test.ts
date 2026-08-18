@@ -12,6 +12,13 @@ import {
   orientForSwimming,
   rotateQuarter,
   rigIsUsable,
+  runsAlongColumn,
+  runsAlongRow,
+  tentacleSignal,
+  hasTentacles,
+  tipsAtBottom,
+  TENTACLE_LINES_3,
+  TENTACLE_LINES_4,
 } from '../rig'
 
 /** 塗りつぶした矩形を置く。 */
@@ -241,5 +248,92 @@ describe('rigIsUsable', () => {
   it('リグが無い古い絵は使わない', () => {
     expect(rigIsUsable(undefined)).toBe(false)
     expect(rigIsUsable(null)).toBe(false)
+  })
+})
+
+/** タコ。丸い胴から、細い足が何本も下へ垂れている。 */
+function octopus(): RgbaImage {
+  const image = createImage(90, 110)
+  // 胴（丸い塊）
+  for (let y = 6; y < 48; y++) {
+    const half = Math.round(Math.sqrt(Math.max(0, 1 - ((y - 27) / 21) ** 2)) * 32)
+    fill(image, 45 - half, y, 45 + half, y + 1)
+  }
+  // 足 6 本。下へ垂らす
+  for (let leg = 0; leg < 6; leg++) {
+    const x = 12 + leg * 13
+    for (let y = 46; y < 106; y++) {
+      const wobble = Math.round(Math.sin((y - 46) / 9 + leg) * 3)
+      fill(image, x + wobble, y, x + wobble + 5, y + 1)
+    }
+  }
+  return image
+}
+
+describe('runsAlongRow / runsAlongColumn', () => {
+  it('何も無い行は 0', () => {
+    expect(runsAlongRow(createImage(10, 10), 5)).toBe(0)
+  })
+
+  it('離れた塊の数を数える', () => {
+    const image = createImage(20, 4)
+    fill(image, 1, 0, 4, 4)
+    fill(image, 8, 0, 11, 4)
+    fill(image, 15, 0, 18, 4)
+    expect(runsAlongRow(image, 2)).toBe(3)
+    expect(runsAlongColumn(image, 2)).toBe(1)
+  })
+})
+
+describe('tentacleSignal / detectKind', () => {
+  it('魚には足の並びが出ない', () => {
+    expect(hasTentacles(fishFacingRight())).toBe(false)
+  })
+
+  it('タコには足の並びが出る', () => {
+    expect(hasTentacles(octopus())).toBe(true)
+  })
+
+  it('割合ではなく本数で数える。足が短い絵でも埋もれないため', () => {
+    // 実物のタコは 20 行中 4 行しか足に当たらず、割合では魚と誤判定した
+    const signal = tentacleSignal(octopus())
+    expect(signal.lines3).toBeGreaterThanOrEqual(TENTACLE_LINES_3)
+    expect(signal.lines4).toBeGreaterThanOrEqual(TENTACLE_LINES_4)
+  })
+
+  it('魚は fish、タコは tentacled、ただの四角は unknown', () => {
+    const square = createImage(60, 60)
+    fill(square, 5, 5, 55, 55)
+    expect(estimateRig(fishFacingRight()).kind).toBe('fish')
+    expect(estimateRig(octopus()).kind).toBe('tentacled')
+    expect(estimateRig(square).kind).toBe('unknown')
+  })
+
+  it('タコには尾びれを付けない。足の1本を尾と取り違えると体がちぎれて揺れる', () => {
+    const rig = estimateRig(octopus())
+    expect(rig.tail).toBeNull()
+    expect(rigIsUsable(rig)).toBe(false)
+  })
+
+  it('タコの向きは変えない。足を垂らした絵を横倒しにしない', () => {
+    const oriented = orientForSwimming(octopus())
+    expect(oriented.turns).toBe(0)
+    expect(oriented.flipped).toBe(false)
+  })
+})
+
+describe('tipsAtBottom', () => {
+  it('足を下へ垂らした絵では true', () => {
+    expect(tipsAtBottom(octopus())).toBe(true)
+  })
+
+  it('上下をひっくり返すと false', () => {
+    expect(tipsAtBottom(flipVertical(octopus()))).toBe(false)
+  })
+
+  it('足が見つからない絵では、垂らして描くほうが普通なので true に倒す', () => {
+    const square = createImage(40, 40)
+    fill(square, 5, 5, 35, 35)
+    expect(tipsAtBottom(square)).toBe(true)
   })
 })

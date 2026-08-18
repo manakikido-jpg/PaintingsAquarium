@@ -14,9 +14,19 @@ export interface CutoutOptions {
   paperSaturation: number
   /** 境界をぼかす幅。0 にすると輪郭がギザギザになる（0〜1） */
   feather: number
+  /**
+   * 明るさのしきい値を写真ごとに自動で選ぶか。
+   *
+   * 紙も照明も毎回違うので、既定は自動。
+   * 手で決めたいときだけ切る（そのとき `paperValue` が使われる）。
+   * 古い設定ファイルには入っていないので、未指定は自動とみなす。
+   */
+  auto?: boolean
 }
 
 export const DEFAULT_CUTOUT_OPTIONS: CutoutOptions = {
+  // 既定は自動。会場のスタッフにつまみを触らせないため
+  auto: true,
   /*
    * 実物の絵1枚（新聞紙に青のマーカー）で測った安全域は 0.50〜0.66 だった。
    * 0.68 以上にすると**絵が丸ごと消え、紙の裏写りだけが残る**（R-018）。
@@ -191,4 +201,97 @@ export function diagnoseResult(image: RgbaImage): { ok: true } | { ok: false; me
       '罫線や印刷のある紙（新聞紙・チラシの裏）を使っていると、この状態になりやすいので、' +
       '無地の紙に描いたものを撮り直すのが確実です。',
   }
+}
+
+/* ------------------------------------------------------------------
+ * しきい値の自動選び
+ *
+ * 実物3枚で、うまくいくしきい値の範囲が全部違った。
+ *   魚（新聞紙）0.50〜0.66 ／ イカ 0.55〜0.62 ／ タコ 0.40〜0.58
+ * 紙も照明も毎回違うので、**1つの固定値でどれにも当てるのは無理**。
+ *
+ * かといって会場のスタッフに毎回つまみを触らせるのは、
+ * このアプリの核（アプリ操作0回）を壊す。だから絵ごとに自動で選ぶ。
+ * ------------------------------------------------------------------ */
+
+/** 切り抜いた結果に、絵として意味のある中身が入っているか。 */
+export interface InkStats {
+  /** 外接矩形に対する不透明な画素の割合 */
+  readonly fill: number
+  /** 不透明な画素のうち、はっきり濃い（＝線や塗り）ものの割合 */
+  readonly darkShare: number
+}
+
+export function inkStats(image: RgbaImage): InkStats {
+  let opaque = 0
+  let dark = 0
+  for (let index = 0; index < image.data.length; index += 4) {
+    if (image.data[index + 3] <= 12) continue
+    opaque++
+    const luminance =
+      (image.data[index] * 0.299 + image.data[index + 1] * 0.587 + image.data[index + 2] * 0.114) /
+      255
+    if (luminance < 0.5) dark++
+  }
+  const area = Math.max(1, image.width * image.height)
+  return { fill: opaque / area, darkShare: opaque === 0 ? 0 : dark / opaque }
+}
+
+/**
+ * 濃い画素がこれだけ混じっていれば「絵が残っている」とみなす。
+ *
+ * 実測: うまくいった切り抜きは 29〜53%、失敗（紙の裏写りだけ）は 0〜6%。
+ * 間が広く空いているので、境目はこの辺りならどこでもよい。
+ */
+export const MIN_DARK_SHARE = 0.12
+
+/** 試すしきい値。0.02 刻みだと 1 枚あたりの回数が増えるだけで結果が変わらない。 */
+export const CUTOUT_CANDIDATES: readonly number[] = [
+  0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.72, 0.76, 0.8,
+]
+
+export interface ChosenCutout {
+  /** 選んだしきい値 */
+  readonly value: number
+  /** 通ったしきい値の並び。会場で調べるときのために残す */
+  readonly passed: readonly number[]
+}
+
+/**
+ * この写真に合うしきい値を選ぶ。
+ *
+ * **通った値の中で「いちばん長く続いた範囲」の真ん中を採る。**
+ * 端を採らないのは、紙や照明が少し変わっただけで外れるため。
+ * 実物でも、うまくいく範囲は必ずひと続きの帯になっていた。
+ *
+ * `judge` に、切り抜き後の後処理（塊の選別・トリミング）を渡す。
+ * ここに書かないのは、この関数を `regions` や `trim` から独立させておくため。
+ */
+export function chooseCutoutValue(
+  judge: (paperValue: number) => InkStats | null,
+  candidates: readonly number[] = CUTOUT_CANDIDATES,
+): ChosenCutout | null {
+  const passed: number[] = []
+  for (const value of candidates) {
+    const stats = judge(value)
+    if (stats && stats.darkShare >= MIN_DARK_SHARE) passed.push(value)
+  }
+  if (passed.length === 0) return null
+
+  // 通った値のうち、隣り合って続いている帯を探す
+  let bestFrom = 0
+  let bestLength = 0
+  let from = 0
+  for (let index = 1; index <= passed.length; index++) {
+    const broken =
+      index === passed.length ||
+      candidates.indexOf(passed[index]) !== candidates.indexOf(passed[index - 1]) + 1
+    if (!broken) continue
+    if (index - from > bestLength) {
+      bestLength = index - from
+      bestFrom = from
+    }
+    from = index
+  }
+  return { value: passed[bestFrom + Math.floor((bestLength - 1) / 2)], passed }
 }

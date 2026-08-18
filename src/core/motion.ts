@@ -4,6 +4,7 @@ import {
   FISH_SIZE_RATIO,
   WALKER_SIZE_RATIO,
 } from './size'
+import type { CreatureKind } from './rig'
 import { facesRight, renderY, separateFish, spawnFish, stepFish, type Fish, type Tank } from './swim'
 import { separateWalkers, spawnWalker, stepWalker, walkerY, type Lane, type Walker } from './walk'
 import type { MotionKind } from './theme'
@@ -41,6 +42,7 @@ export function spawnCreature(
   imageHeight: number,
   lanes: readonly Lane[],
   sizeScale = DEFAULT_SIZE_SCALE,
+  kind: CreatureKind = 'unknown',
 ): Creature {
   if (motion === 'walk') {
     return {
@@ -52,10 +54,18 @@ export function spawnCreature(
   }
 
   // flutter / rise はまだ未実装。浮遊で代用する（テーマ側が ready: false なので選べない）。
+  /*
+   * タコ・イカ・クラゲは魚のようには進まない。
+   * 水を押して進む生き物なので、速さは魚の半分ほどにして漂わせる。
+   * 魚と同じ速さで走らせると、足を引きずって滑っているように見える。
+   */
+  const drifts = kind === 'tentacled'
+
   return {
     kind: 'float',
     fish: spawnFish(seed, tank, imageWidth, imageHeight, {
       targetSize: creatureSize(tank, FISH_SIZE_RATIO, sizeScale),
+      ...(drifts ? { minSpeed: 12, maxSpeed: 38 } : {}),
     }),
   }
 }

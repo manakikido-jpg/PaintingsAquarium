@@ -234,6 +234,21 @@ export function App(): React.JSX.Element {
 
           <section>
             <label>
+              <input
+                type="checkbox"
+                checked={settings.cutout.auto !== false}
+                onChange={(event) => void patchCutout({ auto: event.target.checked })}
+              />
+              明るさを写真ごとに自動で合わせる
+            </label>
+            <p className="note">
+              紙や照明が変わるたびに、合う明るさも変わります。自動にしておくと、
+              1枚ごとに何通りか試して、いちばん安定して絵が残る値を選びます。
+              ふだんは自動のままにしてください。
+              下のつまみは、自動を切ったときだけ使われます。
+            </p>
+
+            <label>
               紙とみなす明るさ: {settings.cutout.paperValue.toFixed(2)}
               <input
                 type="range"
@@ -258,7 +273,7 @@ export function App(): React.JSX.Element {
               />
             </label>
             <p className="note">
-              絵が消えすぎるときは「明るさ」を上げ、紙の白が残るときは下げてください。
+              自動を切ったときの値です。絵が消えすぎるときは上げ、紙の白が残るときは下げてください。
               変更は次に取り込む写真から効きます。
             </p>
           </section>

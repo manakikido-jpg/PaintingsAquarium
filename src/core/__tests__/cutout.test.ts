@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cutoutPaper, diagnoseCutout, opaqueRatio, DEFAULT_CUTOUT_OPTIONS, diagnoseResult } from '../cutout'
+import { cutoutPaper, diagnoseCutout, opaqueRatio, DEFAULT_CUTOUT_OPTIONS, diagnoseResult, chooseCutoutValue, inkStats } from '../cutout'
 import { createImage } from '../image'
 import {
   AGED_PAPER,
@@ -174,5 +174,63 @@ describe('diagnoseResult', () => {
       expect(result.message).toContain('明るさ')
       expect(result.message).toContain('無地の紙')
     }
+  })
+})
+
+describe('chooseCutoutValue', () => {
+  const good = { fill: 0.5, darkShare: 0.3 }
+  const bad = { fill: 0.02, darkShare: 0.02 }
+
+  it('通る値がひと続きなら、その真ん中を採る', () => {
+    // 0.48 / 0.52 / 0.56 が通る → 真ん中の 0.52
+    const chosen = chooseCutoutValue((value) => (value >= 0.48 && value <= 0.56 ? good : bad))
+    expect(chosen?.value).toBeCloseTo(0.52)
+  })
+
+  it('端は採らない。紙や照明が少し変わっただけで外れるため', () => {
+    const chosen = chooseCutoutValue((value) => (value >= 0.4 && value <= 0.6 ? good : bad))
+    expect(chosen?.value).toBeGreaterThan(0.4)
+    expect(chosen?.value).toBeLessThan(0.6)
+  })
+
+  it('通る帯が2つに割れたら、長いほうを採る', () => {
+    const chosen = chooseCutoutValue((value) =>
+      value === 0.4 || (value >= 0.6 && value <= 0.72) ? good : bad,
+    )
+    expect(chosen?.value).toBeGreaterThanOrEqual(0.6)
+    expect(chosen?.value).toBeLessThanOrEqual(0.72)
+  })
+
+  it('切り抜きが全部失敗したら null。黙って変な値を返さない', () => {
+    expect(chooseCutoutValue(() => null)).toBeNull()
+  })
+
+  it('濃い画素が無い結果は通さない。紙の裏写りだけが残った状態を弾く', () => {
+    expect(chooseCutoutValue(() => ({ fill: 0.9, darkShare: 0.03 }))).toBeNull()
+  })
+})
+
+describe('inkStats', () => {
+  it('透明な絵では 0', () => {
+    const stats = inkStats(createImage(10, 10))
+    expect(stats.fill).toBe(0)
+    expect(stats.darkShare).toBe(0)
+  })
+
+  it('濃い画素の割合を、不透明な画素に対して数える', () => {
+    const image = createImage(10, 10)
+    // 左半分だけ不透明。そのうち上半分が黒、下半分が白
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 5; x++) {
+        const index = (y * 10 + x) * 4
+        const light = y >= 5 ? 255 : 0
+        image.data[index] = light
+        image.data[index + 1] = light
+        image.data[index + 2] = light
+        image.data[index + 3] = 255
+      }
+    }
+    expect(inkStats(image).fill).toBeCloseTo(0.5)
+    expect(inkStats(image).darkShare).toBeCloseTo(0.5)
   })
 })

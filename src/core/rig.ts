@@ -35,6 +35,13 @@ export interface Rig {
   readonly confidence: number
   /** 誰が出したか。AI と比べるために残す */
   readonly source: 'shape' | 'model'
+  /**
+   * 何の生き物か。動き方を変えるために使う。
+   * 古い絵には入っていないので、読むときは既定を `'unknown'` にする。
+   */
+  readonly kind?: CreatureKind
+  /** 足の先が下側か。`kind === 'tentacled'` のときだけ意味がある */
+  readonly tipsDown?: boolean
 }
 
 /** リグを使うかどうかの境目。これ未満なら今まで通りの動きにする。 */
@@ -167,8 +174,20 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
   const spineLeftToRight = midline(spans)
   const spine = headsRight ? [...spineLeftToRight].reverse() : spineLeftToRight
 
-  if (!guess) {
-    return { spine, tail: null, headsRight, confidence: 0, source: 'shape' }
+  const kind = detectKind(image, guess)
+
+  // 足のある生き物に尾びれの動きを当てない。
+  // 足の1本を尾と取り違えて、体の後ろが理由もなくちぎれて揺れる。
+  if (!guess || kind === 'tentacled') {
+    return {
+      spine,
+      tail: null,
+      headsRight,
+      confidence: 0,
+      source: 'shape',
+      kind,
+      tipsDown: kind === 'tentacled' ? tipsAtBottom(image) : undefined,
+    }
   }
 
   // `from` は頭からの割合。絵の中の x に直す
@@ -185,6 +204,7 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
     headsRight,
     confidence: flareConfidence(guess.flare),
     source: 'shape',
+    kind,
   }
 }
 
@@ -317,4 +337,129 @@ export function orientForSwimming(image: RgbaImage): Oriented {
   // 上下が逆。ひっくり返してから、その向きで測り直す
   const flipped = flipVertical(best.image)
   return { image: flipped, rig: estimateRig(flipped), turns: best.turns, flipped: true }
+}
+
+/* ------------------------------------------------------------------
+ * 生き物の種類
+ *
+ * 魚とタコ・イカでは動き方が違う。
+ * 尾びれの無い絵に「尾を振る」動きを当てると、体の後ろが理由もなく
+ * ちぎれて揺れる。**何も動かないより悪い。**
+ *
+ * 見分け方は「足の本数」。タコ・イカ・クラゲは、胴から**細長い足が
+ * 何本も**生えている。絵を横一列に走査すると、足の並んでいる高さでは
+ * **線が何度も途切れる**。魚の胴は1本に繋がっている。
+ * ------------------------------------------------------------------ */
+
+export type CreatureKind = 'fish' | 'tentacled' | 'unknown'
+
+/** 1本の走査線が、絵を何回横切るか。 */
+export function runsAlongRow(image: RgbaImage, y: number): number {
+  let runs = 0
+  let inside = false
+  for (let x = 0; x < image.width; x++) {
+    const solid = image.data[(y * image.width + x) * 4 + 3] >= ALPHA_THRESHOLD
+    if (solid && !inside) runs++
+    inside = solid
+  }
+  return runs
+}
+
+export function runsAlongColumn(image: RgbaImage, x: number): number {
+  let runs = 0
+  let inside = false
+  for (let y = 0; y < image.height; y++) {
+    const solid = image.data[(y * image.width + x) * 4 + 3] >= ALPHA_THRESHOLD
+    if (solid && !inside) runs++
+    inside = solid
+  }
+  return runs
+}
+
+/**
+ * 足の並びの強さ。1本の走査線が絵を3回以上／4回以上横切った本数を数える。
+ *
+ * **割合ではなく本数で数える。** 最初は「足のある行の割合」で測っていたが、
+ * 頭が大きく足が短いタコ（実物）では 20 行中 4 行しか当たらず、
+ * 割合が薄まって魚と誤判定した。足は絵の一部にしか無いのが普通。
+ */
+export interface TentacleSignal {
+  /** 3回以上横切った線の本数 */
+  readonly lines3: number
+  /** 4回以上横切った線の本数 */
+  readonly lines4: number
+}
+
+export function tentacleSignal(image: RgbaImage, samples = 40): TentacleSignal {
+  const scan = (size: number, runsAt: (index: number) => number): TentacleSignal => {
+    let lines3 = 0
+    let lines4 = 0
+    for (let index = 0; index < samples; index++) {
+      const at = Math.min(size - 1, Math.floor(((index + 0.5) * size) / samples))
+      const runs = runsAt(at)
+      if (runs >= 3) lines3++
+      if (runs >= 4) lines4++
+    }
+    return { lines3, lines4 }
+  }
+  // 縦と横の両方で測って多いほう。足を下へ垂らした絵と横へ広げた絵の両方があるため
+  const rows = scan(image.height, (y) => runsAlongRow(image, y))
+  const columns = scan(image.width, (x) => runsAlongColumn(image, x))
+  return {
+    lines3: Math.max(rows.lines3, columns.lines3),
+    lines4: Math.max(rows.lines4, columns.lines4),
+  }
+}
+
+/**
+ * 足のある生き物とみなす境目。**実物3枚で測った値**。
+ *
+ *   魚 lines3=1  lines4=0
+ *   タコ lines3=5  lines4=2
+ *   イカ lines3=14 lines4=14
+ *
+ * どちらか一方でも超えたら足あり、にしている。
+ * 足を大きく広げた絵（イカ）と、足が短い絵（タコ）の両方を拾うため。
+ * **標本は3枚。** 増えたら測り直すこと。
+ */
+export const TENTACLE_LINES_3 = 4
+export const TENTACLE_LINES_4 = 2
+
+export function hasTentacles(image: RgbaImage): boolean {
+  const signal = tentacleSignal(image)
+  return signal.lines4 >= TENTACLE_LINES_4 || signal.lines3 >= TENTACLE_LINES_3
+}
+
+/**
+ * 生き物の種類を決める。
+ *
+ * 足の判定を先に見るのは、**タコの足の1本が尾びれに見えることがある**ため。
+ * くびれと広がりだけで判定すると、タコを魚として扱ってしまう。
+ * どちらとも言えない絵（四角・虹）は `unknown` にして、動きを控えめにする。
+ */
+export function detectKind(image: RgbaImage, tail: TailGuess | null): CreatureKind {
+  if (hasTentacles(image)) return 'tentacled'
+  if (tail && flareConfidence(tail.flare) >= RIG_MIN_CONFIDENCE) return 'fish'
+  return 'unknown'
+}
+
+/**
+ * 足の先が絵の下側にあるか。
+ *
+ * タコもイカもクラゲも、普通は**足を下に垂らして**描かれる。
+ * ただし紙の向きは描いた人が決めるので（R-019）、上下逆のこともある。
+ * 足の並んでいる（線が何度も途切れる）行が、上半分と下半分のどちらに
+ * 多いかで決める。波はここへ向かって大きくなる。
+ */
+export function tipsAtBottom(image: RgbaImage, samples = 40): boolean {
+  let top = 0
+  let bottom = 0
+  for (let index = 0; index < samples; index++) {
+    const y = Math.min(image.height - 1, Math.floor(((index + 0.5) * image.height) / samples))
+    if (runsAlongRow(image, y) < 3) continue
+    if (y < image.height / 2) top++
+    else bottom++
+  }
+  // 同数なら下。垂らして描くほうが普通なので、迷ったらそちらに寄せる
+  return bottom >= top
 }

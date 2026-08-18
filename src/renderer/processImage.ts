@@ -1,7 +1,14 @@
-import { cutoutPaper, diagnoseCutout, diagnoseResult, type CutoutOptions } from '../core/cutout'
+import {
+  chooseCutoutValue,
+  cutoutPaper,
+  diagnoseCutout,
+  diagnoseResult,
+  inkStats,
+  type CutoutOptions,
+} from '../core/cutout'
 import { trimTransparent } from '../core/trim'
 import { keepMainRegions } from '../core/regions'
-import type { RgbaImage } from '../core/image'
+import { downscale, type RgbaImage } from '../core/image'
 import { orientForSwimming, type Rig } from '../core/rig'
 
 /**
@@ -23,6 +30,8 @@ export type ProcessResult =
       rig: Rig
       /** 向きを直したか。直したときだけ画面に知らせる */
       turned: boolean
+      /** 実際に使ったしきい値。自動で選んだ値を運営者が見られるようにする */
+      paperValue: number
     }
   | { ok: false; message: string }
 
@@ -73,7 +82,32 @@ export async function processPhoto(
   if (!context) return { ok: false, message: 'この PC の画面描画を初期化できませんでした。' }
   context.drawImage(source, 0, 0, width, height)
 
-  const cut = cutoutPaper(context.getImageData(0, 0, width, height), options)
+  const source_ = context.getImageData(0, 0, width, height)
+
+  /*
+   * この写真に合うしきい値を選ぶ。
+   *
+   * 実物3枚で、うまくいく範囲が全部違った（魚 0.50〜0.66 / イカ 0.55〜0.62 /
+   * タコ 0.40〜0.58）。1つの固定値ではどれかが必ず落ちる。
+   * かといって会場で毎回つまみを触らせるのは、このアプリの核（アプリ操作0回）を壊す。
+   *
+   * 下見は縮小した絵で行う。しきい値は明るさの比較なので縮めても選ぶ値は変わらず、
+   * 実寸のまま何通りも試すと 1 枚に数秒かかる。
+   */
+  let chosen = options.paperValue
+  if (options.auto !== false) {
+    const small = downscale(source_, 400)
+    const found = chooseCutoutValue((paperValue) => {
+      const trial = cutoutPaper(small, { ...options, paperValue })
+      if (!diagnoseCutout(trial).ok) return null
+      const { image } = keepMainRegions(trial)
+      const cropped = trimTransparent(image)
+      return cropped ? inkStats(cropped.image) : null
+    })
+    if (found) chosen = found.value
+  }
+
+  const cut = cutoutPaper(source_, { ...options, paperValue: chosen })
 
   const diagnosis = diagnoseCutout(cut)
   if (!diagnosis.ok) return { ok: false, message: `${fileName}: ${diagnosis.message}` }
@@ -116,5 +150,6 @@ export async function processPhoto(
     touchedBorder,
     rig: oriented.rig,
     turned: oriented.turns !== 0 || oriented.flipped,
+    paperValue: chosen,
   }
 }
