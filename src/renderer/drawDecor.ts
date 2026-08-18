@@ -146,7 +146,12 @@ function coralColour(index: number, style: DecorStyle): Rgb {
   return mix(CORAL_COLOURS[index % CORAL_COLOURS.length], style.water, style.fade)
 }
 
-const SAND = '214, 242, 255'
+/*
+ * 海底の色。**白ではなく青い面**にする。
+ * 白く敷くと霧が溜まったように見え、面として立たない。
+ * 参考にした見え方でも、海底は青い面で、その上に白い光が乗っていた。
+ */
+const SAND = '138, 190, 246'
 
 /** 砂地の高さの列から、指定 X での高さを線形に求める。 */
 export function groundAt(profile: readonly number[], x: number, tank: Tank): number {
@@ -169,21 +174,47 @@ export function drawSand(
   if (strength <= 0 || profile.length === 0) return
 
   const top = Math.min(...profile)
+
+  /*
+   * 海底を「面」として見せる。
+   *
+   * これまでは砂を**ぼんやりした明るみ**として敷いていただけで、
+   * 水と海底の境目が無かった。参考にした見え方では、海底がはっきりした
+   * 面として手前に横たわり、その上に光が乗っている。
+   * **境目の線が1本あるかどうかで、奥行きの見え方が変わる。**
+   */
+  const groundPath = (): void => {
+    context.beginPath()
+    context.moveTo(0, tank.height)
+    for (let index = 0; index < profile.length; index++) {
+      const x = (index / Math.max(1, profile.length - 1)) * tank.width
+      context.lineTo(x, profile[index])
+    }
+    context.lineTo(tank.width, tank.height)
+    context.closePath()
+  }
+
   const gradient = context.createLinearGradient(0, top, 0, tank.height)
-  gradient.addColorStop(0, `rgba(${SAND}, ${0.08 * strength})`)
-  gradient.addColorStop(0.4, `rgba(${SAND}, ${0.3 * strength})`)
-  gradient.addColorStop(1, `rgba(${SAND}, ${0.62 * strength})`)
+  gradient.addColorStop(0, `rgba(${SAND}, ${0.34 * strength})`)
+  gradient.addColorStop(0.35, `rgba(${SAND}, ${0.6 * strength})`)
+  gradient.addColorStop(1, `rgba(${SAND}, ${0.86 * strength})`)
 
   context.fillStyle = gradient
+  groundPath()
+  context.fill()
+
+  // 境目の光。海底の縁に当たっている光を1本入れると、面として立ち上がる
+  context.save()
   context.beginPath()
-  context.moveTo(0, tank.height)
   for (let index = 0; index < profile.length; index++) {
     const x = (index / Math.max(1, profile.length - 1)) * tank.width
-    context.lineTo(x, profile[index])
+    if (index === 0) context.moveTo(x, profile[index])
+    else context.lineTo(x, profile[index])
   }
-  context.lineTo(tank.width, tank.height)
-  context.closePath()
-  context.fill()
+  context.strokeStyle = `rgba(236, 250, 255, ${0.5 * strength})`
+  context.lineWidth = Math.max(1.5, tank.height * 0.0035)
+  context.stroke()
+  context.restore()
 }
 
 function tracePolygon(context: CanvasRenderingContext2D, points: readonly Point[]): void {

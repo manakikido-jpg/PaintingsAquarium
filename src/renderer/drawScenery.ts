@@ -39,6 +39,28 @@ export function drawWater(
   context.fillStyle = gradient
   context.fillRect(0, 0, tank.width, tank.height)
 
+  /*
+   * 中央上が明るく、四隅へ向かって落ちる放射状の光。
+   *
+   * 縦のグラデーションだけだと、**どの高さも横一直線に同じ明るさ**になる。
+   * 参考にした見え方では、光が一点から差し込んで四隅が沈んでいて、
+   * それが「奥行きのある水の中」に見える理由になっていた。
+   * 横方向にも明暗を付けると、同じ色でも空間に見える。
+   */
+  const glow = context.createRadialGradient(
+    tank.width * 0.44,
+    tank.height * 0.12,
+    tank.height * 0.05,
+    tank.width * 0.44,
+    tank.height * 0.12,
+    tank.height * 1.25,
+  )
+  glow.addColorStop(0, `rgba(120, 200, 255, ${0.3 * strength})`)
+  glow.addColorStop(0.45, `rgba(60, 140, 240, ${0.1 * strength})`)
+  glow.addColorStop(1, `rgba(4, 16, 70, ${0.4 * strength})`)
+  context.fillStyle = glow
+  context.fillRect(0, 0, tank.width, tank.height)
+
   // 水面の明るい帯。画面の上端が「水の中の上のほう」に見えるようにする。
   const surfaceHeight = Math.min(tank.height * 0.22, 260)
   const surface = context.createLinearGradient(0, 0, 0, surfaceHeight)
