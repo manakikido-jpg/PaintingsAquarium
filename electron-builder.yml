@@ -13,9 +13,16 @@ files:
   - dist-electron/**
   - package.json
 
-# 完全オフラインで動くアプリなので、自動更新の仕組みは入れない。
-# 更新はインストーラを配り直す（会場PC1台のため、それで足りる）。
-publish: null
+# 更新の置き場。**自動では見に行かない。**
+# 設定画面の「更新を確認」を押したときだけ通信する（2026-08-18 決定）。
+# 会期中は誰も押さないので、実質これまでどおり外部通信なしで動く。
+#
+# ここを書いておくと、ビルド時に latest.yml も作られる。
+# 更新の仕組みは、その latest.yml を見て新しい版かどうかを判断する。
+publish:
+  provider: github
+  owner: manakikido-jpg
+  repo: PaintingsAquarium
 
 win:
   target:

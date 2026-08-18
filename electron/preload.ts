@@ -17,6 +17,8 @@ const api: AquariumApi = {
   deletePiece: (id: string) => ipcRenderer.invoke('aquarium:deletePiece', id),
   rescan: () => ipcRenderer.invoke('aquarium:rescan'),
   toggleFullscreen: () => ipcRenderer.invoke('aquarium:toggleFullscreen'),
+  checkForUpdate: () => ipcRenderer.invoke('aquarium:checkForUpdate'),
+  installUpdate: () => ipcRenderer.invoke('aquarium:installUpdate'),
 
   onIncoming: (handler: (photo: IncomingPhoto) => void) => {
     const listener = (_event: unknown, photo: IncomingPhoto): void => handler(photo)

@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Aquarium } from './Aquarium'
 import { processPhoto } from './processImage'
-import type { IncomingPhoto, Notice, Piece, Settings, StorageLocation } from '../shared/types'
+import type {
+  IncomingPhoto,
+  Notice,
+  Piece,
+  Settings,
+  StorageLocation,
+  UpdateStatus,
+} from '../shared/types'
 import { THEMES, themeOf, type ThemeId } from '../core/theme'
 import { GALLERY_PAGE_SIZE, galleryPage } from '../core/gallery'
 
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [storage, setStorage] = useState<StorageLocation | null>(null)
+  /**
+   * 更新の確認。**押したときだけ通信する**（要件定義 §4 を守るため、
+   * 起動時には見に行かない）。
+   */
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
+  const [updating, setUpdating] = useState(false)
   const [pieces, setPieces] = useState<Piece[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
   const [panelOpen, setPanelOpen] = useState(false)
@@ -237,6 +250,49 @@ export function App(): React.JSX.Element {
                   取り込みフォルダの写真さえ残っていれば、入れ直すだけでもやり直せます。
                 </p>
               </>
+            )}
+
+            {/*
+              更新の確認。押したときだけ外へ通信する。
+              会期中は誰も押さないので、これまでどおりオフラインで動く。
+            */}
+            <div className="row">
+              <span>アプリの更新</span>
+              <button
+                type="button"
+                disabled={updating}
+                onClick={async () => {
+                  setUpdating(true)
+                  setUpdate(null)
+                  setUpdate(await window.aquarium.checkForUpdate())
+                  setUpdating(false)
+                }}
+              >
+                {updating ? '確認中…' : '更新を確認'}
+              </button>
+              {update?.kind === 'available' && (
+                <button
+                  type="button"
+                  disabled={updating}
+                  onClick={async () => {
+                    setUpdating(true)
+                    setUpdate(await window.aquarium.installUpdate())
+                    setUpdating(false)
+                  }}
+                >
+                  新しい版 {update.version} を入れる
+                </button>
+              )}
+            </div>
+            {update && (
+              <p className="note">
+                {update.kind === 'latest' && `いまが最新です（${update.version}）。`}
+                {update.kind === 'available' &&
+                  `新しい版 ${update.version} があります。押すと落として入れ替えます。`}
+                {update.kind === 'downloaded' &&
+                  '落とし終えました。アプリを閉じると入れ替わります。会期中なら、終わってから閉じてください。'}
+                {(update.kind === 'portable' || update.kind === 'unavailable') && update.message}
+              </p>
             )}
           </section>
 

@@ -31,6 +31,14 @@ jobs:
           node-version: '20'
           cache: npm
 
+      # 版番号をビルド番号にする。
+      #
+      # 更新の仕組みは「版番号が上がったか」で判断するので、毎回 0.1.0 のままだと
+      # **新しい版だと気づけない**。ビルドのたびに必ず1つ上がるようにする。
+      - name: 版番号をビルド番号にする
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "0.1.${{ github.run_number }}"
+
       - run: npm ci
 
       # exe を作る前に落とす。壊れたものを配らないため。
@@ -76,5 +84,11 @@ jobs:
 
             未署名のため「WindowsによってPCが保護されました」が出ます。
             「詳細情報」→「実行」で進めてください。
-          prerelease: true
-          files: release/*.exe
+          # 「いちばん新しい版」として扱わせる。
+          # 下書き扱い（prerelease）にすると、更新の確認から見えなくなる
+          prerelease: false
+          make_latest: true
+          # latest.yml も置く。更新の仕組みがこれを見て新しい版か判断する
+          files: |
+            release/*.exe
+            release/latest.yml

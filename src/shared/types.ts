@@ -109,6 +109,20 @@ export interface Notice {
   readonly message: string
 }
 
+/**
+ * 更新の確認結果。
+ *
+ * **押したときだけ**通信する（設定画面の「更新を確認」）。
+ * 起動時には見に行かない。会期中はネットにつながっていなくてよい
+ *（`docs/要件定義.md` §4）。
+ */
+export type UpdateStatus =
+  | { readonly kind: 'latest'; readonly version: string }
+  | { readonly kind: 'available'; readonly version: string }
+  | { readonly kind: 'downloaded'; readonly version: string }
+  | { readonly kind: 'portable'; readonly message: string }
+  | { readonly kind: 'unavailable'; readonly message: string }
+
 export interface AquariumApi {
   getSettings(): Promise<Settings>
   getStorageLocation(): Promise<StorageLocation>
@@ -119,6 +133,10 @@ export interface AquariumApi {
   deletePiece(id: string): Promise<void>
   rescan(): Promise<void>
   toggleFullscreen(): Promise<boolean>
+  /** 新しい版があるか見に行く。押したときだけ通信する */
+  checkForUpdate(): Promise<UpdateStatus>
+  /** 新しい版を落として入れ替える。落とし終えたら再起動でいれかわる */
+  installUpdate(): Promise<UpdateStatus>
   onIncoming(handler: (photo: IncomingPhoto) => void): () => void
   onNotice(handler: (notice: Notice) => void): () => void
 }

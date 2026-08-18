@@ -3,6 +3,7 @@ import chokidar, { type FSWatcher } from 'chokidar'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { autoUpdater } from 'electron-updater'
 import { decideIngest } from '../src/core/ingest'
 import { PORTABLE_DATA_FOLDER, portableBaseDir } from '../src/core/portable'
 import type {
@@ -10,6 +11,7 @@ import type {
   Notice,
   SavePieceInput,
   Settings,
+  UpdateStatus,
   StorageLocation,
 } from '../src/shared/types'
 import * as storage from './storage'
@@ -193,6 +195,65 @@ app.whenReady().then(() => {
   ipcMain.handle('aquarium:savePiece', (_event, input: SavePieceInput) => storage.savePiece(input))
   ipcMain.handle('aquarium:deletePiece', (_event, id: string) => storage.deletePiece(id))
   ipcMain.handle('aquarium:rescan', () => startWatching(storage.readSettings().watchFolder))
+
+  /*
+   * 更新の確認。
+   *
+   * **押したときだけ通信する。** 起動時には見に行かない。
+   * このアプリは完全オフラインで動くのが前提で（要件定義 §4）、
+   * 会期中に外へ通信する理由が無いため（2026-08-18 決定）。
+   *
+   * 持ち運び版（USB から直接動く版）は、仕組み上その場で入れ替えられない。
+   * 落とす場所を案内するだけにする。
+   */
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = true
+
+  const portable = (): boolean => !!process.env.PORTABLE_EXECUTABLE_DIR
+  const cannotUpdate = (): UpdateStatus => ({
+    kind: 'portable',
+    message:
+      '持ち運び版は、その場で入れ替えられません。' +
+      '最新版のページから新しい exe を落として、いまの exe と差し替えてください。',
+  })
+
+  ipcMain.handle('aquarium:checkForUpdate', async (): Promise<UpdateStatus> => {
+    if (portable()) return cannotUpdate()
+    if (!app.isPackaged) {
+      return { kind: 'unavailable', message: '開発中の起動では更新を確認できません。' }
+    }
+    try {
+      const found = await autoUpdater.checkForUpdates()
+      const version = found?.updateInfo.version ?? app.getVersion()
+      if (!found || version === app.getVersion()) return { kind: 'latest', version }
+      return { kind: 'available', version }
+    } catch (error) {
+      // ネットにつながっていないのが普通（会場では外していることを想定）
+      return {
+        kind: 'unavailable',
+        message:
+          'つながりませんでした。ネットにつながる場所で試すか、' +
+          '最新版のページから落として差し替えてください。' +
+          `（${error instanceof Error ? error.message : String(error)}）`,
+      }
+    }
+  })
+
+  ipcMain.handle('aquarium:installUpdate', async (): Promise<UpdateStatus> => {
+    if (portable()) return cannotUpdate()
+    try {
+      const done = await autoUpdater.downloadUpdate()
+      return {
+        kind: 'downloaded',
+        version: done.length > 0 ? autoUpdater.currentVersion.version : app.getVersion(),
+      }
+    } catch (error) {
+      return {
+        kind: 'unavailable',
+        message: `落とせませんでした。（${error instanceof Error ? error.message : String(error)}）`,
+      }
+    }
+  })
 
   ipcMain.handle('aquarium:toggleFullscreen', () => {
     if (!mainWindow) return false
