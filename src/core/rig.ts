@@ -42,6 +42,11 @@ export interface Rig {
   readonly kind?: CreatureKind
   /** 足の先が下側か。`kind === 'tentacled'` のときだけ意味がある */
   readonly tipsDown?: boolean
+  /**
+   * 背びれ・腹びれ。胴から突き出している部分。
+   * **台紙が決まればこの推定は要らなくなる**（`docs/やること.md` T-1）。
+   */
+  readonly fins?: readonly FinGuess[]
 }
 
 /** リグを使うかどうかの境目。これ未満なら今まで通りの動きにする。 */
@@ -195,6 +200,15 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
   const index = Math.min(spans.length - 1, Math.floor(pivotX * spans.length))
   const span = spans[index]
 
+  /*
+   * ひれを探す範囲は「胴」だけ。尾びれの側は除く。
+   * 頭が右なら、尾は絵の左側にある。
+   */
+  const bodyFrom = headsRight ? pivotX : 0
+  const bodyTo = headsRight ? 1 : pivotX
+  const body = { from: bodyFrom, to: bodyTo }
+  const fins = [...findFins(spans, 'top', body), ...findFins(spans, 'bottom', body)]
+
   return {
     spine,
     tail: {
@@ -205,6 +219,7 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
     confidence: flareConfidence(guess.flare),
     source: 'shape',
     kind,
+    fins,
   }
 }
 
@@ -462,4 +477,110 @@ export function tipsAtBottom(image: RgbaImage, samples = 40): boolean {
   }
   // 同数なら下。垂らして描くほうが普通なので、迷ったらそちらに寄せる
   return bottom >= top
+}
+
+/* ------------------------------------------------------------------
+ * 背びれ・腹びれ
+ *
+ * 胴の輪郭から**外へ突き出している部分**を探す。
+ * 尾びれは体の後ろ端にあるので幅の変化（くびれ）で見つかるが、
+ * 背びれ・腹びれは胴の途中にあるので、上下の縁の出っ張りで見つける。
+ *
+ * **台紙が決まればこの推定は要らなくなる**（`docs/やること.md` T-1）。
+ * それまでの繋ぎとして入れている。
+ * ------------------------------------------------------------------ */
+
+export interface FinGuess {
+  /** 絵の左端からの割合。ひれの範囲 */
+  readonly from: number
+  readonly to: number
+  /** 上の縁か下の縁か */
+  readonly side: 'top' | 'bottom'
+  /** 胴の輪郭からどれだけ突き出しているか（絵の高さに対する割合） */
+  readonly depth: number
+  /** ひれの付け根の高さ（絵の高さに対する割合）。ここを軸に回す */
+  readonly base: number
+}
+
+/**
+ * 並びの中央値。胴の輪郭の目安に使う。
+ *
+ * 平均ではなく中央値にするのは、**ひれ自身に引っ張られないため**。
+ * ひれは幅の狭い出っ張りなので、中央値ならほとんど動かない。
+ */
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  if (sorted.length === 0) return 0
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+}
+
+/** ひれとみなす出っ張りの深さ（絵の高さに対する割合）。 */
+export const MIN_FIN_DEPTH = 0.05
+
+/**
+ * 上または下の縁から、突き出している部分を探す。
+ *
+ * 幅の広い窓の中央値を「胴の輪郭」とみなし、そこから離れたところをひれとする。
+ * 窓を広く取るのは、ひれの幅ぶんだけでは中央値がひれ側に寄ってしまうため。
+ */
+export function findFins(
+  spans: readonly ColumnSpan[],
+  side: 'top' | 'bottom',
+  /** 胴として見る範囲（絵の左端からの割合）。尾びれの側は除く */
+  body: { readonly from: number; readonly to: number } = { from: 0, to: 1 },
+  minDepth = MIN_FIN_DEPTH,
+): FinGuess[] {
+  const count = spans.length
+  if (count < 8) return []
+
+  const edge = spans.map((span) => (side === 'top' ? span.top : span.bottom))
+  const window = Math.max(5, Math.round(count * 0.45))
+
+  const fins: FinGuess[] = []
+  let start = -1
+  let deepest = 0
+  let baseAtDeepest = side === 'top' ? 0 : 1
+
+  for (let index = 0; index < count; index++) {
+    const at = (index + 0.5) / count
+    // 尾びれは別に振るので、胴の外は見ない。
+    // 見ると尾の上下の羽を「背びれ・腹びれ」として二重に拾う
+    if (at < body.from || at > body.to || spans[index].height === 0) {
+      if (start >= 0) {
+        fins.push({ from: start / count, to: index / count, side, depth: deepest, base: baseAtDeepest })
+        start = -1
+        deepest = 0
+      }
+      continue
+    }
+    const from = Math.max(0, index - Math.floor(window / 2))
+    const to = Math.min(count, from + window)
+    const nearby: number[] = []
+    for (let k = from; k < to; k++) if (spans[k].height > 0) nearby.push(edge[k])
+    const bodyEdge = median(nearby)
+    // 上の縁は値が小さいほど高い。下の縁はその逆
+    const depth = side === 'top' ? bodyEdge - edge[index] : edge[index] - bodyEdge
+
+    if (depth >= minDepth) {
+      if (start < 0) start = index
+      if (depth > deepest) {
+        deepest = depth
+        baseAtDeepest = bodyEdge
+      }
+    } else if (start >= 0) {
+      fins.push({ from: start / count, to: index / count, side, depth: deepest, base: baseAtDeepest })
+      start = -1
+      deepest = 0
+    }
+  }
+  if (start >= 0) {
+    fins.push({ from: start / count, to: 1, side, depth: deepest, base: baseAtDeepest })
+  }
+
+  // 幅が狭すぎるものは輪郭のギザギザ。広すぎるものは胴そのもの
+  return fins.filter((fin) => {
+    const width = fin.to - fin.from
+    return width >= 0.04 && width <= 0.4
+  })
 }

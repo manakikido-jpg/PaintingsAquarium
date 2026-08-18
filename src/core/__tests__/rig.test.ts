@@ -5,6 +5,7 @@ import {
   backIsUp,
   columnSpans,
   estimateRig,
+  findFins,
   findTail,
   flareConfidence,
   flipVertical,
@@ -335,5 +336,69 @@ describe('tipsAtBottom', () => {
     const square = createImage(40, 40)
     fill(square, 5, 5, 35, 35)
     expect(tipsAtBottom(square)).toBe(true)
+  })
+})
+
+/** 背びれと腹びれのある魚。胴は滑らかで、上下に三角の出っ張りが1つずつ。 */
+function finnedFish(): RgbaImage {
+  const image = createImage(120, 60)
+  // 胴（中央が厚い楕円）
+  for (let x = 10; x < 110; x++) {
+    const t = (x - 10) / 100
+    const half = Math.round(16 * Math.sin(Math.PI * t) + 4)
+    fill(image, x, 30 - half, x + 1, 30 + half)
+  }
+  // 背びれ（上）と腹びれ（下）
+  for (let x = 52; x < 68; x++) {
+    const rise = 12 - Math.abs(x - 60)
+    fill(image, x, 30 - 20 - rise, x + 1, 30 - 18)
+    fill(image, x, 30 + 18, x + 1, 30 + 20 + rise)
+  }
+  return image
+}
+
+describe('findFins', () => {
+  it('胴から突き出した部分を上下それぞれで見つける', () => {
+    const spans = columnSpans(finnedFish(), 24)
+    const top = findFins(spans, 'top')
+    const bottom = findFins(spans, 'bottom')
+    expect(top.length).toBeGreaterThan(0)
+    expect(bottom.length).toBeGreaterThan(0)
+    // 絵の真ん中あたりにある
+    expect((top[0].from + top[0].to) / 2).toBeGreaterThan(0.35)
+    expect((top[0].from + top[0].to) / 2).toBeLessThan(0.65)
+  })
+
+  it('突き出しの無い滑らかな胴では何も見つけない', () => {
+    const image = createImage(120, 60)
+    for (let x = 10; x < 110; x++) {
+      const t = (x - 10) / 100
+      const half = Math.round(20 * Math.sin(Math.PI * t) + 4)
+      fill(image, x, 30 - half, x + 1, 30 + half)
+    }
+    const spans = columnSpans(image, 24)
+    expect(findFins(spans, 'top')).toHaveLength(0)
+    expect(findFins(spans, 'bottom')).toHaveLength(0)
+  })
+
+  it('胴の外は見ない。尾びれの上下の羽をひれとして二重に拾わないため', () => {
+    const spans = columnSpans(fishFacingRight(), 24)
+    // 尾は絵の左端。胴だけ（右 60%）を見れば、尾の羽は入らない
+    const all = findFins(spans, 'top')
+    const bodyOnly = findFins(spans, 'top', { from: 0.4, to: 1 })
+    expect(bodyOnly.length).toBeLessThanOrEqual(all.length)
+    for (const fin of bodyOnly) expect(fin.to).toBeGreaterThan(0.4)
+  })
+
+  it('付け根の高さを返す。ここを軸に回すため', () => {
+    const fins = findFins(columnSpans(finnedFish(), 24), 'top')
+    expect(fins[0].base).toBeGreaterThan(0)
+    expect(fins[0].base).toBeLessThan(1)
+    // 背びれの付け根は絵の真ん中より上
+    expect(fins[0].base).toBeLessThan(0.5)
+  })
+
+  it('区間が少なすぎるときは判定しない', () => {
+    expect(findFins(columnSpans(finnedFish(), 6), 'top')).toHaveLength(0)
   })
 })

@@ -15,6 +15,7 @@ import {
   beatPhase,
   beatRate,
   headRatioToImageX,
+  finAngle,
   stripCount,
   stripOffset,
   tailAngle,
@@ -255,7 +256,11 @@ export function Aquarium({
            * リグが持っている。帯ごとに縦の傾き（せん断）を掛けて隣とつなぐ。
            * 中心の値だけで平行移動すると、境目に段差が出て絵が階段状に割れる。
            */
-          const drawStrip = (nearHead: number, farHead: number): void => {
+          const drawStrip = (
+            nearHead: number,
+            farHead: number,
+            fin: { readonly side: 'top' | 'bottom'; readonly base: number } | null = null,
+          ): void => {
             const leftFrac = headRatioToImageX(headsRight ? farHead : nearHead, headsRight)
             const rightFrac = headRatioToImageX(headsRight ? nearHead : farHead, headsRight)
             const width = place.width * (rightFrac - leftFrac)
@@ -265,19 +270,26 @@ export function Aquarium({
             const atRight = offsetAt(headsRight ? nearHead : farHead)
             const slope = (atRight - atLeft) / width
 
+            /*
+             * ひれが掛かっている帯は、**ひれの側を含めずに**描く。
+             * 含めて描くと、別に回したひれと二重に見える。
+             */
+            const fromY = fin?.side === 'top' ? fin.base : 0
+            const toY = fin?.side === 'bottom' ? fin.base : 1
+
             context.save()
             context.transform(1, slope, 0, 1, 0, atLeft - slope * x)
             context.drawImage(
               swimmer.element,
               source * leftFrac,
-              0,
+              sourceHeight * fromY,
               source * (rightFrac - leftFrac),
-              sourceHeight,
+              sourceHeight * (toY - fromY),
               x,
-              top,
+              top + place.height * fromY,
               // わずかに広げて、帯の継ぎ目に髪の毛ほどの隙間が出るのを防ぐ
               width + width * 0.02,
-              place.height,
+              place.height * (toY - fromY),
             )
             context.restore()
           }
@@ -317,9 +329,63 @@ export function Aquarium({
             context.restore()
           }
 
+          /*
+           * 背びれ・腹びれは胴と別に振る。
+           *
+           * 最初は `clip('evenodd')` で胴からひれの場所を切り抜いたが、
+           * **20匹どころか3匹でも 0.3fps まで落ちた**（R-022）。
+           * いまは切り抜かず、**元画像の切り出す範囲をずらして**描き分けている。
+           * ひれのある帯は「付け根から下（上）だけ」を胴として描き、
+           * 残りをひれとして別に回す。費用は帯を1枚増やすのと同じ。
+           */
+          const fins = drifts ? [] : (swimmer.piece.rig?.fins ?? [])
+
+          /** その位置に掛かっているひれ（無ければ null）。 */
+          const finAt = (from: number, to: number): (typeof fins)[number] | null => {
+            const centre = (from + to) / 2
+            return fins.find((one) => centre >= one.from && centre <= one.to) ?? null
+          }
+
           for (let index = 0; index < strips; index++) {
-            if (drifts) drawBand(index / strips, (index + 1) / strips)
-            else drawStrip((index / strips) * bodyEnd, ((index + 1) / strips) * bodyEnd)
+            if (drifts) {
+              drawBand(index / strips, (index + 1) / strips)
+              continue
+            }
+            const nearHead = (index / strips) * bodyEnd
+            const farHead = ((index + 1) / strips) * bodyEnd
+            // 帯の左右（絵の中での位置）に直してから、ひれが掛かるか見る
+            const leftFrac = headRatioToImageX(headsRight ? farHead : nearHead, headsRight)
+            const rightFrac = headRatioToImageX(headsRight ? nearHead : farHead, headsRight)
+            drawStrip(nearHead, farHead, finAt(leftFrac, rightFrac))
+          }
+
+          for (const fin of fins) {
+            const centre = (fin.from + fin.to) / 2
+            const fromHead = headsRight ? 1 - centre : centre
+            const pivotX = left + place.width * centre
+            const pivotY = top + place.height * fin.base
+            const angle = finAngle(fromHead, time, swimmer.beat.phase, sway, options)
+            const x = left + place.width * fin.from
+            const boxWidth = place.width * (fin.to - fin.from)
+            const fromY = fin.side === 'top' ? 0 : fin.base
+            const toY = fin.side === 'top' ? fin.base : 1
+
+            context.save()
+            context.translate(pivotX, pivotY + offsetAt(fromHead))
+            context.rotate(angle)
+            context.translate(-pivotX, -pivotY)
+            context.drawImage(
+              swimmer.element,
+              source * fin.from,
+              sourceHeight * fromY,
+              source * (fin.to - fin.from),
+              sourceHeight * (toY - fromY),
+              x,
+              top + place.height * fromY,
+              boxWidth,
+              place.height * (toY - fromY),
+            )
+            context.restore()
           }
 
           if (rig?.tail) {
