@@ -1,0 +1,124 @@
+{
+  "parts": [
+    {
+      "file": "part-00.png",
+      "kind": "rock",
+      "width": 800,
+      "height": 255
+    },
+    {
+      "file": "part-01.png",
+      "kind": "rock",
+      "width": 740,
+      "height": 293
+    },
+    {
+      "file": "part-02.png",
+      "kind": "rock",
+      "width": 797,
+      "height": 253
+    },
+    {
+      "file": "part-03.png",
+      "kind": "rock",
+      "width": 800,
+      "height": 333
+    },
+    {
+      "file": "part-04.png",
+      "kind": "rock",
+      "width": 758,
+      "height": 290
+    },
+    {
+      "file": "part-05.png",
+      "kind": "rock",
+      "width": 711,
+      "height": 284
+    },
+    {
+      "file": "part-06.png",
+      "kind": "branch",
+      "width": 310,
+      "height": 391
+    },
+    {
+      "file": "part-07.png",
+      "kind": "branch",
+      "width": 280,
+      "height": 379
+    },
+    {
+      "file": "part-08.png",
+      "kind": "branch",
+      "width": 326,
+      "height": 421
+    },
+    {
+      "file": "part-09.png",
+      "kind": "branch",
+      "width": 317,
+      "height": 411
+    },
+    {
+      "file": "part-10.png",
+      "kind": "brain",
+      "width": 459,
+      "height": 348
+    },
+    {
+      "file": "part-11.png",
+      "kind": "brain",
+      "width": 482,
+      "height": 281
+    },
+    {
+      "file": "part-12.png",
+      "kind": "brain",
+      "width": 467,
+      "height": 276
+    },
+    {
+      "file": "part-13.png",
+      "kind": "brain",
+      "width": 438,
+      "height": 297
+    },
+    {
+      "file": "part-14.png",
+      "kind": "weed",
+      "width": 309,
+      "height": 393
+    },
+    {
+      "file": "part-15.png",
+      "kind": "weed",
+      "width": 512,
+      "height": 416
+    },
+    {
+      "file": "part-16.png",
+      "kind": "weed",
+      "width": 444,
+      "height": 449
+    },
+    {
+      "file": "part-17.png",
+      "kind": "pebble",
+      "width": 435,
+      "height": 160
+    },
+    {
+      "file": "part-18.png",
+      "kind": "pebble",
+      "width": 334,
+      "height": 116
+    },
+    {
+      "file": "part-19.png",
+      "kind": "pebble",
+      "width": 538,
+      "height": 154
+    }
+  ]
+}

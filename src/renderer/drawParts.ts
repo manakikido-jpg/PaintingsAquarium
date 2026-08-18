@@ -1,11 +1,13 @@
-import { partAlpha, partFade, type PlacedPart } from '../core/parts'
+import { partAlpha, type PlacedPart } from '../core/parts'
 import type { Tank } from '../core/swim'
 
 /**
  * パーツ画像を背景に敷く。
  *
- * 1個につき `drawImage` 1回。図形で描いていたときは
- * 縁・影・塗り・切り抜き・光の5工程かかっていたので、こちらのほうが速い。
+ * 1個につき `drawImage` 1回。図形で描くと縁・影・塗り・光の4工程かかるが、
+ * **速くなったわけではない**。同じ11枚での実測は 12.6 / 11.8fps（画像）に対し
+ * 12.0fps（図形）で、差は測定のばらつきの範囲だった。
+ * 重いのは水と光の側で、飾りの描き方ではない。入れた理由は見た目。
  */
 
 /** 読み込んだパーツ画像。 */
@@ -50,15 +52,6 @@ export function loadParts(files: readonly string[], onReady: () => void): PartIm
   return state
 }
 
-/**
- * 水の色へ寄せるための覆い。
- *
- * 奥のものは水の色に溶ける（空気遠近）。画像そのものの色は変えられないので、
- * 上から水の色を薄く重ねる。`globalCompositeOperation` は使わない
- * （面全体の合成になり、毎フレームでは重い）。
- */
-const WATER: readonly [number, number, number] = [26, 86, 224]
-
 export function drawParts(
   context: CanvasRenderingContext2D,
   parts: readonly PlacedPart[],
@@ -75,12 +68,13 @@ export function drawParts(
     /*
      * 高さを基準に幅を出す。幅を基準にすると、細長いパーツが縦へ伸びて
      * 画面を突き抜ける（実際にそうなった）。
-     * ただし極端に横長のパーツは幅が出すぎるので、画面幅の 4 割で頭打ちにする。
+     * ただし極端に横長のパーツは幅が出すぎるので、画面幅の 1/4 で頭打ちにする。
+     * 4 割にしていたときは、石が横につながって**底が壁**になった。
      */
     const aspect = image.naturalWidth / image.naturalHeight
     let height = part.height
     let width = height * aspect
-    const maxWidth = tank.width * 0.4
+    const maxWidth = tank.width * 0.26
     if (width > maxWidth) {
       width = maxWidth
       height = width / aspect
@@ -117,16 +111,5 @@ export function drawParts(
     context.drawImage(image, left, top, width, height)
     context.restore()
 
-    // 奥のものを水の色へ寄せる
-    const fade = partFade(part.depth) * strength
-    if (fade > 0.01) {
-      context.save()
-      context.globalAlpha = fade
-      context.fillStyle = `rgb(${WATER[0]}, ${WATER[1]}, ${WATER[2]})`
-      context.beginPath()
-      context.ellipse(part.x, top + height / 2, width * 0.52, height * 0.55, 0, 0, Math.PI * 2)
-      context.fill()
-      context.restore()
-    }
   }
 }

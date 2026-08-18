@@ -35,8 +35,10 @@ const FRONT_BUBBLE_COUNT = 6
 /**
  * 敷くパーツの数。
  * パーツ画像（`assets/decor/`）がある場合はこちらを使う。
+ * 設定の「飾りの多さ」はこちらにも掛ける（掛け忘れると、画像を置いた途端に
+ * 会場でつまみが効かなくなる）。
  */
-const PART_COUNT = 16
+const PART_COUNT = 9
 
 /** 大きな石。これが背景の主役。パーツ画像が無いときの代わり。 */
 const ROCK_COUNT = 13
@@ -73,7 +75,7 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
   const useParts = DECOR_PARTS.length > 0
   let partImages: PartImages = { images: [], ready: false }
   const parts = useParts
-    ? placeParts(7717, PART_COUNT, DECOR_PARTS.length, tank, {
+    ? placeParts(7717, many(PART_COUNT), DECOR_PARTS.length, tank, {
         groundAt: (x) => {
           const at = Math.min(sand.length - 1, Math.max(0, Math.round((x / tank.width) * (sand.length - 1))))
           return sand[at]

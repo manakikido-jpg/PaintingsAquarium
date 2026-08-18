@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { partAlpha, partFade, placeParts } from '../parts'
+import { partAlpha, placeParts } from '../parts'
 import type { Tank } from '../swim'
 
 const tank: Tank = { width: 1600, height: 900 }
@@ -75,14 +75,32 @@ describe('placeParts', () => {
   })
 })
 
-describe('partAlpha / partFade', () => {
+describe('partAlpha', () => {
   it('奥ほど薄く、水の色に寄る', () => {
     expect(partAlpha(0)).toBeLessThan(partAlpha(1))
-    expect(partFade(0)).toBeGreaterThan(partFade(1))
   })
 
   it('手前は水の色に寄せない', () => {
-    expect(partFade(1)).toBeCloseTo(0)
     expect(partAlpha(1)).toBeCloseTo(1)
+  })
+})
+
+describe('パーツの選び方', () => {
+  const tank = { width: 1600, height: 900 }
+  const options = { groundAt: () => 800 }
+
+  it('種類数の倍だけ置くと、全種類がちょうど2回ずつ出る', () => {
+    // 返り値は奥行き順に並べ替えられるので、出た回数で数える
+    const parts = placeParts(31, 12, 6, tank, options)
+    const times = new Map<number, number>()
+    for (const part of parts) times.set(part.index, (times.get(part.index) ?? 0) + 1)
+    expect([...times.keys()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5])
+    expect([...times.values()]).toEqual([2, 2, 2, 2, 2, 2])
+  })
+
+  it('種類数より少ないときも同じ種類が重複しない', () => {
+    const parts = placeParts(77, 5, 20, tank, options)
+    const used = new Set(parts.map((part) => part.index))
+    expect(used.size).toBe(5)
   })
 })

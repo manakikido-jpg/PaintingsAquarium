@@ -6,8 +6,8 @@ import type { Tank } from './swim'
  *
  * 図形とグラデーションで描く方式は見た目の上限が低く、
  * どれだけ塗りを作り込んでも「多角形とグラデーション」に見えた（R-025）。
- * 絵として作られた画像を貼るほうが、見た目も速度も良い
- *（1個につき `drawImage` 1回で済む）。
+ * 絵として作られた画像を貼るほうが**見た目が良い**。
+ * 速度は変わらなかった（実測で差は出ていない。`drawParts.ts` の冒頭）。
  *
  * **同じ画像が何度も出るので、置き方で違いを作る。**
  * 大きさ・左右反転・奥行き・重なり順を散らさないと、
@@ -63,6 +63,21 @@ export function placeParts(
   const { baseHeight = 0.17, sizeSpread = 0.55, groundAt } = options
   const placed: PlacedPart[] = []
 
+  /*
+   * どのパーツを使うかは、乱数で毎回引かずに**全種類をひと回りさせてから**次へ行く。
+   * 毎回引くと、たまたま同じ色の岩ばかりが並ぶ（実機で緑と水色だけの底になった）。
+   * ひと回りさせれば、置く数が種類数より少なくても色と形が散る。
+   */
+  const order: number[] = []
+  const refill = (): void => {
+    const bag = Array.from({ length: partCount }, (_, i) => i)
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1))
+      ;[bag[i], bag[j]] = [bag[j], bag[i]]
+    }
+    order.push(...bag)
+  }
+
   for (let index = 0; index < count; index++) {
     const slot = (index + 0.5) / count
     const x = tank.width * Math.min(1, Math.max(0, slot + (random() - 0.5) * (0.9 / count)))
@@ -73,8 +88,9 @@ export function placeParts(
      */
     const scale = (0.55 + depth * 0.45) * (1 - sizeSpread / 2 + random() * sizeSpread)
 
+    if (order.length === 0) refill()
     placed.push({
-      index: Math.floor(random() * partCount),
+      index: order.shift() as number,
       x,
       groundY: groundAt(x),
       height: tank.height * baseHeight * scale,
@@ -87,12 +103,16 @@ export function placeParts(
   return placed.sort((a, b) => a.depth - b.depth)
 }
 
-/** その奥行きでの濃さ（空気遠近）。奥ほど薄く、水の色に溶ける。 */
+/**
+ * その奥行きでの濃さ（空気遠近）。奥ほど薄く、下の水の色に溶ける。
+ *
+ * 以前は濃さに加えて**水色の楕円を上から重ねて**いたが、
+ * 楕円がそのまま楕円として見えた（実機で確認）。
+ * 背景の水はパーツの下に既に描かれているので、濃さを下げるだけで
+ * 同じ効果になる。重ねるほど描画も増える。
+ */
 export function partAlpha(depth: number): number {
-  return 0.62 + depth * 0.38
-}
-
-/** その奥行きで水の色へ寄せる割合。 */
-export function partFade(depth: number): number {
-  return 0.45 * (1 - depth)
+  // 下限を上げてある。半透明にしすぎると、重なったパーツが**透けて**
+  // ガラス細工に見える（実機で確認）。奥行きは主に大きさで出す。
+  return 0.9 + depth * 0.1
 }
