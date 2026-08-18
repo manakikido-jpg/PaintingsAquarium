@@ -109,3 +109,46 @@ export function stripCount(strength: number): number {
    */
   return 8
 }
+
+/* ------------------------------------------------------------------
+ * 尾びれの振れ
+ *
+ * 胴体の波とは別に、尾びれは**付け根を軸に回る**。
+ * 胴と同じように平行移動させるだけだと、しなってはいても
+ * 「ひれが動いている」とは見えない。
+ * ------------------------------------------------------------------ */
+
+/** 尾びれの最大の振れ角（ラジアン）。約 30 度。 */
+export const TAIL_MAX_ANGLE = 0.52
+
+/**
+ * 尾びれの角度。正なら尾の先が下がる向き。
+ *
+ * 胴の波より **4分の1周期だけ遅れる**。
+ * 実際の魚は、体をくねらせた力が遅れて尾に伝わる。
+ * 同じ位相で振ると、体と尾が一枚の板のように動いて硬く見える。
+ */
+export function tailAngle(
+  fromRatio: number,
+  timeSeconds: number,
+  phase: number,
+  sway: number,
+  options: UndulateOptions = DEFAULT_UNDULATE,
+): number {
+  if (sway <= 0) return 0
+  const weight = tailWeight(fromRatio, options.headHold)
+  const wave = Math.sin(
+    (fromRatio / options.waveLength) * TAU - timeSeconds * options.speed * TAU + phase - Math.PI / 2,
+  )
+  return wave * TAIL_MAX_ANGLE * weight * Math.min(1, Math.max(0, sway))
+}
+
+/**
+ * 頭からの割合を、絵の中の横位置（0=左, 1=右）に直す。
+ *
+ * 絵は頭が右に描かれているとは限らない（実物は縦向きだった）。
+ * リグが持っている `headsRight` で読み替える。
+ */
+export function headRatioToImageX(fromHead: number, headsRight: boolean): number {
+  return headsRight ? 1 - fromHead : fromHead
+}

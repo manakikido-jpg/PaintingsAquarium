@@ -7,6 +7,9 @@ import {
   stripOffset,
   stripRatio,
   tailWeight,
+  tailAngle,
+  TAIL_MAX_ANGLE,
+  headRatioToImageX,
 } from '../undulate'
 
 describe('stripRatio', () => {
@@ -135,5 +138,59 @@ describe('stripCount', () => {
     // 具体的な本数をテストに書くと、調整のたびにテストを書き換えることになる。
     expect(stripCount(1)).toBeGreaterThanOrEqual(6)
     expect(stripCount(1)).toBeLessThanOrEqual(20)
+  })
+})
+
+describe('tailAngle', () => {
+  it('しなり 0 なら振れない', () => {
+    expect(tailAngle(0.6, 1.2, 0.3, 0)).toBe(0)
+  })
+
+  it('最大の振れ角を超えない', () => {
+    for (let time = 0; time < 4; time += 0.02) {
+      expect(Math.abs(tailAngle(1, time, 0.7, 1))).toBeLessThanOrEqual(TAIL_MAX_ANGLE + 1e-9)
+    }
+  })
+
+  it('しなりの強さに比例する', () => {
+    const full = Math.abs(tailAngle(0.6, 0.4, 0, 1))
+    const half = Math.abs(tailAngle(0.6, 0.4, 0, 0.5))
+    expect(half).toBeCloseTo(full / 2, 6)
+  })
+
+  it('頭側では振れない。付け根が頭に近すぎる絵で顔が回らないため', () => {
+    expect(tailAngle(0.1, 0.5, 0, 1)).toBe(0)
+  })
+
+  it('胴の波より遅れる。同じ位相だと体と尾が一枚板に見える', () => {
+    // 胴のずれが最大になる時刻では、尾の角度はまだ最大になっていない
+    let peakTime = 0
+    let peak = 0
+    for (let time = 0; time < 1; time += 0.005) {
+      const shift = Math.abs(stripOffset(1, time, 0))
+      if (shift > peak) {
+        peak = shift
+        peakTime = time
+      }
+    }
+    const angleAtPeak = Math.abs(tailAngle(1, peakTime, 0, 1))
+    expect(angleAtPeak).toBeLessThan(TAIL_MAX_ANGLE * 0.35)
+  })
+
+  it('胴と同じ周期で戻る', () => {
+    const period = 1 / DEFAULT_UNDULATE.speed
+    expect(tailAngle(0.7, 0.3 + period, 0.2, 1)).toBeCloseTo(tailAngle(0.7, 0.3, 0.2, 1), 6)
+  })
+})
+
+describe('headRatioToImageX', () => {
+  it('頭が右なら、頭からの割合は右から数える', () => {
+    expect(headRatioToImageX(0, true)).toBe(1)
+    expect(headRatioToImageX(1, true)).toBe(0)
+  })
+
+  it('頭が左ならそのまま', () => {
+    expect(headRatioToImageX(0, false)).toBe(0)
+    expect(headRatioToImageX(1, false)).toBe(1)
   })
 })

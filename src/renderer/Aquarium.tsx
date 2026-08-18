@@ -12,9 +12,12 @@ import {
   DEFAULT_UNDULATE as UNDULATE,
   beatPhase,
   beatRate,
+  headRatioToImageX,
   stripCount,
   stripOffset,
+  tailAngle,
 } from '../core/undulate'
+import { rigIsUsable } from '../core/rig'
 import type { ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
@@ -182,11 +185,18 @@ export function Aquarium({
         scene.drawBeneath?.(context, place, creatureLane(swimmer.creature), strength)
         context.globalAlpha = 1
 
+        const rig = rigIsUsable(swimmer.piece.rig) ? swimmer.piece.rig : null
+
         context.save()
         context.globalAlpha = appearAlpha(progress)
         context.translate(place.x, place.y)
-        // 進む向きに合わせて左右反転する。後ろ向きに進んで見えるのを避けるため。
-        context.scale(place.facingRight ? scale : -scale, scale)
+        /*
+         * 頭が進む向きを向くように反転する。後ろ向きに進んで見えるのを避けるため。
+         * 絵の中で頭が右にあるとは限らない（実物は縦向きだった・R-019）ので、
+         * リグが分かっていればそれに従う。
+         */
+        const mirror = place.facingRight !== (rig?.headsRight ?? true)
+        context.scale(mirror ? -scale : scale, scale)
 
         const sway = swayRef.current
         const strips = stripCount(sway)
@@ -198,35 +208,40 @@ export function Aquarium({
           context.drawImage(swimmer.element, left, top, place.width, place.height)
         } else {
           const source = swimmer.element.naturalWidth
+          const sourceHeight = swimmer.element.naturalHeight
           const time = elapsed * swimmer.beat.rate
           const options = { ...UNDULATE, amplitude: UNDULATE.amplitude * sway }
-          /*
-           * 帯の「中心」ではなく「両端」のずれを求め、帯ごとに縦の傾き（せん断）を
-           * 掛ける。中心の値だけで平行移動すると、隣の帯との境目に段差が出て
-           * 絵が階段状に割れて見える。傾ければ端の高さが隣と一致して段差が消える。
-           */
+          const headsRight = rig?.headsRight ?? true
+          // 尾びれが分かっていれば、胴体はその手前までにする。
+          // 尾は胴と別に、付け根を軸に回す。
+          const bodyEnd = rig?.tail ? rig.tail.from : 1
+
           const offsetAt = (fromHead: number): number =>
             stripOffset(fromHead, time, swimmer.beat.phase, options) * place.height
 
-          for (let index = 0; index < strips; index++) {
-            const headSide = index / strips
-            const tailSide = (index + 1) / strips
-            // 頭は進行方向の側＝絵の右。だから頭に近い帯ほど元画像の右を使う。
-            const fromLeft = 1 - tailSide
-            const x = left + place.width * fromLeft
-            const width = place.width / strips
-            const atLeft = offsetAt(tailSide)
-            const atRight = offsetAt(headSide)
+          /*
+           * 帯を1枚描く。`fromHead` は頭からの割合で、絵の左右どちらが頭かは
+           * リグが持っている。帯ごとに縦の傾き（せん断）を掛けて隣とつなぐ。
+           * 中心の値だけで平行移動すると、境目に段差が出て絵が階段状に割れる。
+           */
+          const drawStrip = (nearHead: number, farHead: number): void => {
+            const leftFrac = headRatioToImageX(headsRight ? farHead : nearHead, headsRight)
+            const rightFrac = headRatioToImageX(headsRight ? nearHead : farHead, headsRight)
+            const width = place.width * (rightFrac - leftFrac)
+            if (width <= 0) return
+            const x = left + place.width * leftFrac
+            const atLeft = offsetAt(headsRight ? farHead : nearHead)
+            const atRight = offsetAt(headsRight ? nearHead : farHead)
             const slope = (atRight - atLeft) / width
 
             context.save()
             context.transform(1, slope, 0, 1, 0, atLeft - slope * x)
             context.drawImage(
               swimmer.element,
-              source * fromLeft,
+              source * leftFrac,
               0,
-              source / strips,
-              swimmer.element.naturalHeight,
+              source * (rightFrac - leftFrac),
+              sourceHeight,
               x,
               top,
               // わずかに広げて、帯の継ぎ目に髪の毛ほどの隙間が出るのを防ぐ
@@ -234,6 +249,46 @@ export function Aquarium({
               place.height,
             )
             context.restore()
+          }
+
+          for (let index = 0; index < strips; index++) {
+            drawStrip((index / strips) * bodyEnd, ((index + 1) / strips) * bodyEnd)
+          }
+
+          if (rig?.tail) {
+            /*
+             * 尾びれは1枚のまま、付け根を軸に回す。
+             * 胴体の付け根での縦のずれも一緒に掛けて、胴から離れないようにする。
+             * 継ぎ目を隠すため、付け根より少し頭寄りから切り出す。
+             */
+            const overlap = 0.03
+            const startHead = Math.max(0, rig.tail.from - overlap)
+            const leftFrac = headsRight ? 0 : startHead
+            const rightFrac = headsRight ? headRatioToImageX(startHead, true) : 1
+            const width = place.width * (rightFrac - leftFrac)
+
+            if (width > 0) {
+              const pivotX = left + place.width * rig.tail.pivot.x
+              const pivotY = top + place.height * rig.tail.pivot.y
+              const angle = tailAngle(rig.tail.from, time, swimmer.beat.phase, sway, options)
+
+              context.save()
+              context.translate(pivotX, pivotY + offsetAt(rig.tail.from))
+              context.rotate(angle)
+              context.translate(-pivotX, -pivotY)
+              context.drawImage(
+                swimmer.element,
+                source * leftFrac,
+                0,
+                source * (rightFrac - leftFrac),
+                sourceHeight,
+                left + place.width * leftFrac,
+                top,
+                width,
+                place.height,
+              )
+              context.restore()
+            }
           }
         }
         context.restore()
