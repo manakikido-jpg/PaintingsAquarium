@@ -1,198 +1,229 @@
-import { spawnRocks, spawnSeaweed, type Rock, type Seaweed } from '../../core/decor'
-import {
-  logBranches,
-  logOutline,
-  ridgeProfile,
-  smokePuffs,
-  spawnLogs,
-  spawnVolcano,
-  volcanoOutline,
-  type FallenLog,
-} from '../../core/land'
 import { makeLanes, type Lane } from '../../core/walk'
-import { seaweedShape } from '../../core/decor'
+import { placeParts, type PlacedPart } from '../../core/parts'
+import { ridgeProfile } from '../../core/land'
+import { drawParts, loadParts, type PartImages } from '../drawParts'
+import { DINO_FINDS, DINO_PLANTS, DINO_ROCKS, DINO_TREES, DINO_VOLCANOES } from '../parts'
 import type { Tank } from '../../core/swim'
 import type { Scene } from './types'
 
 /*
- * 色。水中と同じ考え方で決めている（R-006）。
- * 空を明るく、手前に来るほど濃い影絵にする。奥行きは色ではなく濃さで出す。
- * 前の列ほど濃くしないと、絵の足元がどの地面に乗っているのか分からなくなる。
+ * 恐竜の世界。
+ *
+ * **2026-08-22 に作り直した。**
+ * それまでは夕暮れの影絵（黒いシルエット＋紫の空）だった。水族館を POP に
+ * 作り直したとき（R-024）と同じ間違いをしていて、**絵より背景が重かった**。
+ * 子どもが塗るのは鮮やかな恐竜なので、その手前に暗い草木が並ぶと絵が沈む。
+ *
+ * いまは水族館と同じ考え方で組み立てている。
+ *   - 背景そのものは**静かな1色**（空の青、地面の砂色）
+ *   - 色は**パーツ画像**（岩・草・木・火山）だけが持つ
+ *   - 絵が歩く帯（画面の中ほど）には、なるべく何も置かない
+ *
+ * 種類を増やしたくなったら、**まず一覧画像にそれがあるかを見ること。**
+ * 図形で描き足すと、また「多角形とグラデーション」に戻る（R-025）。
  */
-const FAR_RIDGE = '86, 96, 132'
-const NEAR_RIDGE = '54, 60, 88'
-const SILHOUETTE = '14, 15, 24'
 
 const LANE_COUNT = 10
-const ROCK_COUNT = 7
-const FERN_COUNT = 7
-const LOG_COUNT = 3
 
-function fillPolygon(
-  context: CanvasRenderingContext2D,
-  points: readonly { x: number; y: number }[],
-): void {
-  if (points.length === 0) return
-  context.beginPath()
-  context.moveTo(points[0].x, points[0].y)
-  for (let index = 1; index < points.length; index++) {
-    context.lineTo(points[index].x, points[index].y)
-  }
-  context.closePath()
-  context.fill()
-}
+/** 奥の地面に並べる岩・台地の数 */
+const ROCK_COUNT = 7
+/** 岩の間に立てる木の数 */
+const TREE_COUNT = 3
+/** 手前の草の数 */
+const PLANT_COUNT = 8
+/**
+ * 途中の列に置く草の数（1列あたり）。
+ * 地面が広いままだと**砂の板**に見えるので、奥行きの手がかりを少し置く。
+ * 小さくすること。大きいと、そこを歩く絵が隠れる。
+ */
+const MID_PLANT_COUNT = 3
+/** 途中の草を置く列。手前すぎると絵の邪魔になり、奥すぎると効かない */
+const MID_PLANT_LANES = [3, 6]
+/** 足元の小物（卵・化石・骨）の数。多いと拾い物だらけの床になる */
+const FIND_COUNT = 3
+
+/** 地面の色。パーツが極彩色なので、地面は彩度を落とした砂色にする */
+const GROUND_FAR = '246, 231, 190'
+const GROUND_TOP = '236, 214, 164'
+const GROUND_BOTTOM = '198, 166, 116'
+/** 遠景の丘。空と地面をつなぐだけの役なので、彩度は低め */
+const FAR_HILL = '150, 214, 206'
+const NEAR_HILL = '116, 191, 150'
 
 function fillRidge(
   context: CanvasRenderingContext2D,
   profile: readonly number[],
   tank: Tank,
   colour: string,
+  bottom: number,
 ): void {
   context.fillStyle = colour
   context.beginPath()
-  context.moveTo(0, tank.height)
+  context.moveTo(0, bottom)
   for (let index = 0; index < profile.length; index++) {
     context.lineTo((index / Math.max(1, profile.length - 1)) * tank.width, profile[index])
   }
-  context.lineTo(tank.width, tank.height)
+  context.lineTo(tank.width, bottom)
   context.closePath()
   context.fill()
 }
 
 /** 恐竜。絵は地面の上を歩くので、奥行きの列を持つ。 */
-export function createDinosaurScene(tank: Tank): Scene {
+export function createDinosaurScene(tank: Tank, decorDensity = 1): Scene {
+  const many = (base: number): number => Math.max(1, Math.round(base * decorDensity))
+
   const lanes: Lane[] = makeLanes(tank, LANE_COUNT, {
     backRatio: 0.63,
     // 1.0 に近づけすぎると、一番手前の地面が画面の下端に来て、
-    // そこに置いた飾り（倒木・岩・シダ）が画面の外に出て見えなくなる。
+    // そこに置いた飾りが画面の外に出て見えなくなる。
     frontRatio: 0.9,
     minScale: 0.42,
     maxScale: 1,
   })
 
-  const farRidge = ridgeProfile(3301, tank, { baseRatio: 0.56, heightRatio: 0.14, peaks: 4.2 })
-  const nearRidge = ridgeProfile(9187, tank, { baseRatio: 0.64, heightRatio: 0.1, peaks: 2.8 })
-  const volcano = spawnVolcano(tank, 0.22)
-  const volcanoBaseY = tank.height * 0.62
+  const horizon = lanes.length > 0 ? lanes[0].groundY : tank.height * 0.63
+  const frontGroundY = lanes.length > 0 ? lanes[lanes.length - 1].groundY : tank.height * 0.9
 
-  // 手前の列に置く飾り。シダは海藻の形をそのまま使い、揺れをゆっくりにしている
-  // （空気は水より重くないので、大きく揺れると水中に見える）。
-  const ferns: Seaweed[] = spawnSeaweed(7717, FERN_COUNT, tank).map((weed) => ({
-    ...weed,
-    // 海藻の細長い形のままだと、陸では「黒い棘」にしか見えない。
-    // 低く太くして、葉の茂みに寄せる。
-    // 背を低く抑える。手前の草が高いと、奥の列を歩く絵が隠れてしまう。
-    // 「装飾は絵を隠さない」を陸でも守る。
-    height: weed.height * 0.38,
-    halfWidth: weed.halfWidth * 2.2,
-    // 陸のシダは水中の海藻より大きく開く。まっすぐ上を向いた葉の束は棘に見える。
-    lean: weed.lean * 2.2,
-    swaySpeed: weed.swaySpeed * 0.35,
-    swayAmplitude: weed.swayAmplitude * 0.4,
-  }))
-  const rocks: Rock[] = spawnRocks(4133, ROCK_COUNT, tank)
-  const logs: FallenLog[] = spawnLogs(2609, LOG_COUNT, tank)
+  const farRidge = ridgeProfile(3301, tank, { baseRatio: 0.56, heightRatio: 0.12, peaks: 4.2 })
+  const nearRidge = ridgeProfile(9187, tank, { baseRatio: 0.61, heightRatio: 0.08, peaks: 2.8 })
+
+  /*
+   * パーツ画像。1枚も無ければ空の配列になり、空と地面だけの背景になる。
+   * **真っ白にはならない**ので、配り忘れても壊れて見えることはない。
+   */
+  const rockImages: PartImages = loadParts(DINO_ROCKS, () => undefined)
+  const treeImages: PartImages = loadParts(DINO_TREES, () => undefined)
+  const plantImages: PartImages = loadParts(DINO_PLANTS, () => undefined)
+  const volcanoImages: PartImages = loadParts(DINO_VOLCANOES, () => undefined)
+  const findImages: PartImages = loadParts(DINO_FINDS, () => undefined)
+
+  /*
+   * 岩と木は**地平線のすぐ下**に置く。絵が歩くのはその手前なので、
+   * ここに置けば絵に重ならない。地面の中ほどに置くと、
+   * 歩いている絵の顔が岩に隠れる（水族館で同じことを直した）。
+   */
+  const backGroundAt = (x: number): number => horizon + tank.height * 0.012 * Math.sin(x * 0.01)
+  const rocks: PlacedPart[] = placeParts(8823, many(ROCK_COUNT), DINO_ROCKS.length, tank, {
+    baseHeight: 0.2,
+    sizeSpread: 0.5,
+    groundAt: backGroundAt,
+  })
+  const trees: PlacedPart[] = placeParts(4133, many(TREE_COUNT), DINO_TREES.length, tank, {
+    baseHeight: 0.19,
+    sizeSpread: 0.35,
+    groundAt: backGroundAt,
+  })
+
+  /*
+   * 草と小物は一番手前の地面に置く。**絵の足元より下**なので、
+   * 絵にかぶらずに奥行きだけが増える。
+   */
+  const plants: PlacedPart[] = placeParts(7717, many(PLANT_COUNT), DINO_PLANTS.length, tank, {
+    baseHeight: 0.1,
+    sizeSpread: 0.5,
+    groundAt: () => frontGroundY + tank.height * 0.045,
+  })
+  /*
+   * 途中の列の草。**その列の絵より奥**に描くので、列ごとに分けて持つ。
+   * まとめて `drawBehind` で描くと、奥の列を歩く絵の前に出てしまう。
+   */
+  const midPlants = new Map<number, PlacedPart[]>(
+    MID_PLANT_LANES.filter((index) => index < lanes.length).map((index) => [
+      index,
+      placeParts(5100 + index * 37, many(MID_PLANT_COUNT), DINO_PLANTS.length, tank, {
+        baseHeight: 0.045 + index * 0.004,
+        sizeSpread: 0.4,
+        groundAt: () => lanes[index].groundY + tank.height * 0.006,
+      }),
+    ]),
+  )
+
+  const finds: PlacedPart[] = placeParts(2609, many(FIND_COUNT), DINO_FINDS.length, tank, {
+    baseHeight: 0.055,
+    sizeSpread: 0.3,
+    groundAt: () => frontGroundY + tank.height * 0.085,
+  })
+
+  /*
+   * 火山は1つだけ、遠景に置く。
+   * 一覧画像の火山には煙も描かれているので、煙を別に描き足さない
+   *（描き足すと二重になり、山肌の手前で煙が湧いて見える）。
+   */
+  const volcano: PlacedPart[] =
+    DINO_VOLCANOES.length > 0
+      ? [
+          {
+            index: 0,
+            x: tank.width * 0.78,
+            groundY: horizon + tank.height * 0.01,
+            height: tank.height * 0.3,
+            flipped: false,
+            depth: 0.1,
+          },
+        ]
+      : []
 
   const drawSky = (context: CanvasRenderingContext2D, strength: number): void => {
-    const sky = context.createLinearGradient(0, 0, 0, tank.height * 0.7)
-    sky.addColorStop(0, '#2a2140')
-    sky.addColorStop(0.45, '#6b4a5c')
-    sky.addColorStop(0.78, '#c07a5a')
-    sky.addColorStop(1, '#e0a06d')
+    const sky = context.createLinearGradient(0, 0, 0, horizon)
+    sky.addColorStop(0, '#2fa3de')
+    sky.addColorStop(0.55, '#7fd0ef')
+    sky.addColorStop(1, '#d5f2fb')
     context.fillStyle = sky
-    context.fillRect(0, 0, tank.width, tank.height)
+    context.fillRect(0, 0, tank.width, horizon + 1)
 
-    // 陽の当たる帯。空が単なるグラデーションのままだと書き割りに見える。
-    const glow = context.createRadialGradient(
-      tank.width * 0.72,
-      tank.height * 0.6,
-      0,
-      tank.width * 0.72,
-      tank.height * 0.6,
-      tank.width * 0.45,
-    )
-    glow.addColorStop(0, `rgba(255, 214, 150, ${0.35 * strength})`)
-    glow.addColorStop(1, 'rgba(255, 214, 150, 0)')
-    context.fillStyle = glow
-    context.fillRect(0, 0, tank.width, tank.height)
-  }
-
-  const drawVolcano = (
-    context: CanvasRenderingContext2D,
-    elapsed: number,
-    strength: number,
-  ): void => {
-    context.save()
-    // 煙は山より先に描く。山の上に描くと、山肌の手前で煙が湧いて見える。
-    for (const puff of smokePuffs(volcano, elapsed)) {
-      const alpha = puff.alpha * strength
-      if (alpha <= 0.002) continue
-      const y = volcanoBaseY - volcano.height + puff.y
-      const gradient = context.createRadialGradient(puff.x, y, 0, puff.x, y, puff.radius)
-      gradient.addColorStop(0, `rgba(72, 62, 78, ${alpha})`)
-      gradient.addColorStop(1, 'rgba(72, 62, 78, 0)')
-      context.fillStyle = gradient
-      context.beginPath()
-      context.arc(puff.x, y, puff.radius, 0, Math.PI * 2)
-      context.fill()
-    }
-
-    context.fillStyle = `rgb(${NEAR_RIDGE})`
-    fillPolygon(context, volcanoOutline(volcano, volcanoBaseY))
-
-    // 火口の火。これが無いと、ただの尖った山にしか見えない。
-    const craterY = volcanoBaseY - volcano.height
-    const craterHalf = volcano.halfWidth * volcano.craterRatio
-    const fire = context.createRadialGradient(volcano.x, craterY, 0, volcano.x, craterY, craterHalf * 2.2)
-    fire.addColorStop(0, `rgba(255, 150, 70, ${0.75 * strength})`)
-    fire.addColorStop(0.45, `rgba(226, 88, 46, ${0.35 * strength})`)
-    fire.addColorStop(1, 'rgba(226, 88, 46, 0)')
-    context.fillStyle = fire
-    context.beginPath()
-    context.arc(volcano.x, craterY, craterHalf * 2.2, 0, Math.PI * 2)
-    context.fill()
-    context.restore()
-  }
-
-  /** 霧の層。遠景と手前を切り離して、奥行きを一段深くする。 */
-  const drawHaze = (
-    context: CanvasRenderingContext2D,
-    elapsed: number,
-    strength: number,
-  ): void => {
+    // 陽だまり。空が一様なグラデーションのままだと書き割りに見える
     if (strength <= 0) return
-    for (let layer = 0; layer < 3; layer++) {
-      const y = tank.height * (0.6 + layer * 0.06)
-      const height = tank.height * 0.05
-      const drift = Math.sin(elapsed * 0.07 + layer) * tank.width * 0.02
-      const gradient = context.createLinearGradient(0, y - height, 0, y + height)
-      gradient.addColorStop(0, 'rgba(224, 190, 172, 0)')
-      gradient.addColorStop(0.5, `rgba(224, 190, 172, ${(0.16 - layer * 0.03) * strength})`)
-      gradient.addColorStop(1, 'rgba(224, 190, 172, 0)')
-      context.fillStyle = gradient
-      context.fillRect(drift - tank.width * 0.05, y - height, tank.width * 1.1, height * 2)
-    }
+    const glow = context.createRadialGradient(
+      tank.width * 0.24,
+      tank.height * 0.2,
+      0,
+      tank.width * 0.24,
+      tank.height * 0.2,
+      tank.width * 0.34,
+    )
+    glow.addColorStop(0, `rgba(255, 246, 205, ${0.5 * strength})`)
+    glow.addColorStop(1, 'rgba(255, 246, 205, 0)')
+    context.fillStyle = glow
+    context.fillRect(0, 0, tank.width, horizon)
+  }
+
+  const drawGround = (context: CanvasRenderingContext2D): void => {
+    const ground = context.createLinearGradient(0, horizon, 0, tank.height)
+    // 地平線のすぐ下を明るくする。1本のグラデーションだけだと、
+    // 地面が**砂色の板**に見えて、奥行きが空との境目でしか出ない。
+    ground.addColorStop(0, `rgb(${GROUND_FAR})`)
+    ground.addColorStop(0.12, `rgb(${GROUND_TOP})`)
+    ground.addColorStop(1, `rgb(${GROUND_BOTTOM})`)
+    context.fillStyle = ground
+    context.fillRect(0, horizon, tank.width, tank.height - horizon)
   }
 
   return {
     motion: 'walk',
     lanes,
 
-    drawBehind(context, elapsed, strength) {
+    drawBehind(context, _elapsed, strength) {
       drawSky(context, strength)
-      fillRidge(context, farRidge, tank, `rgb(${FAR_RIDGE})`)
-      drawVolcano(context, elapsed, strength)
-      fillRidge(context, nearRidge, tank, `rgb(${NEAR_RIDGE})`)
-      drawHaze(context, elapsed, strength)
+      fillRidge(context, farRidge, tank, `rgb(${FAR_HILL})`, horizon + 1)
+      fillRidge(context, nearRidge, tank, `rgb(${NEAR_HILL})`, horizon + 1)
+      drawParts(context, volcano, volcanoImages, tank, strength, {
+        shadowColour: '120, 92, 52',
+        shadowAlpha: 0.18,
+        maxWidthRatio: 0.34,
+      })
+      drawGround(context)
 
-      // 地面は 1 枚。奥は霞んで明るく、手前ほど暗い（空気遠近）。
-      const top = lanes.length > 0 ? lanes[0].groundY : tank.height * 0.7
-      const ground = context.createLinearGradient(0, top, 0, tank.height)
-      ground.addColorStop(0, 'rgb(84, 80, 108)')
-      ground.addColorStop(0.35, 'rgb(58, 55, 78)')
-      ground.addColorStop(1, 'rgb(26, 25, 38)')
-      context.fillStyle = ground
-      context.fillRect(0, top, tank.width, tank.height - top)
+      // 岩と木は地面の上。空気遠近のかわりに、地平線側を薄く霞ませる
+      drawParts(context, rocks, rockImages, tank, strength, {
+        shadowColour: '120, 92, 52',
+        shadowAlpha: 0.22,
+        maxWidthRatio: 0.22,
+      })
+      drawParts(context, trees, treeImages, tank, strength, {
+        shadowColour: '120, 92, 52',
+        shadowAlpha: 0.22,
+        maxWidthRatio: 0.14,
+      })
     },
 
     /** 足元の影。地面に立っていることを示す唯一の手がかり。 */
@@ -204,8 +235,9 @@ export function createDinosaurScene(tank: Tank): Scene {
       const radius = place.width * 0.42
       const feet = place.y + place.height / 2
       const gradient = context.createRadialGradient(place.x, feet, 0, place.x, feet, radius)
-      gradient.addColorStop(0, `rgba(10, 9, 16, ${0.45 * strength})`)
-      gradient.addColorStop(1, 'rgba(10, 9, 16, 0)')
+      // 地面が明るいので、水中と同じ濃さの影を落とすと**穴**に見える
+      gradient.addColorStop(0, `rgba(120, 92, 52, ${0.34 * strength})`)
+      gradient.addColorStop(1, 'rgba(120, 92, 52, 0)')
 
       context.save()
       context.fillStyle = gradient
@@ -221,70 +253,42 @@ export function createDinosaurScene(tank: Tank): Scene {
      *
      * 最初は列ごとに地面を塗り分けていたが、**横縞模様**になった。
      * 10 列ぶんの境目が明るい線として並び、地面ではなく畝に見える（R-009）。
-     * 地面そのものは `drawBehind` で 1 枚の連続したグラデーションとして描き、
-     * ここでは奥行きを「絵の大きさ」と「足元の影」で見せる。
+     * 地面そのものは `drawBehind` で 1 枚の連続したグラデーションとして描く。
      */
-    drawLane(context, index, elapsed, strength) {
-      const lane = lanes[index]
-      if (!lane) return
-
-      // 一番手前の地面にだけ飾りを置く。奥の列に置くと、そこを歩く絵に
-      // かぶさって足元が読めなくなる。
-      if (index !== lanes.length - 1) return
-      const groundY = lane.groundY
-
-      context.fillStyle = `rgba(${SILHOUETTE}, ${0.85 * strength})`
-      for (const log of logs) {
-        fillPolygon(context, logOutline(log, groundY + tank.height * 0.004))
-        context.lineCap = 'round'
-        context.strokeStyle = `rgba(${SILHOUETTE}, ${0.85 * strength})`
-        for (const branch of logBranches(log, groundY + tank.height * 0.004)) {
-          context.lineWidth = branch.width
-          context.beginPath()
-          context.moveTo(branch.from.x, branch.from.y)
-          context.lineTo(branch.to.x, branch.to.y)
-          context.stroke()
-        }
-      }
-
-      for (const rock of rocks) {
-        context.fillStyle = `rgba(${SILHOUETTE}, ${(0.7 + rock.depth * 0.25) * strength})`
-        const points: { x: number; y: number }[] = []
-        const steps = 20
-        for (let step = 0; step <= steps; step++) {
-          const angle = Math.PI * (step / steps)
-          const radius = 1 + Math.sin(angle * 2 + rock.seed) * 0.07
-          points.push({
-            x: rock.x - Math.cos(angle) * rock.halfWidth * radius,
-            y: groundY + tank.height * 0.0042 - Math.sin(angle) * rock.height * 0.7 * radius,
-          })
-        }
-        fillPolygon(context, points)
-      }
-
-      for (const fern of ferns) {
-        context.fillStyle = `rgba(${SILHOUETTE}, ${(0.72 + fern.depth * 0.22) * strength})`
-        const nodes = seaweedShape(fern, elapsed, groundY + tank.height * 0.0045)
-        if (nodes.length === 0) continue
-        context.beginPath()
-        context.moveTo(nodes[0].x - nodes[0].halfWidth, nodes[0].y)
-        for (const node of nodes) context.lineTo(node.x - node.halfWidth, node.y)
-        for (let step = nodes.length - 1; step >= 0; step--) {
-          context.lineTo(nodes[step].x + nodes[step].halfWidth, nodes[step].y)
-        }
-        context.closePath()
-        context.fill()
-      }
+    drawLane(context, index, _elapsed, strength) {
+      const plants = midPlants.get(index)
+      if (!plants) return
+      drawParts(context, plants, plantImages, tank, strength, {
+        shadowColour: '120, 92, 52',
+        shadowAlpha: 0.18,
+        maxWidthRatio: 0.06,
+      })
     },
 
     drawFront(context, _elapsed, strength) {
       if (strength <= 0) return
-      // 画面の下を少し沈めて、手前の地面が切れている感じを消す。
-      const fade = context.createLinearGradient(0, tank.height * 0.9, 0, tank.height)
-      fade.addColorStop(0, 'rgba(10, 10, 18, 0)')
-      fade.addColorStop(1, `rgba(10, 10, 18, ${0.45 * strength})`)
+      /*
+       * 手前の草と小物は**絵より前**に描く。
+       * 絵の足元（一番手前の列）より下に置いてあるので絵は隠れず、
+       * 画面の下端が切れている感じだけが消える。
+       */
+      drawParts(context, plants, plantImages, tank, strength, {
+        shadowColour: '120, 92, 52',
+        shadowAlpha: 0.2,
+        maxWidthRatio: 0.12,
+      })
+      drawParts(context, finds, findImages, tank, strength, {
+        shadowColour: '120, 92, 52',
+        shadowAlpha: 0.2,
+        maxWidthRatio: 0.1,
+      })
+
+      // 画面の下端を少しだけ沈める。地面が切れている感じが消える
+      const fade = context.createLinearGradient(0, tank.height * 0.93, 0, tank.height)
+      fade.addColorStop(0, 'rgba(150, 112, 60, 0)')
+      fade.addColorStop(1, `rgba(150, 112, 60, ${0.28 * strength})`)
       context.fillStyle = fade
-      context.fillRect(0, tank.height * 0.9, tank.width, tank.height * 0.1)
+      context.fillRect(0, tank.height * 0.93, tank.width, tank.height * 0.07)
     },
   }
 }

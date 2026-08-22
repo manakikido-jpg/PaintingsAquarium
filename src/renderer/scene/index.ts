@@ -12,7 +12,7 @@ import { createDinosaurScene } from './dinosaurScene'
 export function createScene(theme: ThemeId, tank: Tank, decorDensity = 1): Scene {
   switch (theme) {
     case 'dinosaur':
-      return createDinosaurScene(tank)
+      return createDinosaurScene(tank, decorDensity)
     default:
       return createAquariumScene(tank, decorDensity)
   }

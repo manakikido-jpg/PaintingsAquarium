@@ -67,12 +67,26 @@ export function loadParts(files: readonly string[], onReady: () => void): PartIm
   return state
 }
 
+export interface DrawPartsOptions {
+  /**
+   * 接地の影の色。`rgb(...)` の中身だけを渡す。
+   * 既定は水中用の濃紺。陸（恐竜）で同じ色を使うと、
+   * 足元だけ**青い水たまり**があるように見える。
+   */
+  readonly shadowColour?: string
+  /** 影の濃さ。地面が明るいテーマでは薄くする */
+  readonly shadowAlpha?: number
+  /** 画面の幅に対する、1個の最大の幅 */
+  readonly maxWidthRatio?: number
+}
+
 export function drawParts(
   context: CanvasRenderingContext2D,
   parts: readonly PlacedPart[],
   loaded: PartImages,
   tank: Tank,
   strength: number,
+  options: DrawPartsOptions = {},
 ): void {
   if (strength <= 0 || !loaded.ready || loaded.images.length === 0) return
 
@@ -89,7 +103,7 @@ export function drawParts(
     const aspect = image.naturalWidth / image.naturalHeight
     let height = part.height
     let width = height * aspect
-    const maxWidth = tank.width * 0.26
+    const maxWidth = tank.width * (options.maxWidthRatio ?? 0.26)
     if (width > maxWidth) {
       width = maxWidth
       height = width / aspect
@@ -109,8 +123,10 @@ export function drawParts(
       part.groundY,
       width * 0.6,
     )
-    shadow.addColorStop(0, `rgba(6, 26, 76, ${0.34 * strength * partAlpha(part.depth)})`)
-    shadow.addColorStop(1, 'rgba(6, 26, 76, 0)')
+    const shadowColour = options.shadowColour ?? '6, 26, 76'
+    const shadowAlpha = options.shadowAlpha ?? 0.34
+    shadow.addColorStop(0, `rgba(${shadowColour}, ${shadowAlpha * strength * partAlpha(part.depth)})`)
+    shadow.addColorStop(1, `rgba(${shadowColour}, 0)`)
     context.fillStyle = shadow
     context.beginPath()
     context.ellipse(part.x, part.groundY, width * 0.6, height * 0.1, 0, 0, Math.PI * 2)

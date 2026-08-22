@@ -1,3 +1,9 @@
+/*
+ * 2026-08-22 追記: 恐竜テーマをパーツ画像で作り直したので、
+ * いま使っているのは `ridgeProfile`（遠景の丘）だけ。
+ * 火山・倒木は画像に置き換わった（`assets/decor/dinosaur/`）。
+ * 図形で描く方式に戻すときのために残してある。
+ */
 import type { Point, Span } from './decor'
 import { placeOutside } from './decor'
 import type { Tank } from './swim'

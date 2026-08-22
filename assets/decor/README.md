@@ -33,3 +33,25 @@ python3 tools/split-parts.py assets/decor/source/parts-sheet.png assets/decor
 
 `docs/背景パーツの作り方.md` に、画像生成のプロンプトと出力の仕様がある。
 **落ち影は描かせないこと**（接地の影はアプリ側で付けるので二重になる）。
+
+## 恐竜テーマのパーツ（`dinosaur/`）
+
+`assets/decor/dinosaur/` に、種類ごとの名前で置く。
+水族館（`part-*.png`）と違い、**種類で置き場所が変わる**ため名前で分けている。
+
+| 名前 | どこに置かれるか |
+|---|---|
+| `rock-*.png` | 地平線のすぐ下（絵より奥） |
+| `tree-*.png` | 同上。岩の間 |
+| `plant-*.png` | 一番手前（絵より前）と、途中の列 |
+| `volcano-*.png` | 遠景に1つ |
+| `find-*.png` | 足元の小物（卵・化石・骨） |
+
+作り直すときは、一覧画像を `source/dino-sheet.png` に置いてから
+
+```sh
+python3 tools/prep-dino-parts.py
+```
+
+**恐竜そのものは入れない。** 歩くのは子どもが塗った恐竜で、
+背景に出来合いの恐竜がいると自分の絵を探す邪魔になる。
