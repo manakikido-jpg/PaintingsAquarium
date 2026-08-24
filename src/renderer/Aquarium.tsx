@@ -22,7 +22,7 @@ import {
 } from '../core/undulate'
 import { headIsKnown, rigIsUsable, type CreatureKind } from '../core/rig'
 import { partsForPiece, speciesFlies } from '../core/templates'
-import { GLIDE_SPEED, glideTilt } from '../core/behaviour'
+import { FLAP_SPEED, flapSquash, flapStretch, glideTilt } from '../core/behaviour'
 
 /**
  * 手足を漕ぐ速さ（ラジアン/秒）。
@@ -271,17 +271,18 @@ export function Aquarium({
           !turnsToHeading && headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
 
         /*
-         * 飛ぶ絵（プテラノドン）は**滑空**にしてある。
+         * 飛ぶ絵（プテラノドン）の羽ばたき。**絵を切らずに、縦へ縮めて横へ広げる。**
+         * 翼を矩形で切って回すと、この台紙では裂ける（R-037・R-038）。
          *
-         * 縦に縮めて羽ばたきに見せる案は取りやめた。全体が縮むので
-         * **頭も嘴も縮み**、「翼が動いた」ではなく「絵が潰れた」に見える（R-039）。
-         * ここでやるのは**傾けるだけ**。絵の形は変えないので、どこも歪まない。
-         * 本物の羽ばたきは、翼を切り分けられる台紙が来てから（F-511）。
+         * **魚のしなりは掛けない**（下の描き分けで1枚のまま描く）。
+         * しなりが乗っていたときは顔がなびき、翼の動きがその中に埋もれていた。
          */
-        if (flying && swayRef.current > 0) {
-          context.rotate(glideTilt(elapsed * GLIDE_SPEED * swimmer.beat.rate + swimmer.beat.phase))
-        }
-        context.scale(mirror ? -scale : scale, scale)
+        const flapping = flying && swayRef.current > 0
+        const flapTime = elapsed * FLAP_SPEED * swimmer.beat.rate + swimmer.beat.phase
+        if (flapping) context.rotate(glideTilt(flapTime))
+        const squash = flapping ? flapSquash(flapTime) : 1
+        const stretch = flapping ? flapStretch(flapTime) : 1
+        context.scale(mirror ? -scale * stretch : scale * stretch, scale * squash)
 
         const sway = swayRef.current
         const strips = stripCount(sway)
