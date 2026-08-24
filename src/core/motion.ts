@@ -149,9 +149,19 @@ export function stepCreatures(
   const sky: Tank = skyBottom ? { width: tank.width, height: skyBottom } : tank
   const tankFor = (fish: Fish): Tank => (speciesFlies(fish.species as SpeciesId) ? sky : tank)
 
-  const steppedFloats = separateFish(floats, dtSeconds)
-    .map((fish) => steer(fish, tankFor(fish), prey))
-    .map((fish) => stepFish(fish, dtSeconds, tankFor(fish)))
+  /*
+   * **順番が大事。種類ごとの動きを決めてから、避ける。**
+   *
+   * 逆にしていたときは、避け合いが効いていなかった。
+   * タコ・ウミガメ・クラゲの `steer` は縦の速度を**上書きする**ので、
+   * 先に避けても、その結果が毎フレーム捨てられていた。
+   * 実機では**ウミガメ2匹が7秒間くっついたまま**泳いでいた。
+   * 絵が重なると自分の絵を見つけられない（要件定義 §3 5c）。
+   */
+  const steppedFloats = separateFish(
+    floats.map((fish) => steer(fish, tankFor(fish), prey)),
+    dtSeconds,
+  ).map((fish) => stepFish(fish, dtSeconds, tankFor(fish)))
   const steppedWalkers = separateWalkers(walkers).map((walker) => stepWalker(walker, dtSeconds, tank))
 
   let floatIndex = 0

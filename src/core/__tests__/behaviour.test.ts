@@ -15,6 +15,7 @@ import {
   type Prey,
 } from '../behaviour'
 import { spawnCreature, stepCreatures } from '../motion'
+import type { CreatureKind } from '../rig'
 import { speciesFlies, type SpeciesId } from '../templates'
 
 const tank: Tank = { width: 1600, height: 900 }
@@ -238,4 +239,53 @@ describe('飛ぶ絵は空から降りてこない', () => {
       expect(creature.fish.y).toBeGreaterThanOrEqual(0)
     }
   })
+})
+
+/*
+ * **避け合いは、種類ごとの動きを通したあとでも効いていること。**
+ *
+ * ここを単体（`separateFish` だけ）で試していたので、
+ * 実機でウミガメ2匹がくっついたまま泳いでいるのに気づけなかった。
+ * タコ・ウミガメ・クラゲの動きは縦の速度を上書きするため、
+ * 避けた結果が毎フレーム捨てられていた。
+ */
+describe('重なった絵が離れる（動きを通したあとで）', () => {
+  const tank: Tank = { width: 1600, height: 900 }
+
+  const overlapped = (species: SpeciesId, kind: CreatureKind) => {
+    const one = spawnCreature('float', 11, tank, 300, 200, [], 1, kind, species)
+    const two = spawnCreature('float', 12, tank, 300, 200, [], 1, kind, species)
+    if (one.kind !== 'float' || two.kind !== 'float') throw new Error('浮遊で作れなかった')
+    // ほぼ同じ場所に重ねて置く
+    const middle = { x: tank.width / 2, y: tank.height / 2 }
+    return [
+      { kind: 'float' as const, fish: { ...one.fish, ...middle } },
+      { kind: 'float' as const, fish: { ...two.fish, x: middle.x + 6, y: middle.y + 4 } },
+    ]
+  }
+
+  const apart = (list: ReturnType<typeof overlapped>): number => {
+    const [a, b] = list
+    if (a.kind !== 'float' || b.kind !== 'float') return 0
+    return Math.hypot(a.fish.x - b.fish.x, a.fish.y - b.fish.y)
+  }
+
+  for (const [species, kind] of [
+    ['umigame', 'tentacled'],
+    ['tako', 'tentacled'],
+    ['kurage', 'tentacled'],
+    ['fish', 'fish'],
+  ] as const) {
+    it(`${species} は重なったままにならない`, () => {
+      let list = overlapped(species, kind)
+      const started = apart(list)
+      for (let step = 0; step < 20 * 30; step++) {
+        list = stepCreatures(list, 1 / 30, tank) as typeof list
+      }
+      const ended = apart(list)
+      // 体の大きさぶんは離れていること
+      const size = list[0].kind === 'float' ? Math.max(list[0].fish.width, list[0].fish.height) : 0
+      expect(ended, `${species}: ${started.toFixed(0)}px → ${ended.toFixed(0)}px`).toBeGreaterThan(size)
+    })
+  }
 })

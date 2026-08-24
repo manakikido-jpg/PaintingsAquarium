@@ -55,6 +55,19 @@ export interface Fish {
    * 向きを変えて戻る（魚に使う。壁で跳ね返ると水槽のガラスに見える）。
    */
   readonly wall?: 'bounce' | 'turnOutside'
+  /**
+   * 避けのずらし（ピクセル/秒）。**速度とは別に持つ。**
+   *
+   * 以前は避けを「速度の向きを変える」で表していたが、
+   * タコ・ウミガメ・クラゲの動き（`behaviour.ts`）は**縦の速度を上書きする**ため、
+   * 避けた結果が毎フレーム捨てられていた。
+   * 実測で、24匹を60秒泳がせると平均 3.32 組が重なり、
+   * ウミガメ2匹は 21px（体は134px）まで近づいたまま離れなかった。
+   *
+   * 速度と分けて持てば、どの生き物の動きにも消されない。
+   * 速度そのものには足さない（足すと混み合ったときに一部だけ加速して飛び出す）。
+   */
+  readonly nudge?: { readonly x: number; readonly y: number }
   /** 次に何かが起きる時刻（`age` と同じ単位）。イルカの跳ね、サメの速さの切り替え */
   readonly nextEventAt?: number
   /** 跳ね始めたときの高さ（イルカ） */
@@ -89,8 +102,11 @@ export function facesRight(fish: Fish): boolean {
 export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
   const dt = Math.max(0, dtSeconds)
 
-  let x = fish.x + fish.vx * dt
-  let y = fish.y + fish.vy * dt
+  // 避けのずらしは**位置にだけ**効かせる。速度に足すと加速して飛び出す
+  const nudgeX = fish.nudge?.x ?? 0
+  const nudgeY = fish.nudge?.y ?? 0
+  let x = fish.x + (fish.vx + nudgeX) * dt
+  let y = fish.y + (fish.vy + nudgeY) * dt
   let vx = fish.vx
   let vy = fish.vy
 
@@ -98,7 +114,7 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
 
   // 去る途中は壁を無視してそのまま進む。跳ね返ると永遠に出て行けない
   if (fish.exiting) {
-    return { ...fish, x, y, age, phase: fish.phase + fish.phaseSpeed * dt }
+    return { ...fish, x, y, age, phase: fish.phase + fish.phaseSpeed * dt, nudge: undefined }
   }
 
   const halfWidth = fish.width / 2
@@ -142,7 +158,8 @@ export function stepFish(fish: Fish, dtSeconds: number, tank: Tank): Fish {
     vy = -Math.abs(vy)
   }
 
-  return { ...fish, x, y, vx, vy, age, phase: fish.phase + fish.phaseSpeed * dt }
+  // 避けのずらしは1フレームぶん。毎フレーム測り直すので持ち越さない
+  return { ...fish, x, y, vx, vy, age, phase: fish.phase + fish.phaseSpeed * dt, nudge: undefined }
 }
 
 
@@ -237,6 +254,14 @@ export interface SeparateOptions {
   readonly strength?: number
 }
 
+/**
+ * 避けるときの速さの下限（体の長辺に対する割合・毎秒）。
+ * 0.6 なら、体1つぶん離れるのにおよそ 1.7 秒。
+ */
+const MIN_AVOID_SPEED = 0.6
+/** 速い生き物でも、下限の何倍までにするか。飛び出して見えないための上限 */
+const MAX_AVOID_BOOST = 2.5
+
 /** 絵どうしの当たりの目安。横長の絵が多いので長辺で見る。 */
 function avoidanceRadius(fish: Fish): number {
   return Math.max(fish.width, fish.height) / 2
@@ -289,28 +314,47 @@ export function separateFish(
         distance = Math.hypot(dx, dy)
       }
 
-      // 近いほど強く避ける
-      const force = (1 - distance / limit) / distance
-      pushX[a] -= dx * force
-      pushY[a] -= dy * force
-      pushX[b] += dx * force
-      pushY[b] += dy * force
+      /*
+       * 近いほど強く避ける。**深さ（0〜1）に単位ベクトルを掛けて足す。**
+       * 以前は距離で割った値をそのまま足していたので、大きさが画素数に依存し、
+       * 「どれだけ避けるか」を速さに換算できなかった。
+       */
+      const depth = 1 - distance / limit
+      pushX[a] -= (dx / distance) * depth
+      pushY[a] -= (dy / distance) * depth
+      pushX[b] += (dx / distance) * depth
+      pushY[b] += (dy / distance) * depth
     }
   }
 
   return fishes.map((fish, index) => {
     if (pushX[index] === 0 && pushY[index] === 0) return fish
 
-    const speed = Math.hypot(fish.vx, fish.vy)
-    if (speed < 1e-6) return fish
+    const length = Math.hypot(pushX[index], pushY[index])
+    if (length < 1e-6) return fish
 
-    const vx = fish.vx + pushX[index] * strength * speed * dt
-    const vy = fish.vy + pushY[index] * strength * speed * dt
-    const changed = Math.hypot(vx, vy)
-    if (changed < 1e-6) return fish
+    /*
+     * どれだけの速さで避けるか。
+     *
+     * **自分の速さだけを基準にしない。** ウミガメは画面を横切るのに 40〜55 秒
+     *（1920px で 40px/秒ほど）と遅く、自分の速さぶんしか避けられないと
+     * 体1つぶん離れるのに何秒もかかる。実測で 21px まで近づいたまま離れなかった。
+     * 体の大きさを基準にした下限を入れて、遅い生き物でも1秒ほどで離れられるようにする。
+     */
+    const own = Math.hypot(fish.vx, fish.vy)
+    const floor = Math.max(fish.width, fish.height) * MIN_AVOID_SPEED
+    const speed = Math.min(Math.max(own, floor), floor * MAX_AVOID_BOOST)
 
-    // 速さは元のまま。向きだけ変える。
-    return { ...fish, vx: (vx / changed) * speed, vy: (vy / changed) * speed }
+    // 深く重なっているほど強く。`strength` は「どの深さで最大にするか」を決める
+    const amount = Math.min(1, length * strength)
+    return {
+      ...fish,
+      // 速度は変えない。位置のずらしとして持たせ、`stepFish` で足す
+      nudge: {
+        x: (pushX[index] / length) * speed * amount,
+        y: (pushY[index] / length) * speed * amount,
+      },
+    }
   })
 }
 
