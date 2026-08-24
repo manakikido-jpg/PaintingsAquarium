@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { spawnFish, stepFish, type Fish, type Tank } from '../swim'
 import {
-  FLAP_SQUASH,
-  FLAP_TILT,
+  GLIDE_TILT,
   IRUKA_GAP,
   IRUKA_JUMP_SECONDS,
   IRUKA_TOP,
-  flapSquash,
-  flapStretch,
-  flapTilt,
+  glideTilt,
   isJumping,
   jumpLift,
   steer,
@@ -172,46 +169,26 @@ describe('台紙に一致しなかった絵', () => {
   })
 })
 
-describe('羽ばたき（絵を切らずに縦へ縮める）', () => {
-  it('縮み幅は決めた範囲に収まる', () => {
+describe('滑空（絵の形は変えない）', () => {
+  /*
+   * **飛ぶ絵は歪ませない。** 縦に縮める案は「絵が潰れた」に見えて取りやめた（R-039）。
+   * ここでやってよいのは、絵の形を変えない傾きだけ。
+   */
+  it('傾きは決めた範囲に収まる', () => {
     let low = 1
-    let high = 1
+    let high = -1
     for (let step = 0; step < 200; step++) {
-      const value = flapSquash((step / 200) * Math.PI * 4)
+      const value = glideTilt((step / 200) * Math.PI * 4)
       low = Math.min(low, value)
       high = Math.max(high, value)
     }
-    expect(low).toBeCloseTo(1 - FLAP_SQUASH, 3)
-    expect(high).toBeCloseTo(1 + FLAP_SQUASH, 3)
+    expect(low).toBeCloseTo(-GLIDE_TILT, 3)
+    expect(high).toBeCloseTo(GLIDE_TILT, 3)
   })
 
-  /*
-   * 縦を縮めても**紙は裏返らない**こと。倍率が 0 以下になると絵が反転して、
-   * 裏向きのプテラノドンが飛ぶ。
-   */
-  it('倍率が 0 以下にならない', () => {
-    for (let step = 0; step < 200; step++) {
-      expect(flapSquash(step * 0.37)).toBeGreaterThan(0.5)
-    }
-  })
-
-  /*
-   * 縦に縮んだときは横へ広がること。縦だけ動かすと**息をしている**ように見える。
-   */
-  it('縦と横が逆に動く', () => {
-    for (const time of [0.4, 1.2, 2.9, 4.7]) {
-      const vertical = flapSquash(time) - 1
-      const horizontal = flapStretch(time) - 1
-      expect(Math.sign(vertical)).toBe(-Math.sign(horizontal))
-      expect(Math.abs(horizontal)).toBeLessThan(Math.abs(vertical))
-    }
-  })
-
-  it('傾きは羽ばたきより遅く、幅も小さい', () => {
-    expect(FLAP_TILT).toBeLessThan(0.1)
-    // 半分の速さ（周期が倍）。羽ばたきと同じ速さだと、はためきに見える
-    expect(flapTilt(Math.PI)).toBeCloseTo(FLAP_TILT, 5)
-    expect(flapSquash(Math.PI)).toBeCloseTo(1, 5)
+  it('傾きは小さい。大きいと落ちているように見える', () => {
+    // 5度ほど。これを超えると滑空ではなく墜落に見える
+    expect(GLIDE_TILT).toBeLessThan(0.1)
   })
 })
 

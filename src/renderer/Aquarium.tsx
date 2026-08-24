@@ -22,7 +22,7 @@ import {
 } from '../core/undulate'
 import { headIsKnown, rigIsUsable, type CreatureKind } from '../core/rig'
 import { partsForPiece, speciesFlies } from '../core/templates'
-import { FLAP_SPEED, flapSquash, flapStretch, flapTilt } from '../core/behaviour'
+import { GLIDE_SPEED, glideTilt } from '../core/behaviour'
 
 /**
  * 手足を漕ぐ速さ（ラジアン/秒）。
@@ -234,6 +234,7 @@ export function Aquarium({
         const rig = rigIsUsable(swimmer.piece.rig) ? swimmer.piece.rig : null
         const kind: CreatureKind = swimmer.piece.rig?.kind ?? 'unknown'
         const drifts = kind === 'tentacled'
+        const flying = speciesFlies(swimmer.piece.species)
         /*
          * 頭がどちら側か分かっている絵か。
          *
@@ -270,16 +271,17 @@ export function Aquarium({
           !turnsToHeading && headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
 
         /*
-         * 羽ばたき（プテラノドン）。**絵を切らずに、全体を縦に縮めて広げる。**
-         * 翼を矩形で切って回すと、この台紙では裂ける（R-037・R-038）。
-         * 横に広がった絵を縦に縮めると、翼が下りたように見える。
+         * 飛ぶ絵（プテラノドン）は**滑空**にしてある。
+         *
+         * 縦に縮めて羽ばたきに見せる案は取りやめた。全体が縮むので
+         * **頭も嘴も縮み**、「翼が動いた」ではなく「絵が潰れた」に見える（R-039）。
+         * ここでやるのは**傾けるだけ**。絵の形は変えないので、どこも歪まない。
+         * 本物の羽ばたきは、翼を切り分けられる台紙が来てから（F-511）。
          */
-        const flapping = speciesFlies(swimmer.piece.species) && swayRef.current > 0
-        const flapTime = elapsed * FLAP_SPEED * swimmer.beat.rate + swimmer.beat.phase
-        if (flapping) context.rotate(flapTilt(flapTime))
-        const squash = flapping ? flapSquash(flapTime) : 1
-        const stretch = flapping ? flapStretch(flapTime) : 1
-        context.scale(mirror ? -scale * stretch : scale * stretch, scale * squash)
+        if (flying && swayRef.current > 0) {
+          context.rotate(glideTilt(elapsed * GLIDE_SPEED * swimmer.beat.rate + swimmer.beat.phase))
+        }
+        context.scale(mirror ? -scale : scale, scale)
 
         const sway = swayRef.current
         const strips = stripCount(sway)
@@ -328,11 +330,16 @@ export function Aquarium({
             )
             context.restore()
           }
-        } else if (strips <= 1 || (!headKnown && !drifts)) {
+        } else if (flying || strips <= 1 || (!headKnown && !drifts)) {
           /*
            * そのまま1枚で描く。
            * - しなり 0（描画命令が1回に戻るので、重いときの逃げ道）
            * - 頭が分からない絵（どちらを止めればよいか決められない）
+           * - **飛ぶ絵**（プテラノドン）
+           *
+           * 飛ぶ絵に魚のしなりを掛けると、**顔がなびく**（実機で確認）。
+           * しなりは「胴をくねらせて水を押す」動きなので、
+           * 体が硬い生き物に掛けると、旗がはためいているようにしか見えない。
            */
           context.drawImage(swimmer.element, left, top, place.width, place.height)
         } else {
