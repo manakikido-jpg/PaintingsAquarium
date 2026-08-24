@@ -390,16 +390,25 @@ export function Aquarium({
 
             context.save()
             context.transform(1, slope, 0, 1, 0, atLeft - slope * x)
+            /*
+             * 継ぎ目に髪の毛ほどの隙間が出るのを防ぐため、**元画像と出力の両方**を
+             * 出力1画素ぶん広げる。
+             *
+             * **出力だけを広げてはいけない。** 縮尺が隣の帯とわずかに変わり、
+             * 隙間の代わりに**継ぎ目が線として見える**（タコのドームを横切る線が出ていた）。
+             * 元画像の右端は超えられないので、そこで止める。
+             */
+            const growX = Math.min(1 - rightFrac, place.width > 0 ? width / place.width / 64 : 0)
+            const spanX = rightFrac - leftFrac + growX
             context.drawImage(
               swimmer.element,
               source * leftFrac,
               sourceHeight * fromY,
-              source * (rightFrac - leftFrac),
+              source * spanX,
               sourceHeight * (toY - fromY),
               x,
               top + place.height * fromY,
-              // わずかに広げて、帯の継ぎ目に髪の毛ほどの隙間が出るのを防ぐ
-              width + width * 0.02,
+              place.width * spanX,
               place.height * (toY - fromY),
             )
             context.restore()
@@ -426,16 +435,19 @@ export function Aquarium({
 
             context.save()
             context.transform(1, 0, slope, 1, shiftTop - slope * y, 0)
+            // 縦も同じ考え方。元画像と出力を同じだけ広げる（上の `growX` を参照）
+            const growY = Math.min(1 - (topFrac + (farBody - nearBody)), (farBody - nearBody) / 64)
+            const spanY = farBody - nearBody + growY
             context.drawImage(
               swimmer.element,
               0,
               sourceHeight * topFrac,
               source,
-              sourceHeight * (farBody - nearBody),
+              sourceHeight * spanY,
               left,
               y,
               place.width,
-              height + height * 0.02,
+              place.height * spanY,
             )
             context.restore()
           }

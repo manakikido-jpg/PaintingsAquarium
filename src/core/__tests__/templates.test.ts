@@ -8,6 +8,7 @@ import {
   directionInPiece,
   identifySpecies,
   partsForPiece,
+  rigForSpecies,
   templatesForTheme,
   type SpeciesId,
 } from '../templates'
@@ -150,6 +151,28 @@ describe('identifySpecies', () => {
     for (const id of SPECIES_IDS) {
       const found = identifySpecies(tilted(pieceOf(id, 8), degrees))
       expect(found?.id).toBe(id)
+    }
+  })
+
+  /*
+   * **足・触手の向きは、絵から推定しない**（R-044）。
+   * 波は「止める側」から「振れる側」へ強くなるので、ここが逆になると
+   * 止めるべき頭が大きく振れる。実測でタコ4匹のうち2匹が逆になっていて、
+   * 会場から「顔が揺れている」と言われた。
+   */
+  it('足のある生き物は、台紙から足の向きが決まる', () => {
+    for (const id of ['tako', 'kurage', 'umigame'] as const) {
+      expect(rigForSpecies(id, false).tipsDown).toBe(true)
+      // 左右反転しても上下は変わらない
+      expect(rigForSpecies(id, true).tipsDown).toBe(true)
+    }
+  })
+
+  it('横向きに泳ぐ生き物には、足の向きを持たせない', () => {
+    // 魚・イルカ・サメ・恐竜は縦に切らないので、あっても使われない。
+    // 持たせると「使われるのかどうか」が読めなくなる
+    for (const id of ['fish', 'iruka', 'same', 'pteranodon'] as const) {
+      expect(rigForSpecies(id, false).tipsDown).toBeUndefined()
     }
   })
 

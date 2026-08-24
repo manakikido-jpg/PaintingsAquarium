@@ -194,6 +194,12 @@ export async function processPhoto(
         headsRight: answer.headsRight,
         headKnown: true,
         tail: answer.tail,
+        /*
+         * 足・触手がどちら向きかも**台紙の正解**を使う。
+         * 絵からの推定は、実測でタコ4匹のうち2匹を外していた。
+         * 外すと波の向きが逆になり、**止めるべき頭が大きく振れて顔が揺れる**（R-044）。
+         */
+        tipsDown: answer.tipsDown ?? oriented.rig.tipsDown,
         // ひれは絵から実測したものを使う（台紙の手置きの矩形は胴を裂いた）
         // 台紙どおりなので推定ではない。動きに使ってよい
         confidence: 1,

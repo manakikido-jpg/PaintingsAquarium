@@ -465,6 +465,31 @@ export interface SpeciesRig {
   readonly kind: CreatureKind
   readonly headsRight: boolean
   readonly tail: { readonly from: number; readonly pivot: { readonly x: number; readonly y: number } } | null
+  /**
+   * 足・触手の先が絵の**下**にあるか（`tentacled` のときだけ意味がある）。
+   *
+   * 波は「止める側（頭）」から「大きく振れる側（先）」へ向かって強くなる。
+   * ここが逆だと、**止めるべき頭が大きく振れて顔が揺れる**。
+   */
+  readonly tipsDown?: boolean
+}
+
+/**
+ * 足・触手の先が下を向いている台紙。
+ *
+ * **絵からの推定を使わない。** 取り込んだ絵は台紙の向きへ起こしてあるので
+ * （`processImage`）、どちらが先かは台紙で決まっている。
+ * 推定（`rig.ts` の `tipsAtBottom`）は、実測でタコ4匹のうち**2匹を外した**。
+ * 外すと波の向きが逆になり、会場から「顔が揺れている」と言われた（R-044）。
+ * 正解が手元にあるのに推定を信じ続ける理由は無い（R-034 と同じ）。
+ */
+const TIPS_DOWN: Partial<Record<SpeciesId, boolean>> = {
+  // 頭（ドーム）が上、足が下
+  tako: true,
+  // かさが上、触手が下
+  kurage: true,
+  // 上から見た絵。頭が上・尾が下なので、振れるのは下
+  umigame: true,
 }
 
 /**
@@ -476,12 +501,13 @@ export interface SpeciesRig {
 export function rigForSpecies(id: SpeciesId, mirrored: boolean): SpeciesRig {
   const kind = KIND_OF[id]
   const rig = TEMPLATE_RIG[id]
-  if (!rig) return { kind, headsRight: mirrored, tail: null }
+  if (!rig) return { kind, headsRight: mirrored, tail: null, tipsDown: TIPS_DOWN[id] }
 
   const pivotX = mirrored ? 1 - rig.tailFrom : rig.tailFrom
   return {
     kind,
     headsRight: mirrored,
     tail: { from: rig.tailFrom, pivot: { x: pivotX, y: rig.tailY } },
+    tipsDown: TIPS_DOWN[id],
   }
 }
