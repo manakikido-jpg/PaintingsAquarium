@@ -15,8 +15,13 @@
 
 1. **切れる線があるか** — 縦・横それぞれで、絵を一番横切らない線がどれだけ横切るか。
    0% なら、そこで切っても裂けない。10% を超えるなら、その方向には切れない。
-2. **塗る場所が残っているか** — 一番大きい「塗れる区画」が絵全体の何割か。
-   ほかの台紙は 27〜31%。**8% まで落ちると塗り絵として成立しない**（R-038）。
+2. **塗る場所が残っているか** — 線の内側の白の**合計**が絵全体の何割か。
+   ほかの台紙は 31〜52%。**12% まで落ちると塗り絵として成立しない**（R-038）。
+
+   **一番大きい区画の広さで判断しないこと。** 区画が細かく分かれている絵は
+   一番大きい区画が小さくなるが、塗る場所が減ったわけではない（むしろ
+   塗り分けやすい）。実際、この道具の最初の版は「一番大きい区画」で見ていて、
+   良い台紙（合計 31%・最大 12%）を「狭すぎる」と誤って落とした。
 3. **輪郭が閉じているか** — 内側の面積 ÷ 線の面積。2.0 未満は線が切れている疑い。
 """
 import sys
@@ -31,8 +36,8 @@ INK = 140
 OUTSIDE = 128
 # 切る線として使える上限（絵をこれ以上横切るなら、その方向には切れない）
 CUT_LIMIT = 0.10
-# 塗れる区画の下限（ほかの台紙は 0.27〜0.31）
-PAINT_LIMIT = 0.20
+# 塗れる面積（合計）の下限。ほかの台紙は 0.31〜0.52
+PAINT_LIMIT = 0.22
 
 
 def load(path, side=800):
@@ -66,6 +71,12 @@ def regions(filled, ink):
     sizes = ndimage.sum(white, labels, range(1, count + 1))
     total = filled.shape[0] * filled.shape[1]
     return sorted((size / total for size in sizes), reverse=True)
+
+
+def paint_total(filled, ink):
+    """線の内側の白の合計。**塗れる場所の量はこちらで見る。**"""
+    white = filled & ~ink.astype(bool)
+    return white.sum() / (filled.shape[0] * filled.shape[1])
 
 
 def best_cuts(filled):
@@ -128,13 +139,14 @@ def main() -> int:
 
         cuts = best_cuts(filled)
         paint = regions(filled, ink)
+        total_paint = paint_total(filled, ink)
         closed = filled.sum() / max(1, ink.sum())
 
         print(f'\n{path.name}  {width}x{height}  比 {width / height:.2f} : 1')
         print(f'  輪郭      内側/線 = {closed:.1f}' + ('' if closed >= 2.0 else '   ← 線が切れている疑い'))
         print(
-            f'  塗れる区画 一番大きいもの {paint[0] * 100:.0f}%'
-            + ('' if paint[0] >= PAINT_LIMIT else f'   ← 狭すぎる（{PAINT_LIMIT * 100:.0f}% 以上ほしい）')
+            f'  塗れる面積 合計 {total_paint * 100:.0f}%（一番大きい区画 {paint[0] * 100:.0f}%）'
+            + ('' if total_paint >= PAINT_LIMIT else f'   ← 狭すぎる（{PAINT_LIMIT * 100:.0f}% 以上ほしい）')
         )
         usable = [cut for cut in cuts if cut[3] <= CUT_LIMIT]
         import math
@@ -149,7 +161,7 @@ def main() -> int:
         if not usable:
             print('  → **この絵は切れない。** 手足だけを動かすことはできない')
 
-        if closed < 2.0 or paint[0] < PAINT_LIMIT:
+        if closed < 2.0 or total_paint < PAINT_LIMIT:
             worst = 1
 
     print('\n※ 切れなくても台紙としては使える（動かさなければよい）。')

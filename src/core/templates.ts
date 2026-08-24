@@ -195,12 +195,24 @@ export interface Box {
 export interface SpritePart {
   /** 元画像の中の切り出す範囲 */
   readonly box: Box
-  /** 回す軸。`swing` が 0 のときは使わない */
+  /** 回す（伸び縮みさせる）軸。`swing` も `lift` も 0 のときは使わない */
   readonly pivot: { readonly x: number; readonly y: number }
-  /** 振れ幅（ラジアン）。0 なら動かさない */
+  /** 振れ幅（ラジアン）。0 なら回さない */
   readonly swing: number
   /** 拍のずれ（0〜1）。前足と後ろ足を逆に動かすのに使う */
   readonly beat: number
+  /**
+   * 伸び縮みの幅（倍率のふり幅）。0 なら伸縮しない。
+   *
+   * **回すのとは別の動かし方。** 回すと切り目の両側がずれて裂けるが、
+   * 伸び縮みは**切り目そのものが動かない**ので、どれだけ動かしても開かない。
+   * 軸の線上の画素は動かず、そこから離れるほど大きく動く。
+   *
+   * プテラノドンの翼はこれで開閉する。翼は胴とつながっていて回せないため。
+   */
+  readonly lift?: number
+  /** 伸び縮みさせる向き。既定は縦（`y`）。紙を回して置いたときに入れ替わる */
+  readonly liftAxis?: 'x' | 'y'
 }
 
 const KAME_SIDE = 0.19
@@ -285,8 +297,42 @@ function walkerParts(
   ]
 }
 
+/**
+ * プテラノドン: **翼を開いて、たたむ。**
+ *
+ * 肩の線で上下に分け、上（翼）だけを縦に伸び縮みさせる。
+ * 回さないのは、翼が胴とつながっていて**回すと必ず裂ける**ため（R-037）。
+ * 伸び縮みは切り目の上で連続しているので、裂けようがない。
+ *
+ * 線の位置は台紙を測って決めた。**この高さより上には翼しか無い**
+ *（頭の上端は 0.66、翼だけが横切るのは 0.64 まで）。
+ * 頭・胴・尾は下側に入るので、伸び縮みしても形が変わらない。
+ */
+const PTERA_SHOULDER = 0.64
+const PTERA_LIFT = 0.22
+
+const PTERA_PARTS: readonly SpritePart[] = [
+  // 翼（肩より上）。軸は肩の線
+  {
+    box: { x: 0, y: 0, w: 1, h: PTERA_SHOULDER },
+    pivot: { x: 0.5, y: PTERA_SHOULDER },
+    swing: 0,
+    beat: 0,
+    lift: PTERA_LIFT,
+    liftAxis: 'y',
+  },
+  // 頭と胴（肩より下）。動かさない
+  {
+    box: { x: 0, y: PTERA_SHOULDER, w: 1, h: 1 - PTERA_SHOULDER },
+    pivot: { x: 0.5, y: PTERA_SHOULDER },
+    swing: 0,
+    beat: 0,
+  },
+]
+
 export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
   umigame: KAME_PARTS,
+  pteranodon: PTERA_PARTS,
   /*
    * 数字は台紙を**余白を詰めた状態**で測って決めた（取り込んだ絵と同じ状態）。
    * 腹の下端 = 腰の線。前後の切り目は、足元の列を数えて**空いている列**に置いた。
@@ -306,9 +352,11 @@ function mirrorPart(part: SpritePart): SpritePart {
   return {
     box: { ...part.box, x: 1 - part.box.x - part.box.w },
     pivot: { x: 1 - part.pivot.x, y: part.pivot.y },
-    // 鏡に映すと回る向きも逆になる
+    // 鏡に映すと回る向きも逆になる。伸び縮みは向きを持たないのでそのまま
     swing: -part.swing,
     beat: part.beat,
+    lift: part.lift,
+    liftAxis: part.liftAxis,
   }
 }
 
@@ -319,6 +367,9 @@ function turnBackPart(part: SpritePart): SpritePart {
     pivot: { x: part.pivot.y, y: 1 - part.pivot.x },
     swing: part.swing,
     beat: part.beat,
+    lift: part.lift,
+    // 絵を90度まわすと、縦の伸び縮みは横の伸び縮みになる
+    liftAxis: part.lift ? ((part.liftAxis ?? 'y') === 'y' ? 'x' : 'y') : part.liftAxis,
   }
 }
 

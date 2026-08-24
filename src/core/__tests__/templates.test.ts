@@ -338,3 +338,53 @@ describe('恐竜の足の分割', () => {
     }
   })
 })
+
+describe('プテラノドンの翼', () => {
+  /*
+   * 翼は**回さずに伸び縮みさせる**。回すと切り目の両側がずれて裂けるため（R-037）。
+   * 伸び縮みなら切り目の上が動かないので、どれだけ動かしても開かない。
+   */
+  it('回さずに伸び縮みする', () => {
+    const parts = partsForPiece('pteranodon')
+    expect(parts).toHaveLength(2)
+    for (const part of parts) expect(part.swing).toBe(0)
+    const moving = parts.filter((part) => (part.lift ?? 0) !== 0)
+    expect(moving).toHaveLength(1)
+    expect(moving[0].lift).toBeGreaterThan(0.1)
+  })
+
+  it('絵の全面を覆う', () => {
+    const parts = partsForPiece('pteranodon')
+    for (let row = 0; row < 48; row++) {
+      for (let column = 0; column < 48; column++) {
+        const x = (column + 0.5) / 48
+        const y = (row + 0.5) / 48
+        const covered = parts.some(
+          (part) =>
+            x >= part.box.x &&
+            x < part.box.x + part.box.w &&
+            y >= part.box.y &&
+            y < part.box.y + part.box.h,
+        )
+        expect(covered, `(${x.toFixed(2)}, ${y.toFixed(2)}) が抜けている`).toBe(true)
+      }
+    }
+  })
+
+  /*
+   * 動く帯の軸は、動かない帯との**境目**に置く。
+   * ここがずれると、伸び縮みしたときに境目が開く。
+   */
+  it('伸び縮みの軸が、上下の境目にある', () => {
+    const [wing, body] = partsForPiece('pteranodon')
+    expect(wing.pivot.y).toBeCloseTo(wing.box.y + wing.box.h)
+    expect(wing.pivot.y).toBeCloseTo(body.box.y)
+  })
+
+  it('紙を90度まわして置くと、伸び縮みの向きも変わる', () => {
+    const upright = partsForPiece('pteranodon', 0, false).find((part) => part.lift)
+    const turned = partsForPiece('pteranodon', 1, false).find((part) => part.lift)
+    expect(upright?.liftAxis ?? 'y').toBe('y')
+    expect(turned?.liftAxis).toBe('x')
+  })
+})

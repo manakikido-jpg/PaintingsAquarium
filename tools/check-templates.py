@@ -27,6 +27,10 @@ from PIL import Image, ImageDraw
 # 調べるときの長辺の上限（速さのため）
 MAX_SIDE = 1000
 # 升目の細かさ。match.ts の既定と合わせる
+# `--verbose` で、変形の1つ1つの結果を出す。
+# どの程度のゆがみで入れ替わるのかが分からないと、直すべきか判断できない
+VERBOSE = '--verbose' in sys.argv
+
 GRID = 48
 # これより暗ければ線とみなす
 INK_LEVEL = 140
@@ -256,6 +260,10 @@ def main():
             scores.sort(reverse=True)
             total += 1
             mine = next(score for score, who in scores if who == name)
+            if VERBOSE:
+                flag = '' if scores[0][1] == name else f'   ← {scores[0][1]} と判定'
+                print(f'    傾き{angle:+3d}° 横×{scale_x} 縦×{scale_y}  '
+                      f'自分 {mine:.2f}  1位 {scores[0][1]} {scores[0][0]:.2f}{flag}')
             rival, rival_name = next((score, who) for score, who in scores if who != name)
             margins.append(mine - rival)
             if scores[0][1] != name:

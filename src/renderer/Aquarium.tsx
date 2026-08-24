@@ -22,7 +22,7 @@ import {
 } from '../core/undulate'
 import { headIsKnown, rigIsUsable, type CreatureKind } from '../core/rig'
 import { partsForPiece, speciesFlies } from '../core/templates'
-import { FLAP_SPEED, flapSquash, flapStretch, glideTilt } from '../core/behaviour'
+import { FLAP_SPEED, glideTilt } from '../core/behaviour'
 
 /**
  * 手足を漕ぐ速さ（ラジアン/秒）。
@@ -271,18 +271,17 @@ export function Aquarium({
           !turnsToHeading && headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
 
         /*
-         * 飛ぶ絵（プテラノドン）の羽ばたき。**絵を切らずに、縦へ縮めて横へ広げる。**
-         * 翼を矩形で切って回すと、この台紙では裂ける（R-037・R-038）。
+         * 飛ぶ絵（プテラノドン）は、機体ごと少しだけ傾ける。
          *
-         * **魚のしなりは掛けない**（下の描き分けで1枚のまま描く）。
-         * しなりが乗っていたときは顔がなびき、翼の動きがその中に埋もれていた。
+         * **翼そのものは下の分割で開閉する**（`PARTITION.pteranodon`）。
+         * 以前はここで絵全体を縦へ縮めていたが、頭も嘴も縮むので
+         * 「翼が動いた」ではなく「絵が潰れた」に見えた（R-039）。
+         * 台紙を V 字ポーズに描き直せたので、その方法は要らなくなった。
          */
-        const flapping = flying && swayRef.current > 0
-        const flapTime = elapsed * FLAP_SPEED * swimmer.beat.rate + swimmer.beat.phase
-        if (flapping) context.rotate(glideTilt(flapTime))
-        const squash = flapping ? flapSquash(flapTime) : 1
-        const stretch = flapping ? flapStretch(flapTime) : 1
-        context.scale(mirror ? -scale * stretch : scale * stretch, scale * squash)
+        if (flying && swayRef.current > 0) {
+          context.rotate(glideTilt(elapsed * FLAP_SPEED * swimmer.beat.rate + swimmer.beat.phase))
+        }
+        context.scale(mirror ? -scale : scale, scale)
 
         const sway = swayRef.current
         const strips = stripCount(sway)
@@ -305,16 +304,23 @@ export function Aquarium({
           const sourceHeight = swimmer.element.naturalHeight
           const time = elapsed * swimmer.beat.rate * LIMB_SPEED
           for (const part of limbs) {
-            const angle =
-              part.swing === 0
-                ? 0
-                : part.swing * sway * Math.sin(time + part.beat * Math.PI * 2 + swimmer.beat.phase)
+            const wave = Math.sin(time + part.beat * Math.PI * 2 + swimmer.beat.phase)
+            const angle = part.swing === 0 ? 0 : part.swing * sway * wave
+            /*
+             * 伸び縮み（プテラノドンの翼）。**回すのとは別の動かし方。**
+             * 軸の線上は動かないので、隣の帯との継ぎ目が開かない。
+             */
+            const lift = part.lift ? 1 + part.lift * sway * wave : 1
             context.save()
-            if (angle !== 0) {
+            if (angle !== 0 || lift !== 1) {
               const pivotX = left + place.width * part.pivot.x
               const pivotY = top + place.height * part.pivot.y
               context.translate(pivotX, pivotY)
-              context.rotate(angle)
+              if (angle !== 0) context.rotate(angle)
+              if (lift !== 1) {
+                const sideways = part.liftAxis === 'x'
+                context.scale(sideways ? lift : 1, sideways ? 1 : lift)
+              }
               context.translate(-pivotX, -pivotY)
             }
             context.drawImage(
