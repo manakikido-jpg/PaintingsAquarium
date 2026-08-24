@@ -77,7 +77,12 @@ export function createDinosaurScene(tank: Tank, decorDensity = 1): Scene {
     // 1.0 に近づけすぎると、一番手前の地面が画面の下端に来て、
     // そこに置いた飾りが画面の外に出て見えなくなる。
     frontRatio: 0.9,
-    minScale: 0.42,
+    /*
+     * 奥の列の縮み。0.42 では**画面の高さの6%**まで小さくなり、
+     * 子どもが自分の絵を見つけられなかった（要件定義 §3 5c）。
+     * 奥行きは残しつつ、奥でも読める 0.6 にした。
+     */
+    minScale: 0.6,
     maxScale: 1,
   })
 

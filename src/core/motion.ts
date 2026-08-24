@@ -104,7 +104,12 @@ export function spawnCreature(
   return {
     kind: 'float',
     fish: spawnFish(seed, tank, imageWidth, imageHeight, {
-      targetSize: creatureSize(tank, FISH_SIZE_RATIO, sizeScale),
+      /*
+       * 飛ぶ絵（プテラノドン）は、**歩く絵と同じ大きさ**にする。
+       * 泳ぐ絵の基準を使うと、同じ画面の恐竜より小さくなり、
+       * 空の1匹だけ遠くに居るように見える。
+       */
+      targetSize: creatureSize(tank, flies ? WALKER_SIZE_RATIO : FISH_SIZE_RATIO, sizeScale),
       ...speed,
       species,
       wall: swimsAcross || species === undefined ? 'turnOutside' : 'bounce',
