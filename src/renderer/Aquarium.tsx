@@ -29,6 +29,19 @@ import { FLAP_SPEED, glideTilt } from '../core/behaviour'
  * 速いと機械的に見え、遅いと止まって見える。1周 2 秒弱になる値にした。
  */
 const LIMB_SPEED = 3.4
+
+/**
+ * 帯の継ぎ目を重ねる幅（画素）。
+ *
+ * 帯の境目が画素の途中に来ると、両側の帯の**半透明の縁**どうしが重なる。
+ * 半透明を2枚重ねても不透明にならないので、そこだけ背景が透けて筋になる。
+ * 実測で、白いベタ塗りの上の境目が 255 → 243 まで落ちていた。
+ *
+ * 1画素だと、絵が縮んで表示されているときに足りずに残る。
+ * 2画素まで広げると、絵の縁（半透明のところ）が2回描かれてわずかに濃くなるが、
+ * 幅2画素の話なので、筋が見えるより良い。
+ */
+const SEAM_OVERLAP = 2
 import type { ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
@@ -397,14 +410,17 @@ export function Aquarium({
             context.save()
             context.transform(1, slope, 0, 1, 0, atLeft - slope * x)
             /*
-             * 継ぎ目に髪の毛ほどの隙間が出るのを防ぐため、**元画像と出力の両方**を
-             * 出力1画素ぶん広げる。
+             * 継ぎ目を隠すため、**元画像と出力の両方**を `SEAM_OVERLAP` 画素ぶん広げる。
+             *
+             * 帯の境目が画素の途中に来ると、両側の帯が**半透明の縁**で重なる。
+             * 半透明どうしを重ねても不透明にはならないので、そこだけ背景が透けて
+             * **細い縦の筋**になる。実測で、白いベタ塗りの上で 255 → 243 まで落ちていた。
              *
              * **出力だけを広げてはいけない。** 縮尺が隣の帯とわずかに変わり、
-             * 隙間の代わりに**継ぎ目が線として見える**（タコのドームを横切る線が出ていた）。
+             * 隙間の代わりに継ぎ目が線として見える（タコのドームを横切る線が出ていた）。
              * 元画像の右端は超えられないので、そこで止める。
              */
-            const growX = Math.min(1 - rightFrac, place.width > 0 ? width / place.width / 64 : 0)
+            const growX = Math.min(1 - rightFrac, place.width > 0 ? SEAM_OVERLAP / place.width : 0)
             const spanX = rightFrac - leftFrac + growX
             context.drawImage(
               swimmer.element,
@@ -442,7 +458,10 @@ export function Aquarium({
             context.save()
             context.transform(1, 0, slope, 1, shiftTop - slope * y, 0)
             // 縦も同じ考え方。元画像と出力を同じだけ広げる（上の `growX` を参照）
-            const growY = Math.min(1 - (topFrac + (farBody - nearBody)), (farBody - nearBody) / 64)
+            const growY = Math.min(
+              1 - (topFrac + (farBody - nearBody)),
+              place.height > 0 ? SEAM_OVERLAP / place.height : 0,
+            )
             const spanY = farBody - nearBody + growY
             context.drawImage(
               swimmer.element,
