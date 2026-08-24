@@ -17,7 +17,7 @@ import {
   type Walker,
 } from './walk'
 import type { MotionKind } from './theme'
-import { speedRange, steer, type Prey } from './behaviour'
+import { sharePrey, speedRange, steer, type Prey } from './behaviour'
 import { speciesFlies, type SpeciesId } from './templates'
 
 /**
@@ -142,6 +142,15 @@ export function stepCreatures(
     .map((fish) => ({ x: fish.x, y: fish.y }))
 
   /*
+   * **サメどうしで相手を分ける。** 全部のサメに同じ一覧を渡すと、
+   * それぞれが「一番近い相手」を選ぶので、1匹の魚に集まって群れて見える。
+   */
+  const hunters = floats.filter((fish) => fish.species === 'same')
+  const shares = sharePrey(hunters, prey)
+  const mine = new Map<Fish, Prey[]>()
+  hunters.forEach((hunter, index) => mine.set(hunter, shares[index]))
+
+  /*
    * 飛ぶ絵には**空だけの水槽**を渡す。こうすると、上下の折り返しが
    * 地平線の上で起きるので、地面へ降りてこない。
    * 動きの決まりごと（steer / stepFish）はそのまま使える。
@@ -159,7 +168,7 @@ export function stepCreatures(
    * 絵が重なると自分の絵を見つけられない（要件定義 §3 5c）。
    */
   const steppedFloats = separateFish(
-    floats.map((fish) => steer(fish, tankFor(fish), prey)),
+    floats.map((fish) => steer(fish, tankFor(fish), mine.get(fish) ?? prey)),
     dtSeconds,
   ).map((fish) => stepFish(fish, dtSeconds, tankFor(fish)))
   const steppedWalkers = separateWalkers(walkers).map((walker) => stepWalker(walker, dtSeconds, tank))

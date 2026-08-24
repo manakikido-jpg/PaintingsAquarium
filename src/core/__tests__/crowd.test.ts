@@ -126,22 +126,33 @@ describe('端に張り付かない', () => {
     expect(Math.max(...longest)).toBeLessThan(35)
   })
 
-  it('どの種類も、画面の上・中・下をひととおり使う', () => {
-    // 生まれた高さに居続けると、下の帯の絵は飾りと重なって見つけにくい
+  /*
+   * **1匹ずつではなく、種類ごとに見る。**
+   * サメは追う相手の深さについていくので（`sharePrey`）、
+   * その相手が下のほうに居れば、サメも300秒ずっと下に居ることがある。
+   * それは追いかけている以上おかしくない。
+   * 会場で困るのは「**その種類がまるごと沈んでいる**」ことなので、そちらを見る。
+   */
+  it('どの種類も、まとめて見れば画面の上・中・下を使う', () => {
     let creatures = crowd()
     const dt = 1 / 30
-    const bands = creatures.map(() => [0, 0, 0])
+    const bands = new Map<string, number[]>()
     for (let step = 0; step < 300 / dt; step++) {
       creatures = stepCreatures(creatures, dt, tank)
-      creatures.forEach((creature, index) => {
+      for (const creature of creatures) {
+        if (creature.kind !== 'float') continue
+        const id = creature.fish.species ?? '?'
         const { y } = placeCreature(creature, [])
-        bands[index][Math.min(2, Math.max(0, Math.floor((y / tank.height) * 3)))]++
-      })
+        const band = Math.min(2, Math.max(0, Math.floor((y / tank.height) * 3)))
+        const seen = bands.get(id) ?? [0, 0, 0]
+        seen[band]++
+        bands.set(id, seen)
+      }
     }
-    for (const band of bands) {
-      const total = band[0] + band[1] + band[2]
-      // どの帯にも 5% 以上は居ること（3等分なので、均せば 33%）
-      for (const part of band) expect(part / total).toBeGreaterThan(0.05)
+    for (const [, seen] of bands) {
+      const total = seen[0] + seen[1] + seen[2]
+      // 均せば 33%。1割を切ったら「その帯に居ない」とみなす
+      for (const part of seen) expect(part / total).toBeGreaterThan(0.1)
     }
   })
 })

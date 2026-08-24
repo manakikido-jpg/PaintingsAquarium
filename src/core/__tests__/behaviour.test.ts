@@ -5,12 +5,14 @@ import {
   GLIDE_TILT,
   IRUKA_GAP,
   IRUKA_JUMP_SECONDS,
+  IRUKA_RISE,
   IRUKA_TOP,
   flapSquash,
   flapStretch,
   glideTilt,
   isJumping,
   jumpLift,
+  sharePrey,
   steer,
   type Prey,
 } from '../behaviour'
@@ -109,13 +111,26 @@ describe('イルカ', () => {
     expect(jumpLift(0.25)).toBeLessThan(jumpLift(0.5))
   })
 
-  it('決めた時刻が来たら跳ね、画面の上のほうまで届く', () => {
+  /*
+   * 跳ぶ高さは**2つで頭打ち**にしてある（「飛びすぎ」と言われた）。
+   *   - 届く高さ（`IRUKA_TOP`）… これより上へは行かない
+   *   - 上がれる高さ（`IRUKA_RISE`）… 深いところから跳んでも画面を縦断しない
+   */
+  it('深いところから跳んでも、上がるのは画面の高さの3割ちょっとまで', () => {
     const dolphin = creature('iruka', { y: 700, nextEventAt: 1 })
     const path = run(dolphin, IRUKA_GAP[0])
-    const highest = Math.min(...path.map((one) => one.y))
-    expect(highest).toBeLessThan(tank.height * (IRUKA_TOP + 0.12))
+    const rise = 700 - Math.min(...path.map((one) => one.y))
+    expect(rise).toBeLessThan(tank.height * (IRUKA_RISE + 0.02))
+    expect(rise).toBeGreaterThan(tank.height * (IRUKA_RISE - 0.05))
     // 跳ね終わったら元の高さのあたりに戻る
     expect(path[path.length - 1].y).toBeGreaterThan(tank.height * 0.3)
+  })
+
+  it('浅いところから跳んでも、画面の上のほうを突き抜けない', () => {
+    const dolphin = creature('iruka', { y: 320, nextEventAt: 1 })
+    const path = run(dolphin, IRUKA_GAP[0])
+    const highest = Math.min(...path.map((one) => one.y))
+    expect(highest).toBeGreaterThan(tank.height * IRUKA_TOP)
   })
 
   it('跳ねている間だけ「跳んでいる」と答える', () => {
@@ -336,5 +351,43 @@ describe('種類ごとの泳ぎ分け', () => {
       expect(mean).toBeGreaterThan(60 * 0.75)
       expect(mean).toBeLessThan(60 * 1.35)
     }
+  })
+})
+
+/*
+ * **サメどうしで追う相手を分ける。**
+ * 分けないと、それぞれが「一番近い相手」を選ぶので1匹の魚に集まる。
+ * 実測（24匹・300秒）で、同じ種類どうしの平均の距離が
+ * サメ 656px → **885px**（イルカ 764px・まる魚 940px）になった。
+ */
+describe('サメの相手の割り当て', () => {
+  const at = (x: number, y: number): Fish => creature('same', { x, y })
+
+  it('同じ魚を2匹で追わない', () => {
+    const sharks = [at(100, 100), at(120, 110), at(140, 120)]
+    const prey: Prey[] = [{ x: 200, y: 200 }, { x: 900, y: 300 }, { x: 1500, y: 600 }]
+    const shares = sharePrey(sharks, prey)
+    const chosen = shares.map((one) => JSON.stringify(one[0]))
+    expect(new Set(chosen).size).toBe(3)
+  })
+
+  it('近い相手から順に取る', () => {
+    const sharks = [at(100, 100), at(1500, 600)]
+    const prey: Prey[] = [{ x: 1500, y: 600 }, { x: 120, y: 110 }]
+    const shares = sharePrey(sharks, prey)
+    expect(shares[0][0]).toEqual({ x: 120, y: 110 })
+    expect(shares[1][0]).toEqual({ x: 1500, y: 600 })
+  })
+
+  it('相手が足りないサメは、誰も追わない', () => {
+    // 共有させると結局そこへ集まる。追わないほうがばらける
+    const shares = sharePrey([at(100, 100), at(200, 200)], [{ x: 500, y: 500 }])
+    expect(shares[0]).toHaveLength(1)
+    expect(shares[1]).toHaveLength(0)
+  })
+
+  it('相手が居なくても落ちない', () => {
+    expect(sharePrey([at(100, 100)], [])).toEqual([[]])
+    expect(sharePrey([], [{ x: 1, y: 1 }])).toEqual([])
   })
 })

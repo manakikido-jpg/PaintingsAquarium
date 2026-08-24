@@ -84,8 +84,11 @@ export const WANDER_RATE = 0.016
 export const WANDER_BAND = 0.35
 /** 目標の深さへ寄っていく速さ（毎秒）。大きいほど急いで合わせにいく。 */
 export const WANDER_GAIN = 0.5
-/** 端からこの幅（画面の高さに対する割合）までは、波が壁を押す力を弱める。 */
-export const WANDER_EDGE = 0.12
+/**
+ * 端からこの幅（画面の高さに対する割合）までは、波が壁を押す力を弱める。
+ * 目標の深さが動く範囲（`WANDER_BAND`）の外側と同じ幅にしてある。
+ */
+export const WANDER_EDGE = 0.15
 
 /**
  * クラゲ: ふわふわの周期（秒）と振れ幅。
@@ -134,8 +137,20 @@ const TAU = Math.PI * 2
  */
 export const IRUKA_GAP = [20, 30] as const
 export const IRUKA_JUMP_SECONDS = 2.4
-/** 跳ねたときに届く高さ（画面の高さに対する割合。0 が画面の上端）。 */
-export const IRUKA_TOP = 0.08
+/**
+ * 跳ねたときに届く高さ（画面の高さに対する割合。0 が画面の上端）。
+ *
+ * 0.08 にしていたときは「飛びすぎ」と言われた。画面のてっぺんまで届くうえ、
+ * **深いところに居るイルカほど大きく跳ぶ**ので、下から跳ぶと画面を縦断していた。
+ */
+export const IRUKA_TOP = 0.16
+/**
+ * 1回の跳躍で上がれる高さの上限（画面の高さに対する割合）。
+ *
+ * 上の `IRUKA_TOP` は「どこまで届くか」なので、深いところから跳ぶと
+ * 持ち上がる量そのものが大きくなる。ここで頭打ちにする。
+ */
+export const IRUKA_RISE = 0.34
 
 /**
  * サメ: 速さの倍率と、切り替えの間隔（秒）。
@@ -331,7 +346,15 @@ function wave(fish: Fish, tank: Tank, shape: { amplitude: number; wavelength: nu
 function nearEdge(vy: number, fish: Fish, tank: Tank): number {
   const room = vy < 0 ? fish.y : tank.height - fish.y
   const margin = Math.max(1, tank.height * WANDER_EDGE)
-  return vy * Math.min(1, Math.max(0, room / margin))
+  const near = Math.min(1, Math.max(0, room / margin))
+  /*
+   * **2乗にする。** 素直に比例させたときは、まだ波のほうが強かった。
+   * ウミガメの波は最大 39px/秒で、引き戻し（`wanderY`）の上限 17px/秒 の倍以上ある。
+   * 端から 7% の所でも比例だと 0.58 倍＝23px/秒 残り、押し勝ってしまう。
+   * 実測で、ウミガメが画面の下 5% に 50秒 張り付いていた。
+   * 2乗なら同じ所で 0.34 倍＝13px/秒 になり、引き戻しが勝つ。
+   */
+  return vy * near * near
 }
 
 /**
@@ -393,8 +416,10 @@ function leap(fish: Fish, tank: Tank): Fish {
     const started = (fish.jumpUntil ?? 0) - IRUKA_JUMP_SECONDS
     const progress = (fish.age - started) / IRUKA_JUMP_SECONDS
     const from = fish.jumpFrom ?? fish.y
-    const top = tank.height * IRUKA_TOP + fish.height / 2
-    const y = from - jumpLift(progress) * Math.max(0, from - top)
+    // 「届く高さ」と「上がれる高さ」の両方で頭打ちにする
+    const ceiling = tank.height * IRUKA_TOP + fish.height / 2
+    const rise = Math.min(Math.max(0, from - ceiling), tank.height * IRUKA_RISE)
+    const y = from - jumpLift(progress) * rise
     // 跳ねている間は縦の速度を持たせない。位置そのものを決めているため
     return { ...fish, y, vy: 0 }
   }
@@ -422,6 +447,41 @@ function leap(fish: Fish, tank: Tank): Fish {
   }
 
   return { ...fish, vy: wander }
+}
+
+/**
+ * サメどうしで追う相手を分ける。
+ *
+ * **1匹の魚に全部のサメが集まると、群れて見える。**
+ * `chase` は「一番近い相手」を選ぶので、サメが4匹居ると同じ魚に寄っていく。
+ * 実測で、同じ種類どうしの平均の距離はサメ 656px（イルカ 881px・まる魚 780px）
+ * といちばん近かった。
+ *
+ * 早い者勝ちで1匹ずつ割り当てる。相手が足りないぶんのサメは**誰も追わない**
+ *（そのまま泳ぐ）。同じ魚を共有させると、結局そこへ集まってしまう。
+ * 会場では魚のほうが多いので、追えないサメが出るのは絵が少ないときだけ。
+ *
+ * 渡す順で決まるので、同じ並びなら毎フレーム同じ割り当てになる。
+ * 毎フレーム選び直しても相手が入れ替わらない、というのがここでは大事
+ *（入れ替わると、サメが左右に細かく揺れる）。
+ */
+export function sharePrey(hunters: readonly Fish[], prey: readonly Prey[]): Prey[][] {
+  const taken = new Set<number>()
+  return hunters.map((hunter) => {
+    let best = -1
+    let nearest = Infinity
+    for (let index = 0; index < prey.length; index++) {
+      if (taken.has(index)) continue
+      const distance = Math.hypot(prey[index].x - hunter.x, prey[index].y - hunter.y)
+      if (distance < nearest) {
+        nearest = distance
+        best = index
+      }
+    }
+    if (best < 0) return []
+    taken.add(best)
+    return [prey[best]]
+  })
 }
 
 /**
