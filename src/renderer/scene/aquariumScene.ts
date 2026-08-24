@@ -82,7 +82,14 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
         },
       })
     : []
-  if (useParts) partImages = loadParts(DECOR_PARTS, () => undefined)
+  /*
+   * 画像は非同期で届く。届いたら**焼き直す**（下の `staticStrength = -1`）。
+   * 1回焼いて終わりにすると、起動直後に間に合わなかった画像が
+   * **二度と背景に出てこない**。
+   */
+  if (useParts) partImages = loadParts(DECOR_PARTS, () => {
+    staticStrength = -1
+  })
 
   const pick = <T extends { depth: number }>(items: readonly T[], from: number, to: number): T[] =>
     items.filter((item) => item.depth >= from && item.depth < to)
@@ -94,25 +101,32 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
   const nearCorals: Coral[] = pick(allCorals, 0.5, 1.01)
 
   /*
-   * 奥と中は起動時に1枚へ焼く。毎フレーム描くのは手前だけ。
-   * 焼いておけば、数を増やしても費用が増えない。
+   * 奥と中はぼかして1枚へ焼く。`filter: blur()` を毎フレーム掛けると
+   * 大画面で重いので、起動時に1回だけ掛ける（R-012）。
+   *
+   * **パーツ画像を使うときは作らない。** 使わない層でも実寸の面を2枚持つので、
+   * 1920×1080 で 16MB を無駄に抱えることになる。
    */
-  const farLayer: BakedLayer | null = bakeLayer(
-    tank,
-    (context) => {
-      drawCorals(context, farCorals, sand, tank, 1, FAR_STYLE)
-      drawRocks(context, farRocks, sand, tank, 1, FAR_STYLE)
-    },
-    { blur: Math.max(3, tank.width * 0.0032), resolution: 1 },
-  )
+  const farLayer: BakedLayer | null = useParts
+    ? null
+    : bakeLayer(
+        tank,
+        (context) => {
+          drawCorals(context, farCorals, sand, tank, 1, FAR_STYLE)
+          drawRocks(context, farRocks, sand, tank, 1, FAR_STYLE)
+        },
+        { blur: Math.max(3, tank.width * 0.0032), resolution: 1 },
+      )
 
-  const midLayer: BakedLayer | null = bakeLayer(
-    tank,
-    (context) => {
-      drawRocks(context, midRocks, sand, tank, 1, MID_STYLE)
-    },
-    { blur: Math.max(1.5, tank.width * 0.002), resolution: 1 },
-  )
+  const midLayer: BakedLayer | null = useParts
+    ? null
+    : bakeLayer(
+        tank,
+        (context) => {
+          drawRocks(context, midRocks, sand, tank, 1, MID_STYLE)
+        },
+        { blur: Math.max(1.5, tank.width * 0.002), resolution: 1 },
+      )
 
   let backBubbles: Bubble[] = spawnBubbles(1207, BACK_BUBBLE_COUNT, tank, {
     maxAlpha: 0.14,
@@ -152,6 +166,45 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
 
   let lastElapsed = 0
 
+  /*
+   * 動かないものは1枚に焼いてから貼る。
+   *
+   * 水・砂・パーツ・周辺の暗がりは**1フレームも変わらない**のに、
+   * 毎フレーム描き直していた。実測（絵24枚・1920×1080・GPU無しの開発環境）で
+   * この層だけで**約13ms**、全体の3分の1を使っていた。
+   *
+   * 2枚に分けるのは、**間に動くものが挟まる**から。
+   * 水 → 揺らぎ模様と光の筋（動く）→ 砂と飾り、の順で重なっている。
+   * 1枚にまとめると、揺らぎ模様が海底の岩の上にも乗ってしまう。
+   *
+   * 焼き直すのは「背景の強さ」が変わったときだけ（設定のつまみ・R-023）。
+   * 強さを掛けたあとの絵をそのまま焼くので、**見た目は1画素も変わらない**。
+   * 強さを別に掛ける（薄く焼いて貼るときに濃さで調整する）やり方は採らない。
+   * 重なった物どうしで濃さの掛かり方が変わり、色がずれる。
+   */
+  let staticStrength = -1
+  let waterLayer: BakedLayer | null = null
+  let floorLayer: BakedLayer | null = null
+
+  const paintFloor = (context: CanvasRenderingContext2D, strength: number): void => {
+    drawSand(context, sand, tank, strength)
+    if (useParts) {
+      drawParts(context, parts, partImages, tank, strength)
+    } else {
+      farLayer?.draw(context, tank, strength)
+      midLayer?.draw(context, tank, strength)
+      drawCorals(context, nearCorals, sand, tank, strength, NEAR_STYLE)
+      drawRocks(context, nearRocks, sand, tank, strength, NEAR_STYLE)
+    }
+    drawVignette(context, tank, strength)
+  }
+
+  const bakeStatic = (strength: number): void => {
+    waterLayer = bakeLayer(tank, (context) => drawWater(context, tank, strength))
+    floorLayer = bakeLayer(tank, (context) => paintFloor(context, strength))
+    staticStrength = strength
+  }
+
   return {
     motion: 'float',
     lanes: [],
@@ -162,24 +215,24 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
       backBubbles = backBubbles.map((bubble) => stepBubble(bubble, dt, tank))
       frontBubbles = frontBubbles.map((bubble) => stepBubble(bubble, dt, tank))
 
-      drawWater(context, tank, strength)
+      /*
+       * パーツ画像が届くまでは焼かない。
+       * 焼いてしまうと、その時点で読めていた画像だけの背景が固定される。
+       */
+      const canBake = !useParts || partImages.ready
+      if (canBake && strength !== staticStrength) bakeStatic(strength)
+
+      if (canBake) waterLayer?.draw(context, tank, 1)
+      else drawWater(context, tank, strength)
+
       causticsFar.draw(context, elapsed, strength)
       causticsNear.draw(context, elapsed * 1.13, strength)
       // 上から差し込む光。デフォルメした絵では、光は説明ではなく飾りなので強めに出す
       drawLightRays(context, rays, elapsed, tank, strength)
 
-      drawSand(context, sand, tank, strength)
+      if (canBake) floorLayer?.draw(context, tank, 1)
+      else paintFloor(context, strength)
 
-      if (useParts) {
-        drawParts(context, parts, partImages, tank, strength)
-      } else {
-        farLayer?.draw(context, tank, strength)
-        midLayer?.draw(context, tank, strength)
-        drawCorals(context, nearCorals, sand, tank, strength, NEAR_STYLE)
-        drawRocks(context, nearRocks, sand, tank, strength, NEAR_STYLE)
-      }
-
-      drawVignette(context, tank, strength)
       drawBubbles(context, backBubbles, strength)
     },
 
