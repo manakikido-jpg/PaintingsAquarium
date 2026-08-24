@@ -14,6 +14,8 @@ import {
   rotateQuarter,
   rigIsUsable,
   headIsKnown,
+  headsRightOf,
+  type Rig,
   HEAD_MARGIN,
   runsAlongColumn,
   runsAlongRow,
@@ -200,6 +202,41 @@ describe('estimateRig', () => {
     fill(image, 5, 5, 75, 55)
     const rig = estimateRig(image)
     expect(rigIsUsable(rig)).toBe(false)
+  })
+})
+
+/*
+ * **頭の向きは、尾があるかどうかとは無関係**（R-046）。
+ *
+ * `rigIsUsable` は「尾を付け根で回してよいか」を見る関数で、`tail !== null` を要求する。
+ * ここから頭の向きを取ると、尾を持たない絵（イルカ）で既定値（右）に落ちる。
+ * 絵の反転はべつの経路で正しい向きを見ていたので、2つが食い違い、
+ * **止めるべき頭が最大に振れた**（実測で絵の高さの ±11%）。
+ */
+describe('頭の向きは尾と無関係（R-046）', () => {
+  // イルカと同じ形のリグ。尾は持たないが、頭の向きは分かっている
+  const noTail: Rig = {
+    spine: [
+      { x: 0.1, y: 0.5 },
+      { x: 0.9, y: 0.5 },
+    ],
+    tail: null,
+    headsRight: false,
+    headKnown: true,
+    confidence: 1,
+    source: 'shape',
+    kind: 'fish',
+  }
+
+  it('尾が無くても、頭の向きはそのまま答える', () => {
+    expect(rigIsUsable(noTail)).toBe(false)
+    expect(headIsKnown(noTail)).toBe(true)
+    expect(headsRightOf(noTail)).toBe(false)
+  })
+
+  it('リグが無い絵は、右向きとみなす（今までどおり）', () => {
+    expect(headsRightOf(null)).toBe(true)
+    expect(headsRightOf(undefined)).toBe(true)
   })
 })
 

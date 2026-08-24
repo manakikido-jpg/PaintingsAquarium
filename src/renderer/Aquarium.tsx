@@ -20,7 +20,7 @@ import {
   stripOffset,
   tailAngle,
 } from '../core/undulate'
-import { headIsKnown, rigIsUsable, type CreatureKind } from '../core/rig'
+import { headIsKnown, headsRightOf, rigIsUsable, type CreatureKind } from '../core/rig'
 import { partsForPiece, speciesFlies } from '../core/templates'
 import { FLAP_SPEED, glideTilt } from '../core/behaviour'
 
@@ -268,7 +268,7 @@ export function Aquarium({
         }
 
         const mirror =
-          !turnsToHeading && headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
+          !turnsToHeading && headKnown && place.facingRight !== headsRightOf(swimmer.piece.rig)
 
         /*
          * 飛ぶ絵（プテラノドン）は、機体ごと少しだけ傾ける。
@@ -354,7 +354,13 @@ export function Aquarium({
           const sourceHeight = swimmer.element.naturalHeight
           const time = elapsed * swimmer.beat.rate
           const options = { ...UNDULATE, amplitude: UNDULATE.amplitude * sway }
-          const headsRight = rig?.headsRight ?? true
+          /*
+           * **`rig` からではなく、絵そのものから取る。**
+           * `rig` は「尾を回してよいか」で null になる（`rigIsUsable`）。
+           * そこから頭の向きを取ると、尾を持たない絵で既定値（右）に落ち、
+           * **上の反転と食い違って頭が最大に振れる**（R-046）。
+           */
+          const headsRight = headsRightOf(swimmer.piece.rig)
           // 尾びれが分かっていれば、胴体はその手前までにする。
           // 尾は胴と別に、付け根を軸に回す。
           const bodyEnd = rig?.tail ? rig.tail.from : 1

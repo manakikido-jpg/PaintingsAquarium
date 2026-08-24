@@ -260,6 +260,22 @@ export function rigIsUsable(rig: Rig | null | undefined): rig is Rig {
 }
 
 /**
+ * 頭が絵の右にあるか。
+ *
+ * **尾があるかどうかとは関係が無い。** `rigIsUsable` は「尾を付け根で回してよいか」
+ * を見る関数（`tail !== null` を要求する）で、頭の向きとは別の話。
+ * ここを混ぜて `rigIsUsable` の結果から頭の向きを取ると、
+ * **尾を持たない絵で既定値（右）に落ちる**。
+ *
+ * 実際にそうなった。イルカから尾のリグを外したとたん、しなりの向きだけが
+ * 裏返り、**止めるべき頭が最大に振れた**（絵の反転はこの値を直に見ていたので、
+ * 2つが食い違った）。実測で、頭側の列が絵の高さの ±11% 上下し、尾側は動いていなかった。R-046。
+ */
+export function headsRightOf(rig: Rig | null | undefined): boolean {
+  return rig?.headsRight ?? true
+}
+
+/**
  * 頭がどちら側かを当てにしてよいか。
  *
  * ここが false の絵は、**しならせない・左右反転もしない**。
