@@ -45,6 +45,11 @@ export interface SpeciesInfo {
    * 外形の重なりしか見ないので、海と陸を混ぜれば必ずこうなる。
    */
   readonly theme: ThemeId
+  /**
+   * 空を飛ぶか。歩くテーマの中でも、これだけは地面に乗せない。
+   * 翼竜が地面を歩いていると、作りかけに見える。
+   */
+  readonly flies?: boolean
   /** 台紙の中で頭が向いている向き */
   readonly head: Direction
   /**
@@ -65,7 +70,14 @@ export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
   kurage: { id: 'kurage', label: 'クラゲ', theme: SEA, head: { x: 0, y: -1 }, swimsSideways: false },
   umigame: { id: 'umigame', label: 'ウミガメ', theme: SEA, head: { x: 0, y: -1 }, swimsSideways: false },
   // 恐竜はどれも横向きで、台紙では頭が左を向いている
-  pteranodon: { id: 'pteranodon', label: 'プテラノドン', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
+  pteranodon: {
+    id: 'pteranodon',
+    label: 'プテラノドン',
+    theme: LAND,
+    head: { x: -1, y: 0 },
+    swimsSideways: true,
+    flies: true,
+  },
   ankylosaurus: { id: 'ankylosaurus', label: 'アンキロサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
   brontosaurus: { id: 'brontosaurus', label: 'ブロントサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
   stegosaurus: { id: 'stegosaurus', label: 'ステゴサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
@@ -342,6 +354,11 @@ export function partsForPiece(
  * ------------------------------------------------------------------ */
 
 /** その台紙の生き物が、魚のように泳ぐか、足で漂うか。 */
+/** その台紙は空を飛ぶか。台紙に一致しなかった絵（`undefined`）は歩く。 */
+export function speciesFlies(id?: SpeciesId): boolean {
+  return id ? SPECIES[id].flies === true : false
+}
+
 export const KIND_OF: Record<SpeciesId, CreatureKind> = {
   fish: 'fish',
   iruka: 'fish',

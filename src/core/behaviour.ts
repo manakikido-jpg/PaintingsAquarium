@@ -25,6 +25,8 @@ export const CROSS_SECONDS: Record<string, readonly [number, number]> = {
   tako: [50, 70],
   // ほとんど流されるだけ。横切るのに3分以上かかる
   kurage: [80, 140],
+  // 空を滑るので、地面の恐竜より速い
+  pteranodon: [14, 22],
 }
 
 /** その種類の速さ（ピクセル毎秒）。 */
@@ -282,4 +284,47 @@ function chase(fish: Fish, prey: readonly Prey[]): Fish {
     speedScale,
     nextEventAt,
   }
+}
+
+/* ------------------------------------------------------------------ 羽ばたき
+ *
+ * **絵を切らずに羽ばたかせる。**
+ *
+ * 翼を矩形で切って回す方法は、この台紙では使えない。翼が斜めに描かれていて、
+ * 縦横どちらの線を引いても胴か翼の途中を通るため、振ると裂ける（R-037）。
+ * 翼をまっすぐ横に広げた台紙に描き直せば切れるが、
+ * **測ったら塗る場所が狭くなりすぎた**（一番大きい区画が絵の 8%。
+ * ほかの台紙は 27〜31%）。塗り絵として成立しないので、台紙は元のまま使う。
+ *
+ * 代わりに、**絵全体を縦に縮めて広げる**。
+ * 横に広がった絵を縦に縮めると、翼が下りたように見える。切らないので裂けない。
+ * 傾きを少しだけ足すと、羽ばたきながら滑っているように見える。
+ */
+
+/** 羽ばたきの速さ（ラジアン/秒）。1周およそ 2.4 秒 */
+export const FLAP_SPEED = 2.6
+/** 縦の縮み幅。大きくすると潰れて見え、小さいと止まって見える */
+export const FLAP_SQUASH = 0.13
+/**
+ * 縦に縮めたぶん横へ広げる割合。
+ * 縦だけ縮めると**息をしているように**見える。縮めながら横へ広げると、
+ * 翼を打ち下ろして体が伸びたように見える（面積がほぼ変わらない）。
+ */
+export const FLAP_STRETCH = 0.5
+/** 傾きの幅（ラジアン）。羽ばたきの半分の速さでゆっくり傾ける */
+export const FLAP_TILT = 0.06
+
+/** その時刻の縦の倍率（1 が元の高さ）。 */
+export function flapSquash(time: number): number {
+  return 1 + FLAP_SQUASH * Math.sin(time)
+}
+
+/** その時刻の横の倍率。縦と逆に動く。 */
+export function flapStretch(time: number): number {
+  return 1 - FLAP_SQUASH * FLAP_STRETCH * Math.sin(time)
+}
+
+/** その時刻の傾き（ラジアン）。 */
+export function flapTilt(time: number): number {
+  return FLAP_TILT * Math.sin(time * 0.5)
 }

@@ -18,7 +18,7 @@ import {
 } from './walk'
 import type { MotionKind } from './theme'
 import { speedRange, steer, type Prey } from './behaviour'
-import type { SpeciesId } from './templates'
+import { speciesFlies, type SpeciesId } from './templates'
 
 /**
  * テーマごとに違う動きを、画面側から同じ扱いにするための層。
@@ -60,8 +60,17 @@ export function spawnCreature(
   sizeScale = DEFAULT_SIZE_SCALE,
   kind: CreatureKind = 'unknown',
   species?: SpeciesId,
+  /** 空の下端。飛ぶ絵はここより上に出す */
+  skyBottom?: number,
 ): Creature {
-  if (motion === 'walk') {
+  /*
+   * 飛ぶ絵（プテラノドン）は、歩くテーマの中でも**浮遊**として扱う。
+   * 地面の列に乗せると、翼竜が地面を歩くことになる。
+   */
+  const flies = speciesFlies(species)
+  if (flies && skyBottom) tank = { width: tank.width, height: skyBottom }
+
+  if (motion === 'walk' && !flies) {
     return {
       kind: 'walk',
       walker: spawnWalker(seed, tank, lanes, imageWidth, imageHeight, {
@@ -83,7 +92,8 @@ export function spawnCreature(
    * 端で跳ね返ると水槽のガラスに当たったように見える（会場からの指摘）。
    * 上から見た生き物（タコ・クラゲ・ウミガメ）は画面内で折り返す。
    */
-  const swimsAcross = species === 'fish' || species === 'iruka' || species === 'same'
+  const swimsAcross =
+    species === 'fish' || species === 'iruka' || species === 'same' || flies
 
   /*
    * 速さは種類ごとに決める（`CROSS_SECONDS`）。種類が分からない絵だけ、
@@ -110,6 +120,11 @@ export function stepCreatures(
   creatures: readonly Creature[],
   dtSeconds: number,
   tank: Tank,
+  /**
+   * 空の下端（ピクセル）。飛ぶ絵はここより下へ行かない。
+   * 渡さなければ画面全体を使う（水族館はこちら）。
+   */
+  skyBottom?: number,
 ): Creature[] {
   const floats: Fish[] = []
   const walkers: Walker[] = []
@@ -126,9 +141,17 @@ export function stepCreatures(
     .filter((fish) => fish.species === 'fish' || fish.species === undefined)
     .map((fish) => ({ x: fish.x, y: fish.y }))
 
+  /*
+   * 飛ぶ絵には**空だけの水槽**を渡す。こうすると、上下の折り返しが
+   * 地平線の上で起きるので、地面へ降りてこない。
+   * 動きの決まりごと（steer / stepFish）はそのまま使える。
+   */
+  const sky: Tank = skyBottom ? { width: tank.width, height: skyBottom } : tank
+  const tankFor = (fish: Fish): Tank => (speciesFlies(fish.species as SpeciesId) ? sky : tank)
+
   const steppedFloats = separateFish(floats, dtSeconds)
-    .map((fish) => steer(fish, tank, prey))
-    .map((fish) => stepFish(fish, dtSeconds, tank))
+    .map((fish) => steer(fish, tankFor(fish), prey))
+    .map((fish) => stepFish(fish, dtSeconds, tankFor(fish)))
   const steppedWalkers = separateWalkers(walkers).map((walker) => stepWalker(walker, dtSeconds, tank))
 
   let floatIndex = 0

@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { spawnFish, stepFish, type Fish, type Tank } from '../swim'
 import {
+  FLAP_SQUASH,
+  FLAP_TILT,
   IRUKA_GAP,
   IRUKA_JUMP_SECONDS,
   IRUKA_TOP,
+  flapSquash,
+  flapStretch,
+  flapTilt,
   isJumping,
   jumpLift,
   steer,
   type Prey,
 } from '../behaviour'
-import type { SpeciesId } from '../templates'
+import { spawnCreature, stepCreatures } from '../motion'
+import { speciesFlies, type SpeciesId } from '../templates'
 
 const tank: Tank = { width: 1600, height: 900 }
 
@@ -163,5 +169,73 @@ describe('台紙に一致しなかった絵', () => {
     const next = steer(free, tank)
     expect(next.vx).toBe(free.vx)
     expect(next.vy).toBe(free.vy)
+  })
+})
+
+describe('羽ばたき（絵を切らずに縦へ縮める）', () => {
+  it('縮み幅は決めた範囲に収まる', () => {
+    let low = 1
+    let high = 1
+    for (let step = 0; step < 200; step++) {
+      const value = flapSquash((step / 200) * Math.PI * 4)
+      low = Math.min(low, value)
+      high = Math.max(high, value)
+    }
+    expect(low).toBeCloseTo(1 - FLAP_SQUASH, 3)
+    expect(high).toBeCloseTo(1 + FLAP_SQUASH, 3)
+  })
+
+  /*
+   * 縦を縮めても**紙は裏返らない**こと。倍率が 0 以下になると絵が反転して、
+   * 裏向きのプテラノドンが飛ぶ。
+   */
+  it('倍率が 0 以下にならない', () => {
+    for (let step = 0; step < 200; step++) {
+      expect(flapSquash(step * 0.37)).toBeGreaterThan(0.5)
+    }
+  })
+
+  /*
+   * 縦に縮んだときは横へ広がること。縦だけ動かすと**息をしている**ように見える。
+   */
+  it('縦と横が逆に動く', () => {
+    for (const time of [0.4, 1.2, 2.9, 4.7]) {
+      const vertical = flapSquash(time) - 1
+      const horizontal = flapStretch(time) - 1
+      expect(Math.sign(vertical)).toBe(-Math.sign(horizontal))
+      expect(Math.abs(horizontal)).toBeLessThan(Math.abs(vertical))
+    }
+  })
+
+  it('傾きは羽ばたきより遅く、幅も小さい', () => {
+    expect(FLAP_TILT).toBeLessThan(0.1)
+    // 半分の速さ（周期が倍）。羽ばたきと同じ速さだと、はためきに見える
+    expect(flapTilt(Math.PI)).toBeCloseTo(FLAP_TILT, 5)
+    expect(flapSquash(Math.PI)).toBeCloseTo(1, 5)
+  })
+})
+
+describe('飛ぶ絵は空から降りてこない', () => {
+  it('プテラノドンだけが飛ぶ', () => {
+    expect(speciesFlies('pteranodon')).toBe(true)
+    for (const id of ['ankylosaurus', 'brontosaurus', 'stegosaurus', 'triceratops', 'fish'] as const) {
+      expect(speciesFlies(id)).toBe(false)
+    }
+    // 台紙に一致しなかった絵は歩く
+    expect(speciesFlies(undefined)).toBe(false)
+  })
+
+  it('長く飛ばしても地平線より下へ行かない', () => {
+    const tank = { width: 1600, height: 900 }
+    const sky = 900 * 0.63
+    let creature = spawnCreature('walk', 4242, tank, 300, 160, [], 1, 'fish', 'pteranodon', sky)
+    expect(creature.kind).toBe('float')
+    for (let step = 0; step < 4000; step++) {
+      creature = stepCreatures([creature], 1 / 30, tank, sky)[0]
+      if (creature.kind !== 'float') throw new Error('飛ぶ絵が歩きに変わった')
+      // 絵の中心が空の中に収まっている
+      expect(creature.fish.y).toBeLessThanOrEqual(sky)
+      expect(creature.fish.y).toBeGreaterThanOrEqual(0)
+    }
   })
 })

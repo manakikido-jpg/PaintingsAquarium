@@ -21,7 +21,8 @@ import {
   tailAngle,
 } from '../core/undulate'
 import { headIsKnown, rigIsUsable, type CreatureKind } from '../core/rig'
-import { partsForPiece } from '../core/templates'
+import { partsForPiece, speciesFlies } from '../core/templates'
+import { FLAP_SPEED, flapSquash, flapStretch, flapTilt } from '../core/behaviour'
 
 /**
  * 手足を漕ぐ速さ（ラジアン/秒）。
@@ -197,6 +198,8 @@ export function Aquarium({
             sizeRef.current,
             piece.rig?.kind ?? 'unknown',
             piece.species,
+            // 飛ぶ絵は地平線（一番奥の列の地面）より上だけを使う
+            scene.lanes[0]?.groundY,
           ),
         })
       }
@@ -206,6 +209,7 @@ export function Aquarium({
         list.map((swimmer) => swimmer.creature),
         dt,
         tank,
+        scene.lanes[0]?.groundY,
       )
       for (let index = 0; index < list.length; index++) list[index].creature = stepped[index]
 
@@ -218,7 +222,13 @@ export function Aquarium({
         const scale = appearScale(progress)
 
         context.globalAlpha = appearAlpha(progress)
-        scene.drawBeneath?.(context, place, creatureLane(swimmer.creature), strength)
+        /*
+         * 足元の影は**地面に立っている絵にだけ**付ける。
+         * 飛んでいる絵に付けると、空の途中に影が浮く（実機で確認）。
+         */
+        if (!speciesFlies(swimmer.piece.species)) {
+          scene.drawBeneath?.(context, place, creatureLane(swimmer.creature), strength)
+        }
         context.globalAlpha = 1
 
         const rig = rigIsUsable(swimmer.piece.rig) ? swimmer.piece.rig : null
@@ -258,7 +268,18 @@ export function Aquarium({
 
         const mirror =
           !turnsToHeading && headKnown && place.facingRight !== (swimmer.piece.rig?.headsRight ?? true)
-        context.scale(mirror ? -scale : scale, scale)
+
+        /*
+         * 羽ばたき（プテラノドン）。**絵を切らずに、全体を縦に縮めて広げる。**
+         * 翼を矩形で切って回すと、この台紙では裂ける（R-037・R-038）。
+         * 横に広がった絵を縦に縮めると、翼が下りたように見える。
+         */
+        const flapping = speciesFlies(swimmer.piece.species) && swayRef.current > 0
+        const flapTime = elapsed * FLAP_SPEED * swimmer.beat.rate + swimmer.beat.phase
+        if (flapping) context.rotate(flapTilt(flapTime))
+        const squash = flapping ? flapSquash(flapTime) : 1
+        const stretch = flapping ? flapStretch(flapTime) : 1
+        context.scale(mirror ? -scale * stretch : scale * stretch, scale * squash)
 
         const sway = swayRef.current
         const strips = stripCount(sway)
