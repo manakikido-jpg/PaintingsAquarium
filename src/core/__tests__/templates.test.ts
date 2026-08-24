@@ -8,6 +8,7 @@ import {
   directionInPiece,
   identifySpecies,
   partsForPiece,
+  templatesForTheme,
   type SpeciesId,
 } from '../templates'
 import { TEMPLATE_BITS, TEMPLATE_GRID } from '../templates.generated'
@@ -56,9 +57,34 @@ function turned(image: RgbaImage): RgbaImage {
 }
 
 describe('台紙のデータ', () => {
-  it('6種そろっている', () => {
-    expect(TEMPLATES).toHaveLength(6)
-    expect(SPECIES_IDS.sort()).toEqual(['fish', 'iruka', 'kurage', 'same', 'tako', 'umigame'])
+  it('水族館6種・恐竜5種がそろっている', () => {
+    expect(TEMPLATES).toHaveLength(11)
+    expect(SPECIES_IDS.sort()).toEqual([
+      'ankylosaurus',
+      'brontosaurus',
+      'fish',
+      'iruka',
+      'kurage',
+      'pteranodon',
+      'same',
+      'stegosaurus',
+      'tako',
+      'triceratops',
+      'umigame',
+    ])
+  })
+
+  /*
+   * **テーマを混ぜて照合してはいけない。**
+   * 11種をひとつの集まりとして測ると、まる魚とトリケラトプスが 0.69 で重なる。
+   * 塗った魚が恐竜として判定されると、尾びれが見当違いの場所に付く。
+   */
+  it('テーマごとに台紙が分かれている', () => {
+    expect(templatesForTheme('aquarium')).toHaveLength(6)
+    expect(templatesForTheme('dinosaur')).toHaveLength(5)
+    for (const template of templatesForTheme('dinosaur')) {
+      expect(SPECIES[template.id as SpeciesId].theme).toBe('dinosaur')
+    }
   })
 
   it('升目の数が合っている', () => {
@@ -237,5 +263,78 @@ describe('台紙の向きへ起こす（R-034）', () => {
     // 起こしたあとは左右の違いだけが残る
     expect(after?.mirrored).toBe(true)
     expect(after?.headsRight).toBe(true)
+  })
+})
+
+describe('恐竜の足の分割', () => {
+  const walkers: SpeciesId[] = ['ankylosaurus', 'brontosaurus', 'stegosaurus', 'triceratops']
+
+  /*
+   * 分割は**絵を余さず覆う**必要がある。1か所でも抜けると、そこだけ
+   * 描かれずに背景が透ける（甲羅を切ったときに実際にやった間違い）。
+   */
+  it('絵の全面を覆う', () => {
+    for (const id of walkers) {
+      const parts = partsForPiece(id)
+      expect(parts.length).toBeGreaterThan(2)
+      // 48×48 の升目で、どの升も1回以上どこかの矩形に入っている
+      for (let row = 0; row < 48; row++) {
+        for (let column = 0; column < 48; column++) {
+          const x = (column + 0.5) / 48
+          const y = (row + 0.5) / 48
+          const covered = parts.some(
+            (part) =>
+              x >= part.box.x &&
+              x < part.box.x + part.box.w &&
+              y >= part.box.y &&
+              y < part.box.y + part.box.h,
+          )
+          expect(covered, `${id} の (${x.toFixed(2)}, ${y.toFixed(2)}) が抜けている`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('前足と後ろ足が逆の拍で動く', () => {
+    for (const id of walkers) {
+      const moving = partsForPiece(id).filter((part) => part.swing !== 0)
+      expect(moving).toHaveLength(2)
+      expect(Math.abs(moving[0].beat - moving[1].beat)).toBeCloseTo(0.5)
+    }
+  })
+
+  /*
+   * 足の帯は**腰より上から**切り出す。回したときに腰にできる隙間を、
+   * 足の上端に写っている腹の絵で覆うため。軸のすぐそばなので歪まない。
+   */
+  it('足の帯は腰より上から始まり、胴より先に描かれる', () => {
+    for (const id of walkers) {
+      const parts = partsForPiece(id)
+      // 胴＝画面の上端から始まる帯。**最後に描く**ので腰の継ぎ目を隠せる
+      const bodyIndex = parts.findIndex((part) => part.box.y === 0 && part.box.w === 1)
+      expect(bodyIndex).toBe(parts.length - 1)
+      const legIndexes = parts
+        .map((part, index) => (part.swing !== 0 ? index : -1))
+        .filter((index) => index >= 0)
+      for (const index of legIndexes) expect(index).toBeLessThan(bodyIndex)
+      const body = parts[bodyIndex]
+      const hipY = body.box.y + body.box.h
+      for (const leg of partsForPiece(id).filter((part) => part.swing !== 0)) {
+        expect(leg.box.y).toBeLessThan(hipY)
+        expect(leg.pivot.y).toBeCloseTo(leg.box.y)
+        expect(leg.box.y + leg.box.h).toBeCloseTo(1)
+      }
+    }
+  })
+
+  it('紙を回して置いても、動く部分の数は変わらない', () => {
+    for (const id of walkers) {
+      for (const turns of [0, 1, 2, 3]) {
+        for (const mirrored of [false, true]) {
+          const moving = partsForPiece(id, turns, mirrored).filter((part) => part.swing !== 0)
+          expect(moving).toHaveLength(2)
+        }
+      }
+    }
   })
 })

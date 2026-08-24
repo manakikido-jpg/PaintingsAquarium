@@ -15,7 +15,8 @@ import type { SpeciesId } from '../templates'
  */
 
 const tank: Tank = { width: 1600, height: 900 }
-const KIND: Record<SpeciesId, CreatureKind> = {
+// ここで測るのは水族館の6種だけ（恐竜は歩くので速さの決め方が別）
+const KIND: Partial<Record<SpeciesId, CreatureKind>> = {
   fish: 'fish',
   iruka: 'fish',
   same: 'fish',

@@ -56,7 +56,7 @@ export function App(): React.JSX.Element {
         const current = settingsRef.current ?? (await window.aquarium.getSettings())
         settingsRef.current = current
 
-        const result = await processPhoto(photo.dataUrl, photo.fileName, current.cutout)
+        const result = await processPhoto(photo.dataUrl, photo.fileName, current.cutout, current.theme)
         if (!result.ok) {
           pushNotice({ level: 'warn', message: result.message })
           return

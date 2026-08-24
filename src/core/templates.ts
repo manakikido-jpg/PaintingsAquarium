@@ -1,4 +1,5 @@
 import type { RgbaImage } from './image'
+import type { ThemeId } from './theme'
 import type { CreatureKind } from './rig'
 import { MATCH_THRESHOLD, matchTemplates, type Template } from './match'
 import { TEMPLATE_BITS, TEMPLATE_GRID } from './templates.generated'
@@ -14,7 +15,18 @@ import { TEMPLATE_BITS, TEMPLATE_GRID } from './templates.generated'
  * 会場では台紙を使うが、そうでない絵が入っても壊れないようにしておく。
  */
 
-export type SpeciesId = 'fish' | 'tako' | 'iruka' | 'same' | 'kurage' | 'umigame'
+export type SpeciesId =
+  | 'fish'
+  | 'tako'
+  | 'iruka'
+  | 'same'
+  | 'kurage'
+  | 'umigame'
+  | 'pteranodon'
+  | 'ankylosaurus'
+  | 'brontosaurus'
+  | 'stegosaurus'
+  | 'triceratops'
 
 /** 絵の中の向き。x は右が +、y は**下**が +（画像の座標に合わせる）。 */
 export interface Direction {
@@ -25,6 +37,14 @@ export interface Direction {
 export interface SpeciesInfo {
   readonly id: SpeciesId
   readonly label: string
+  /**
+   * どのテーマの台紙か。
+   *
+   * **照合はテーマの中だけで行う。** 11種をひとつの集まりとして測ったら、
+   * まる魚とトリケラトプスが 0.69 で重なった（塗った魚が恐竜として判定されうる）。
+   * 外形の重なりしか見ないので、海と陸を混ぜれば必ずこうなる。
+   */
+  readonly theme: ThemeId
   /** 台紙の中で頭が向いている向き */
   readonly head: Direction
   /**
@@ -34,13 +54,22 @@ export interface SpeciesInfo {
   readonly swimsSideways: boolean
 }
 
+const SEA = 'aquarium' as const
+const LAND = 'dinosaur' as const
+
 export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
-  fish: { id: 'fish', label: '魚', head: { x: -1, y: 0 }, swimsSideways: true },
-  iruka: { id: 'iruka', label: 'イルカ', head: { x: -1, y: 0 }, swimsSideways: true },
-  same: { id: 'same', label: 'サメ', head: { x: -1, y: 0 }, swimsSideways: true },
-  tako: { id: 'tako', label: 'タコ', head: { x: 0, y: -1 }, swimsSideways: false },
-  kurage: { id: 'kurage', label: 'クラゲ', head: { x: 0, y: -1 }, swimsSideways: false },
-  umigame: { id: 'umigame', label: 'ウミガメ', head: { x: 0, y: -1 }, swimsSideways: false },
+  fish: { id: 'fish', label: '魚', theme: SEA, head: { x: -1, y: 0 }, swimsSideways: true },
+  iruka: { id: 'iruka', label: 'イルカ', theme: SEA, head: { x: -1, y: 0 }, swimsSideways: true },
+  same: { id: 'same', label: 'サメ', theme: SEA, head: { x: -1, y: 0 }, swimsSideways: true },
+  tako: { id: 'tako', label: 'タコ', theme: SEA, head: { x: 0, y: -1 }, swimsSideways: false },
+  kurage: { id: 'kurage', label: 'クラゲ', theme: SEA, head: { x: 0, y: -1 }, swimsSideways: false },
+  umigame: { id: 'umigame', label: 'ウミガメ', theme: SEA, head: { x: 0, y: -1 }, swimsSideways: false },
+  // 恐竜はどれも横向きで、台紙では頭が左を向いている
+  pteranodon: { id: 'pteranodon', label: 'プテラノドン', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
+  ankylosaurus: { id: 'ankylosaurus', label: 'アンキロサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
+  brontosaurus: { id: 'brontosaurus', label: 'ブロントサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
+  stegosaurus: { id: 'stegosaurus', label: 'ステゴサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
+  triceratops: { id: 'triceratops', label: 'トリケラトプス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
 }
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[]
@@ -108,8 +137,13 @@ export interface SpeciesMatch {
  * あとの絵が自分の台紙と **0.985** で重なり、2位は 0.66 だった。
  * 無理にどれかへ当てはめるより、**当てはめないほうが安全**（`match.ts`）。
  */
-export function identifySpecies(image: RgbaImage): SpeciesMatch | null {
-  const best = matchTemplates(image, TEMPLATES, TEMPLATE_GRID)
+export function templatesForTheme(theme?: ThemeId): readonly Template[] {
+  if (!theme) return TEMPLATES
+  return TEMPLATES.filter((template) => SPECIES[template.id as SpeciesId].theme === theme)
+}
+
+export function identifySpecies(image: RgbaImage, theme?: ThemeId): SpeciesMatch | null {
+  const best = matchTemplates(image, templatesForTheme(theme), TEMPLATE_GRID)
   if (!best || best.score < MATCH_THRESHOLD) return null
 
   const id = best.id as SpeciesId
@@ -185,8 +219,74 @@ const KAME_PARTS: readonly SpritePart[] = [
   { box: { x: 1 - KAME_SIDE, y: KAME_BACK, w: KAME_SIDE, h: 1 - KAME_BACK }, pivot: { x: 1 - KAME_SIDE, y: KAME_BACK }, swing: 0.13, beat: 0 },
 ]
 
+/**
+ * 四足の恐竜: **前足の組と後ろ足の組**を、逆の拍で前後に振る。
+ *
+ * 足を4本別々に切らないのは、横から見た絵では手前の足と奥の足が
+ * 重なって描かれていて、**切り目が足の真ん中を通る**ため（R-033 と同じ壊れ方）。
+ * 2組にまとめれば、切り目は足と足の隙間に落ちる。
+ *
+ * 足の帯は**腰の線より少し上から**切り出し、**胴より後に描く**。
+ * こうすると、回したときに腰にできる楔形の隙間を、足の上端の腹の絵が覆う。
+ * 上端は軸のすぐそばなので、回してもほとんど動かない。
+ */
+const HIP_OVERLAP = 0.06
+const LEG_SWING = 0.12
+
+/**
+ * 切り目は**足と足の隙間**に置く。
+ *
+ * 最初は「前足のあたり」で切ったら、切り目が2本目の足の**真ん中**を通り、
+ * 振ったときに足が縦に裂けた（実機で確認）。R-033 と同じ壊れ方。
+ * いまは台紙の足元を列ごとに数えて、**空いている列の真ん中**を切っている。
+ *
+ * 足は**胴より先に描く**。あとから胴を重ねれば、腰にできる継ぎ目が隠れる。
+ */
+function walkerParts(
+  hipY: number,
+  front: readonly [number, number],
+  back: readonly [number, number],
+): readonly SpritePart[] {
+  const still = (x: number, w: number): SpritePart => ({
+    box: { x, y: hipY, w, h: 1 - hipY },
+    pivot: { x: x + w / 2, y: hipY },
+    swing: 0,
+    beat: 0,
+  })
+  const leg = (range: readonly [number, number], beat: number): SpritePart => ({
+    box: { x: range[0], y: hipY - HIP_OVERLAP, w: range[1] - range[0], h: 1 - hipY + HIP_OVERLAP },
+    pivot: { x: (range[0] + range[1]) / 2, y: hipY - HIP_OVERLAP },
+    swing: LEG_SWING,
+    beat,
+  })
+  const gaps: SpritePart[] = []
+  if (front[0] > 0) gaps.push(still(0, front[0]))
+  if (back[0] > front[1]) gaps.push(still(front[1], back[0] - front[1]))
+  if (back[1] < 1) gaps.push(still(back[1], 1 - back[1]))
+  return [
+    // 足が先。あとで胴を重ねて腰の継ぎ目を隠す
+    leg(front, 0),
+    leg(back, 0.5),
+    ...gaps,
+    // 胴（腰から上）。最後に描く
+    { box: { x: 0, y: 0, w: 1, h: hipY }, pivot: { x: 0.5, y: 0 }, swing: 0, beat: 0 },
+  ]
+}
+
 export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
   umigame: KAME_PARTS,
+  /*
+   * 数字は台紙を**余白を詰めた状態**で測って決めた（取り込んだ絵と同じ状態）。
+   * 腹の下端 = 腰の線。前後の切り目は、足元の列を数えて**空いている列**に置いた。
+   *   アンキロ  足 0.14〜0.69・隙間 0.41〜0.43
+   *   ブロント  足 0.16〜0.64・隙間 0.41〜0.42（0.64 より右は尾）
+   *   ステゴ    足 0.15〜0.64・隙間 0.39〜0.41
+   *   トリケラ  足 0.24〜0.87・隙間 0.39〜0.41
+   */
+  ankylosaurus: walkerParts(0.62, [0.13, 0.417], [0.417, 0.7]),
+  brontosaurus: walkerParts(0.72, [0.15, 0.415], [0.415, 0.67]),
+  stegosaurus: walkerParts(0.72, [0.15, 0.396], [0.396, 0.65]),
+  triceratops: walkerParts(0.72, [0.23, 0.399], [0.399, 0.88]),
 }
 
 /** 左右反転。 */
@@ -249,6 +349,12 @@ export const KIND_OF: Record<SpeciesId, CreatureKind> = {
   tako: 'tentacled',
   kurage: 'tentacled',
   umigame: 'tentacled',
+  // 恐竜は胴がまっすぐで、しなるのは尾だけ。魚と同じ扱いでよい
+  pteranodon: 'fish',
+  ankylosaurus: 'fish',
+  brontosaurus: 'fish',
+  stegosaurus: 'fish',
+  triceratops: 'fish',
 }
 
 /**
@@ -273,6 +379,18 @@ const TEMPLATE_RIG: Partial<Record<SpeciesId, TemplateRig>> = {
   same: { tailFrom: 0.8, tailY: 0.55 },
   // イルカ: 弓なりで、尾は右下へ抜ける。背びれは弧の頂点 x=0.62〜0.80
   iruka: { tailFrom: 0.82, tailY: 0.6 },
+  /*
+   * 恐竜の尾。**胴が細くなるところ**を付け根にしてある（余白を詰めた絵での割合）。
+   * ここより後ろだけがしなるので、胴や足は動かない。
+   */
+  // アンキロ: 尾は右へまっすぐ、先に球。胴の終わりは x=0.70
+  ankylosaurus: { tailFrom: 0.72, tailY: 0.5 },
+  // ブロント: 尾は右下へ長く抜ける。腰は x=0.62
+  brontosaurus: { tailFrom: 0.66, tailY: 0.72 },
+  // ステゴ: 尾は右上がりで先に棘。腰は x=0.66
+  stegosaurus: { tailFrom: 0.7, tailY: 0.62 },
+  // トリケラ: 尾は短く右へ。腰は x=0.82
+  triceratops: { tailFrom: 0.84, tailY: 0.62 },
 }
 
 export interface SpeciesRig {

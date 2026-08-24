@@ -11,6 +11,7 @@ import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
 import { orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
 import { identifySpecies, rigForSpecies, type SpeciesId } from '../core/templates'
+import type { ThemeId } from '../core/theme'
 
 /**
  * 切り抜きは画素数に比例して重い。会場の PC で 1 日 200 枚を捌くので、
@@ -72,6 +73,12 @@ export async function processPhoto(
   dataUrl: string,
   fileName: string,
   options: CutoutOptions,
+  /**
+   * いまのテーマ。**照合をこのテーマの台紙だけに絞る。**
+   * 全種をひとつの集まりとして測ると、まる魚とトリケラトプスが 0.69 で
+   * 重なる。渡さなければ今までどおり全種と照合する。
+   */
+  theme?: ThemeId,
 ): Promise<ProcessResult> {
   let source: HTMLImageElement
   try {
@@ -154,7 +161,7 @@ export async function processPhoto(
    * 形から当てる推定は、当たらないことがある（R-030）。
    */
   let image = oriented.image
-  let found = identifySpecies(image)
+  let found = identifySpecies(image, theme)
 
   /*
    * 台紙が分かったら、**絵そのものを台紙の向きへ起こす**。
@@ -169,7 +176,7 @@ export async function processPhoto(
    */
   if (found && found.turns !== 0) {
     image = rotateQuarter(image, found.turns)
-    found = identifySpecies(image)
+    found = identifySpecies(image, theme)
   }
 
   /*

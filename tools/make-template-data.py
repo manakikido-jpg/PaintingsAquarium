@@ -26,12 +26,19 @@ spec.loader.exec_module(check)
 
 # ファイル名 → アプリの中での種類
 SPECIES = {
+    # 水族館
     '01_sakana_A_marusakana': 'fish',
     '03_tako': 'tako',
     '04_iruka': 'iruka',
     '05_same': 'same',
     '06_kurage': 'kurage',
     '07_umigame': 'umigame',
+    # 恐竜（assets/templates/dinosaur/）
+    '11_pteranodon': 'pteranodon',
+    '12_ankylosaurus': 'ankylosaurus',
+    '13_brontosaurus': 'brontosaurus',
+    '14_stegosaurus': 'stegosaurus',
+    '15_triceratops': 'triceratops',
 }
 
 
@@ -40,7 +47,9 @@ def main():
     out = Path(sys.argv[2] if len(sys.argv) > 2 else 'src/core/templates.generated.ts')
 
     entries = []
-    for path in sorted(src.glob('*.png')):
+    # 台紙はテーマごとにフォルダを分けてあるので、下の階層まで見る。
+    # `source/`（外枠つきの元画像）は拾わない
+    for path in sorted(p for p in src.rglob('*.png') if 'source' not in p.parts):
         species = SPECIES.get(path.stem)
         if not species:
             print(f'{path.name}: 種類が分からないので飛ばす（tools/make-template-data.py の SPECIES に足す）')
