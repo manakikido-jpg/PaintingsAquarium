@@ -84,6 +84,8 @@ export const WANDER_RATE = 0.016
 export const WANDER_BAND = 0.35
 /** 目標の深さへ寄っていく速さ（毎秒）。大きいほど急いで合わせにいく。 */
 export const WANDER_GAIN = 0.5
+/** 端からこの幅（画面の高さに対する割合）までは、波が壁を押す力を弱める。 */
+export const WANDER_EDGE = 0.12
 
 /**
  * クラゲ: ふわふわの周期（秒）と振れ幅。
@@ -91,6 +93,40 @@ export const WANDER_GAIN = 0.5
  */
 export const KURAGE_PERIOD = 9
 export const KURAGE_RISE = 0.045
+
+/**
+ * まる魚: ひとかきの周期（秒）と、速さの振れ幅。
+ *
+ * **一定の速さで直進すると、生き物に見えない。** 実際の魚は
+ * 「尾をひとかきして進み、あとは惰性で滑る」を繰り返す。
+ * `low` が惰性のとき、`high` が蹴った瞬間の倍率。
+ */
+export const FISH_BEAT_SECONDS = 1.9
+export const FISH_SPEED = { low: 0.55, high: 1.5 } as const
+
+/**
+ * タコ: 水を吐いて進む周期（秒）と、速さの振れ幅。
+ *
+ * まる魚より**長く、強い**。タコは体の中の水を押し出して進むので、
+ * ひとかきごとにぐっと出て、あとはほとんど止まって漂う。
+ * 同じ「脈打つ速さ」でも、周期と強さを変えると別の生き物に見える。
+ */
+export const TAKO_JET_SECONDS = 3.6
+export const TAKO_SPEED = { low: 0.35, high: 2.0 } as const
+
+/**
+ * クラゲ: かさを閉じて上がる周期（秒）と、その強さ。
+ *
+ * **上がるのは速く、沈むのはゆっくり。** 正弦（上下が同じ速さ）だと
+ * 波に揺られているだけに見えて、自分で泳いでいるように見えない。
+ */
+export const KURAGE_PULSE_SECONDS = 3.2
+export const KURAGE_PULSE_RISE = 0.09
+
+/** 脈の鋭さ。大きいほど「ひとかき」が短く鋭くなる。 */
+const PULSE_DECAY = 3.2
+
+const TAU = Math.PI * 2
 
 /**
  * イルカ: 跳ねる間隔（秒）と、跳ねている時間。
@@ -148,6 +184,64 @@ export function jumpLift(progress: number): number {
   return 4 * progress * (1 - progress)
 }
 
+/**
+ * 「ひとかき」の強さ（0〜1）。周期の頭で 1、そのあと指数で落ちる。
+ *
+ * 正弦にしないのは、**蹴る瞬間と惰性の差**が出ないため。
+ * 正弦だと速い時間と遅い時間が同じ長さになり、脈打って見えない。
+ */
+export function pulse(age: number, period: number, phase: number, decay = PULSE_DECAY): number {
+  const at = (((age / period + phase / TAU) % 1) + 1) % 1
+  return Math.exp(-at * decay)
+}
+
+/** `pulse` の1周期の平均。これで割ると、脈を付けても平均の速さが変わらない。 */
+export function pulseMean(decay = PULSE_DECAY): number {
+  return (1 - Math.exp(-decay)) / decay
+}
+
+/**
+ * 脈打つ速さの倍率。平均が 1 になるようにそろえる。
+ *
+ * **そろえないと、種類ごとに速さが変わってしまう。**
+ * 速さは「画面を横切る秒数」で決めてある（`CROSS_SECONDS`）ので、
+ * ここで平均がずれると、その決めごとが崩れる。
+ */
+export function beatScale(
+  age: number,
+  period: number,
+  phase: number,
+  shape: { readonly low: number; readonly high: number },
+): number {
+  const mean = shape.low + shape.high * pulseMean()
+  return (shape.low + shape.high * pulse(age, period, phase)) / mean
+}
+
+/**
+ * 脈打つ速さを当てる。
+ *
+ * **前のフレームで掛けた倍率を、先に割り戻す**（`speedScale`）。
+ * 割り戻さずに毎フレーム掛けると、倍率が積み上がって速さが際限なくずれる
+ * （試験で、魚が画面の外まで飛んで戻ってこなくなった）。
+ * `baseSpeed` を見に行かないのは、途中で速さを変える動き（サメ）とも
+ * 同じ書き方で並べられるようにするため。
+ *
+ * `acrossOnly` は横の速さだけを脈打たせる（タコ）。
+ * 縦まで脈打たせると、足の波の形まで伸び縮みして落ち着かない。
+ */
+function pulsed(
+  fish: Fish,
+  period: number,
+  shape: { readonly low: number; readonly high: number },
+  acrossOnly = false,
+): Fish {
+  const previous = fish.speedScale ?? 1
+  const scale = beatScale(fish.age, period, fish.wavePhase, shape)
+  const change = scale / (previous || 1)
+  if (acrossOnly) return { ...fish, vx: fish.vx * change, speedScale: scale }
+  return { ...fish, vx: fish.vx * change, vy: fish.vy * change, speedScale: scale }
+}
+
 /** いま跳ねている途中か。 */
 export function isJumping(fish: Fish): boolean {
   return fish.jumpFrom !== undefined && fish.age < (fish.jumpUntil ?? 0)
@@ -163,8 +257,12 @@ export function isJumping(fish: Fish): boolean {
  */
 export function steer(fish: Fish, tank: Tank, prey: readonly Prey[] = []): Fish {
   switch (fish.species) {
+    case 'fish':
+      return swish(fish, tank)
     case 'tako':
-      return wave(fish, tank, TAKO_WAVE)
+      // **脈を先に当てる。** 波は横の速さから縦を出すので、
+      // 順番が逆だと1フレーム前の速さで波を描くことになる
+      return wave(jet(fish), tank, TAKO_WAVE)
     case 'kurage':
       return drift(fish, tank)
     case 'umigame':
@@ -179,6 +277,32 @@ export function steer(fish: Fish, tank: Tank, prey: readonly Prey[] = []): Fish 
 }
 
 /**
+ * ひとかきして、あとは惰性で滑る（まる魚）。
+ *
+ * **それまで、まる魚には動きが1つも無かった。** 生まれたときの速度のまま
+ * まっすぐ進み、壁で跳ね返るだけ。6種のうちここだけ「その生き物らしさ」が
+ * 何も無く、実測でも上下の端に 22〜27秒 居続けていた。
+ *
+ * 尾をひとかきするたびに速くなり、あとは落ちていく。
+ * 平均の速さは変えない（`beatScale`）ので、画面を横切る秒数は決めたまま。
+ */
+function swish(fish: Fish, tank: Tank): Fish {
+  // 縦にもゆっくり動かす。ここを入れないと生まれた高さから離れられない（R-043）
+  return { ...pulsed(fish, FISH_BEAT_SECONDS, FISH_SPEED, true), vy: wanderY(fish, tank) }
+}
+
+/**
+ * 水を吐いてぐっと進み、あとはほとんど止まる（タコ）。
+ *
+ * まる魚と同じ「脈打つ速さ」だが、**周期が2倍・強さも2倍**にしてある。
+ * 数字を変えるだけで別の生き物に見える、というのが狙い。
+ * 足の波（`wave`）はそのまま重ねる。
+ */
+function jet(fish: Fish): Fish {
+  return pulsed(fish, TAKO_JET_SECONDS, TAKO_SPEED, true)
+}
+
+/**
  * 上下に波打ちながら横へ進む（タコ・ウミガメ）。
  *
  * **縦の速さを、横の速さに掛けて出す。** こうすると「道の形」が決まり、
@@ -190,7 +314,24 @@ function wave(fish: Fish, tank: Tank, shape: { amplitude: number; wavelength: nu
   const length = Math.max(1, tank.width * shape.wavelength)
   const k = (Math.PI * 2) / length
   const vy = height * k * fish.vx * Math.cos(k * fish.x + fish.wavePhase)
-  return { ...fish, vy: vy + wanderY(fish, tank) }
+  return { ...fish, vy: nearEdge(vy, fish, tank) + wanderY(fish, tank) }
+}
+
+/**
+ * 端に近いところでは、波が壁を押す力を弱める。
+ *
+ * ゆっくりした上下（`wanderY`）は目標を内側に置いてあるので端に張り付かないが、
+ * **波そのものは壁を押せる**。タコは波が上下 103px/秒 で、ゆっくりした上下（最大17px/秒）
+ * より6倍強い。実測で、床の近くで波の下向きが続くタコが1匹、
+ * 300秒のうち **65% を画面の下3分の1** で過ごしていた。
+ *
+ * ここで弱めても居場所は動かせないが（弱めるだけなので）、
+ * 押し付けが止まれば `wanderY` が内側へ引き戻せる。**役割を分けてある。**
+ */
+function nearEdge(vy: number, fish: Fish, tank: Tank): number {
+  const room = vy < 0 ? fish.y : tank.height - fish.y
+  const margin = Math.max(1, tank.height * WANDER_EDGE)
+  return vy * Math.min(1, Math.max(0, room / margin))
 }
 
 /**
@@ -227,10 +368,16 @@ function wanderY(fish: Fish, tank: Tank): number {
  * ゆっくりした上下（`wanderY`）を重ねて、画面全体を使わせる。
  */
 function drift(fish: Fish, tank: Tank): Fish {
-  const swing = tank.height * KURAGE_RISE
-  const omega = (Math.PI * 2) / KURAGE_PERIOD
-  const vy = Math.cos(fish.age * omega + fish.wavePhase) * omega * swing
-  return { ...fish, vy: vy + wanderY(fish, tank) }
+  /*
+   * **上がるのは速く、沈むのはゆっくり。**
+   * それまでは正弦（上下が同じ速さ）で、波に揺られているようにしか見えなかった。
+   * かさを閉じた瞬間にぐっと上がり、あとはゆっくり沈む、が本物の泳ぎ方。
+   * 平均が 0 になるようにそろえてあるので、これ自体では上にも下にも寄らない
+   *（居場所は `wanderY` が決める）。
+   */
+  const beat = pulse(fish.age, KURAGE_PULSE_SECONDS, fish.wavePhase)
+  const lift = (beat - pulseMean()) * tank.height * KURAGE_PULSE_RISE
+  return { ...fish, vy: nearEdge(-lift, fish, tank) + wanderY(fish, tank) }
 }
 
 /**

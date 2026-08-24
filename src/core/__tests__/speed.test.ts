@@ -28,8 +28,8 @@ const KIND: Partial<Record<SpeciesId, CreatureKind>> = {
 interface Measured {
   readonly across: number
   readonly down: number
-  /** 縦のいちばん速いとき（ピクセル毎秒） */
-  readonly peakDown: number
+  /** 同じ瞬間の「縦 ÷ 横」の最大。道のいちばん急なところ */
+  readonly steepest: number
   readonly crossSeconds: number
   readonly swing: number
   readonly fastest: number
@@ -55,7 +55,7 @@ function measure(species: SpeciesId, seconds = 30, seed = 11, skip = 0): Measure
   let maxY = -Infinity
   let fastest = 0
   let slowest = Infinity
-  let peakDown = 0
+  let steepest = 0
   for (let step = 0; step < Math.round((seconds + skip) / dt); step++) {
     creature = stepCreatures([creature], dt, tank)[0]
     if (creature.kind !== 'float') continue
@@ -63,7 +63,8 @@ function measure(species: SpeciesId, seconds = 30, seed = 11, skip = 0): Measure
     const { vx, vy } = creature.fish
     across += Math.abs(vx)
     down += Math.abs(vy)
-    peakDown = Math.max(peakDown, Math.abs(vy))
+    // 横がほとんど止まっている瞬間は、比が意味を持たないので外す
+    if (Math.abs(vx) > 1) steepest = Math.max(steepest, Math.abs(vy) / Math.abs(vx))
     count++
     const speed = Math.hypot(vx, vy)
     fastest = Math.max(fastest, speed)
@@ -76,7 +77,7 @@ function measure(species: SpeciesId, seconds = 30, seed = 11, skip = 0): Measure
   return {
     across: mean,
     down: down / count,
-    peakDown,
+    steepest,
     crossSeconds: tank.width / Math.max(1, mean),
     swing: maxY - minY,
     fastest,
@@ -115,12 +116,19 @@ describe('縦と横のつり合い', () => {
    * 波の速さそのもの（縦のいちばん速いとき）で見る。
    * R-035 で問題になったのも「縦が横の5倍」という**速さの比**だった。
    */
-  it('縦のいちばん速いときでも、横の平均の2.5倍を超えない（跳ねて見える）', () => {
+  it('その瞬間の縦は、横の3倍を超えない（跳ねて見える）', () => {
+    /*
+     * **「縦の最大 ÷ 横の平均」では測れない。**
+     * まる魚とタコは、ひとかきごとに速くなる（`FISH_SPEED` / `TAKO_SPEED`）。
+     * 蹴った瞬間は縦も横も一緒に速くなるので、道の形は変わらないのに
+     * 「縦の最大」だけが上がる。**同じ瞬間の縦と横**でくらべる。
+     * R-035 で問題になったのは「縦が横の5倍」。実測はタコ 2.5・ウミガメ 1.1。
+     */
     for (const species of ['tako', 'umigame'] as const) {
-      const { peakDown, across } = measure(species, 300)
-      expect(peakDown).toBeLessThan(across * 2.5)
+      const { steepest } = measure(species, 300)
+      expect(steepest).toBeLessThan(3)
       // 波が消えていないことも見る。まっすぐ進むだけになると生き物に見えない
-      expect(peakDown).toBeGreaterThan(across * 0.8)
+      expect(steepest).toBeGreaterThan(0.5)
     }
   })
 

@@ -289,3 +289,52 @@ describe('重なった絵が離れる（動きを通したあとで）', () => {
     })
   }
 })
+
+/*
+ * **種類ごとに動きが違うこと。**
+ *
+ * 「それぞれの魚の個別の動きがまだしっかりできていない」との指摘で入れた（F-342）。
+ * 見た目の話に見えるが、**速さの脈の形**という数字で捕まえられる。
+ * ここが同じ数字に寄ると、6種が同じ生き物に見える。
+ */
+describe('種類ごとの泳ぎ分け', () => {
+  /** 300秒泳がせて、速い瞬間と遅い瞬間の比を返す。 */
+  const beatRange = (species: SpeciesId): number => {
+    const path = run(creature(species), 300, [], 1 / 30)
+    const speeds = path.map((one) => Math.hypot(one.vx, one.vy))
+    return Math.max(...speeds) / Math.max(1, Math.min(...speeds))
+  }
+
+  it('まる魚は、ひとかきごとに速くなる（一定の速さで直進しない）', () => {
+    // 直す前は「生まれた速度のまま直進」で、比は 1.0 だった
+    expect(beatRange('fish')).toBeGreaterThan(2)
+  })
+
+  it('タコの脈は、まる魚よりはっきりしている', () => {
+    // 同じ「脈打つ速さ」でも、周期と強さを変えて別の生き物に見せている
+    expect(beatRange('tako')).toBeGreaterThan(beatRange('fish'))
+  })
+
+  it('ウミガメは、脈を打たずにゆったり進む', () => {
+    expect(beatRange('umigame')).toBeLessThan(beatRange('fish'))
+  })
+
+  it('クラゲは、上がるのが速くて沈むのがゆっくり', () => {
+    // 正弦（上下が同じ速さ）だと、波に揺られているようにしか見えない
+    const path = run(creature('kurage', { vx: 12 }), 60)
+    const up = Math.max(...path.map((one) => Math.max(0, -one.vy)))
+    const down = Math.max(...path.map((one) => Math.max(0, one.vy)))
+    expect(up).toBeGreaterThan(down * 1.5)
+  })
+
+  it('脈を付けても、平均の速さは変わらない', () => {
+    // 速さは「画面を横切る秒数」で決めてある（CROSS_SECONDS）。
+    // 脈の平均がずれると、その決めごとが崩れる
+    for (const species of ['fish', 'tako'] as const) {
+      const path = run(creature(species), 300, [], 1 / 30)
+      const mean = path.reduce((sum, one) => sum + Math.hypot(one.vx, one.vy), 0) / path.length
+      expect(mean).toBeGreaterThan(60 * 0.75)
+      expect(mean).toBeLessThan(60 * 1.35)
+    }
+  })
+})
