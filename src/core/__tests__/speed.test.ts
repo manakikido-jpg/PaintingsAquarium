@@ -28,13 +28,24 @@ const KIND: Partial<Record<SpeciesId, CreatureKind>> = {
 interface Measured {
   readonly across: number
   readonly down: number
+  /** 縦のいちばん速いとき（ピクセル毎秒） */
+  readonly peakDown: number
   readonly crossSeconds: number
   readonly swing: number
   readonly fastest: number
   readonly slowest: number
 }
 
-function measure(species: SpeciesId, seconds = 30, seed = 11): Measured {
+/**
+ * `skip` は、測り始めるまでに捨てる秒数。
+ *
+ * **生まれた直後は測らない。** 絵は好きな高さに生まれるが、ゆっくりした上下
+ * （`wanderY`）はそのとき目指す深さが決まっているので、遠ければそこまで
+ * 上限の速さで移動する。実測で、最初の8秒だけ上下 254px・落ち着いたあとは
+ * 51〜121px（画面900）だった。この差は**生まれた場所の問題**であって、
+ * 泳ぎ方の問題ではない。
+ */
+function measure(species: SpeciesId, seconds = 30, seed = 11, skip = 0): Measured {
   let creature = spawnCreature('float', seed, tank, 500, 300, [], 1, KIND[species], species)
   const dt = 1 / 60
   let across = 0
@@ -44,12 +55,15 @@ function measure(species: SpeciesId, seconds = 30, seed = 11): Measured {
   let maxY = -Infinity
   let fastest = 0
   let slowest = Infinity
-  for (let step = 0; step < Math.round(seconds / dt); step++) {
+  let peakDown = 0
+  for (let step = 0; step < Math.round((seconds + skip) / dt); step++) {
     creature = stepCreatures([creature], dt, tank)[0]
     if (creature.kind !== 'float') continue
+    if (step * dt < skip) continue
     const { vx, vy } = creature.fish
     across += Math.abs(vx)
     down += Math.abs(vy)
+    peakDown = Math.max(peakDown, Math.abs(vy))
     count++
     const speed = Math.hypot(vx, vy)
     fastest = Math.max(fastest, speed)
@@ -62,6 +76,7 @@ function measure(species: SpeciesId, seconds = 30, seed = 11): Measured {
   return {
     across: mean,
     down: down / count,
+    peakDown,
     crossSeconds: tank.width / Math.max(1, mean),
     swing: maxY - minY,
     fastest,
@@ -93,11 +108,19 @@ describe('縦と横のつり合い', () => {
    *   - ゆっくりした上下（遅い）… 150秒で1往復。これが無いと、
    *     生まれた高さの帯から出られず、下で生まれた絵が飾りに埋もれる
    */
-  it('S字の波（短い間の上下）は、画面の高さの10〜25%に収まる', () => {
+  /*
+   * **「◯秒の間にどれだけ上下したか」では固定できない。**
+   * 窓を短くすると波の一部しか入らず（8秒窓で 51px しか動かない回がある）、
+   * 長くするとゆっくりした上下が混ざって、波の大きさが分からなくなる。
+   * 波の速さそのもの（縦のいちばん速いとき）で見る。
+   * R-035 で問題になったのも「縦が横の5倍」という**速さの比**だった。
+   */
+  it('縦のいちばん速いときでも、横の平均の2.5倍を超えない（跳ねて見える）', () => {
     for (const species of ['tako', 'umigame'] as const) {
-      const { swing } = measure(species, 8)
-      expect(swing).toBeGreaterThan(tank.height * 0.1)
-      expect(swing).toBeLessThan(tank.height * 0.25)
+      const { peakDown, across } = measure(species, 300)
+      expect(peakDown).toBeLessThan(across * 2.5)
+      // 波が消えていないことも見る。まっすぐ進むだけになると生き物に見えない
+      expect(peakDown).toBeGreaterThan(across * 0.8)
     }
   })
 
@@ -106,6 +129,12 @@ describe('縦と横のつり合い', () => {
       const { swing } = measure(species, 300)
       expect(swing).toBeGreaterThan(tank.height * 0.5)
     }
+  })
+
+  it('クラゲも、長い目で見れば画面の高さの半分より広く上下する', () => {
+    // ふわふわ（9秒で1往復・高さの4.5%）は**その場での揺れ**で、居場所は変わらない。
+    // 横切るのに 80〜140 秒かかるので、これだけだと何分も同じ高さに居座る
+    expect(measure('kurage', 300).swing).toBeGreaterThan(tank.height * 0.5)
   })
 
   it('クラゲは、少しだけ横に流れながら、ゆっくり上下する', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { spawnCreature, stepCreatures, type Creature } from '../motion'
+import { placeCreature, spawnCreature, stepCreatures, type Creature } from '../motion'
 import type { Tank } from '../swim'
 import type { SpeciesId } from '../templates'
 
@@ -76,6 +76,72 @@ describe('24匹が重なったままにならない', () => {
           expect(gap, `${species}: ${gap.toFixed(0)}px`).toBeGreaterThan(size * 0.75)
         }
       }
+    }
+  })
+})
+
+/*
+ * **上下の端に張り付かないこと。**
+ *
+ * `stepFish` は上下の壁で速度を跳ね返すが、生き物ごとの動き（`behaviour.ts`）が
+ * 縦の速度を毎フレーム上書きするので、その跳ね返りは捨てられる（R-043）。
+ * 実測で、イルカが上端10%に **56秒**・タコが **49秒**居続けていた。
+ * 天井をこすり続ける絵は「止まっている」ようにしか見えない。
+ *
+ * これも単体では捕まらない。**24匹を長く泳がせて測る。**
+ */
+describe('端に張り付かない', () => {
+  /*
+   * 「端の帯に居た時間」だけでは測れない。ウミガメは横切るのに 40〜55 秒かかるので、
+   * 天井の近くを**横切っている**だけでも長く居たことになる。
+   * 見て困るのは「止まって見える」ことなので、
+   * **端の帯に居て、かつ横にも進んでいない**時間で測る。
+   */
+  it('どの絵も、端の帯で止まったままにならない', () => {
+    let creatures = crowd()
+    const dt = 1 / 30
+    const stay = new Array(creatures.length).fill(0)
+    const from = new Array(creatures.length).fill(0)
+    const longest = new Array(creatures.length).fill(0)
+    for (let step = 0; step < 300 / dt; step++) {
+      creatures = stepCreatures(creatures, dt, tank)
+      creatures.forEach((creature, index) => {
+        const { x, y } = placeCreature(creature, [])
+        const edge = y < tank.height * 0.1 || y > tank.height * 0.9
+        if (!edge) {
+          stay[index] = 0
+          return
+        }
+        if (stay[index] === 0) from[index] = x
+        // 端でも横へ進んでいるなら、止まってはいない
+        if (Math.abs(x - from[index]) > tank.width * 0.25) {
+          stay[index] = 0
+          return
+        }
+        stay[index] += dt
+        longest[index] = Math.max(longest[index], stay[index])
+      })
+    }
+    // 実測: 直す前は最長 64秒（ウミガメ）。直したあとは 27秒（同）／タコ24・サメ23・まる魚22
+    expect(Math.max(...longest)).toBeLessThan(35)
+  })
+
+  it('どの種類も、画面の上・中・下をひととおり使う', () => {
+    // 生まれた高さに居続けると、下の帯の絵は飾りと重なって見つけにくい
+    let creatures = crowd()
+    const dt = 1 / 30
+    const bands = creatures.map(() => [0, 0, 0])
+    for (let step = 0; step < 300 / dt; step++) {
+      creatures = stepCreatures(creatures, dt, tank)
+      creatures.forEach((creature, index) => {
+        const { y } = placeCreature(creature, [])
+        bands[index][Math.min(2, Math.max(0, Math.floor((y / tank.height) * 3)))]++
+      })
+    }
+    for (const band of bands) {
+      const total = band[0] + band[1] + band[2]
+      // どの帯にも 5% 以上は居ること（3等分なので、均せば 33%）
+      for (const part of band) expect(part / total).toBeGreaterThan(0.05)
     }
   })
 })

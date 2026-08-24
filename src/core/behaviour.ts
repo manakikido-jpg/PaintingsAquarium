@@ -75,8 +75,15 @@ export const UMIGAME_WAVE = { amplitude: 0.1, wavelength: 0.5 } as const
  * ようにしか見えない。速さは横より遅くする（R-035）。
  */
 export const WANDER_SECONDS = 150
-/** 上下の移動の速さ（画面の高さに対する割合・毎秒） */
+/** 上下の移動の速さの上限（画面の高さに対する割合・毎秒） */
 export const WANDER_RATE = 0.016
+/**
+ * 目標の深さが振れる幅（画面の中心からの割合）。
+ * 0.35 なら、画面の高さの 15%〜85% の間を行き来する。
+ */
+export const WANDER_BAND = 0.35
+/** 目標の深さへ寄っていく速さ（毎秒）。大きいほど急いで合わせにいく。 */
+export const WANDER_GAIN = 0.5
 
 /**
  * クラゲ: ふわふわの周期（秒）と振れ幅。
@@ -189,22 +196,41 @@ function wave(fish: Fish, tank: Tank, shape: { amplitude: number; wavelength: nu
 /**
  * ゆっくり上下する速さ。
  *
- * **一定の速さで往復させると、端で長く張り付く。** 壁で止められたまま
- * 向きが変わるまで数十秒かかるため（実際にそうなった）。
- * なめらかに向きが変わる形（余弦）にすると、端の手前で自然に折り返す。
+ * **「上下する速さ」ではなく「目指す深さ」を先に決める。**
+ *
+ * はじめは速さそのものを余弦で振っていたが、それだと**端に張り付いた**。
+ * 上向きの速さが出ている間（最長で周期の半分＝75秒）はずっと天井を押し続け、
+ * `stepFish` の跳ね返りはここで毎フレーム上書きされるので効かない
+ *（R-040・R-041 と同じ形）。実測で、タコが上端10%に **49秒**居続けた。
+ * 端に近いほど力を弱める、も試したが**同じだった**（押さなくなるだけで、
+ * 離れる力が無い）。
+ *
+ * 目指す深さのほうを振ると、これが起きない。
+ * 目標は必ず画面の内側（15%〜85%）にあるので、端に着いた時点で
+ * **目標は必ず内側にあり、そちらへ引き戻される**。
  * 位相は絵ごとにずらす。揃っていると、全部が同時に潜って同時に浮く。
  */
 function wanderY(fish: Fish, tank: Tank): number {
   const turn = (Math.PI * 2) / WANDER_SECONDS
-  return tank.height * WANDER_RATE * Math.cos(fish.age * turn + fish.wavePhase)
+  const target = tank.height * (0.5 + WANDER_BAND * Math.cos(fish.age * turn + fish.wavePhase))
+  // 上限を掛ける。生まれた場所が目標から遠いと、初速が跳ね上がって不自然になる
+  const limit = tank.height * WANDER_RATE
+  return Math.max(-limit, Math.min(limit, (target - fish.y) * WANDER_GAIN))
 }
 
-/** ふわふわ漂う（クラゲ）。横はほとんど進まない。 */
+/**
+ * ふわふわ漂う（クラゲ）。横はほとんど進まない。
+ *
+ * ふわふわ（9秒で1往復・画面の高さの 4.5%）は**その場での揺れ**で、
+ * 居場所は変わらない。横切るのに 80〜140 秒かかる生き物なので、
+ * これだけだと生まれた高さに何分も居座る（実測で下端に 33 秒）。
+ * ゆっくりした上下（`wanderY`）を重ねて、画面全体を使わせる。
+ */
 function drift(fish: Fish, tank: Tank): Fish {
   const swing = tank.height * KURAGE_RISE
   const omega = (Math.PI * 2) / KURAGE_PERIOD
   const vy = Math.cos(fish.age * omega + fish.wavePhase) * omega * swing
-  return { ...fish, vy }
+  return { ...fish, vy: vy + wanderY(fish, tank) }
 }
 
 /**
@@ -226,18 +252,29 @@ function leap(fish: Fish, tank: Tank): Fish {
     return { ...fish, y, vy: 0 }
   }
 
+  /*
+   * 跳ねていない間は、ゆっくり上下する。
+   *
+   * **前は縦の速度を 0 にしていた。** そのため、イルカは生まれた高さのまま
+   * 一生泳ぎ、実測で上端10%に **56秒**居続けた個体がいた。
+   * しかも跳躍は「いまの高さから画面の上まで」を弧にするので、
+   * 上のほうに居るイルカは**跳ねても何も起きない**（持ち上がる余地が無い）。
+   * 深いところに居るときほど大きく跳ねるので、上下するほうが跳躍も映える。
+   */
+  const wander = wanderY(fish, tank)
+
   if (fish.jumpFrom !== undefined) {
     // 着水した直後。次に跳ぶ時刻を決める
     const [low, high] = IRUKA_GAP
     const wait = low + jitter(fish.wavePhase * 1000, fish.age) * (high - low)
-    return { ...fish, jumpFrom: undefined, jumpUntil: undefined, nextEventAt: fish.age + wait, vy: 0 }
+    return { ...fish, jumpFrom: undefined, jumpUntil: undefined, nextEventAt: fish.age + wait, vy: wander }
   }
 
   if (fish.age >= nextAt) {
     return { ...fish, jumpFrom: fish.y, jumpUntil: fish.age + IRUKA_JUMP_SECONDS, vy: 0 }
   }
 
-  return fish
+  return { ...fish, vy: wander }
 }
 
 /**
