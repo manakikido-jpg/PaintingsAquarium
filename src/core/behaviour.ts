@@ -61,6 +61,24 @@ export const TAKO_WAVE = { amplitude: 0.13, wavelength: 0.35 } as const
 export const UMIGAME_WAVE = { amplitude: 0.1, wavelength: 0.5 } as const
 
 /**
+ * ゆっくりした上下の移動（タコ・ウミガメ）。
+ *
+ * **S字の波だけでは、生まれた高さから離れられない。**
+ * 波は上下 10〜13% の往復なので、画面の下のほうで生まれた絵は
+ * そこにい続ける。実測で、24匹を90秒泳がせるとウミガメは
+ * **滞在時間の 49% が画面の一番下**（上から5等分の最下段）で、
+ * 一番上には 0% だった。下は岩とサンゴが並ぶ帯なので、
+ * **自分の絵を探しに来た子どもが見つけられない**（要件定義 §3 5c）。
+ *
+ * そこで、波とは別に**ゆっくり上下を往復する動き**を足す。
+ * 1往復に `WANDER_SECONDS` かけるので、目では「ゆっくり潜って、ゆっくり浮く」
+ * ようにしか見えない。速さは横より遅くする（R-035）。
+ */
+export const WANDER_SECONDS = 150
+/** 上下の移動の速さ（画面の高さに対する割合・毎秒） */
+export const WANDER_RATE = 0.016
+
+/**
  * クラゲ: ふわふわの周期（秒）と振れ幅。
  * こちらは横にほとんど進まないので、時間で決めるほうが自然。
  */
@@ -165,7 +183,20 @@ function wave(fish: Fish, tank: Tank, shape: { amplitude: number; wavelength: nu
   const length = Math.max(1, tank.width * shape.wavelength)
   const k = (Math.PI * 2) / length
   const vy = height * k * fish.vx * Math.cos(k * fish.x + fish.wavePhase)
-  return { ...fish, vy }
+  return { ...fish, vy: vy + wanderY(fish, tank) }
+}
+
+/**
+ * ゆっくり上下する速さ。
+ *
+ * **一定の速さで往復させると、端で長く張り付く。** 壁で止められたまま
+ * 向きが変わるまで数十秒かかるため（実際にそうなった）。
+ * なめらかに向きが変わる形（余弦）にすると、端の手前で自然に折り返す。
+ * 位相は絵ごとにずらす。揃っていると、全部が同時に潜って同時に浮く。
+ */
+function wanderY(fish: Fish, tank: Tank): number {
+  const turn = (Math.PI * 2) / WANDER_SECONDS
+  return tank.height * WANDER_RATE * Math.cos(fish.age * turn + fish.wavePhase)
 }
 
 /** ふわふわ漂う（クラゲ）。横はほとんど進まない。 */

@@ -87,11 +87,24 @@ describe('縦と横のつり合い', () => {
     }
   })
 
-  it('タコとウミガメの上下は、画面の高さの15〜35%に収まる', () => {
+  /*
+   * 上下の動きは**2つある**ので、短い窓と長い窓で別々に見る。
+   *   - S字の波（速い）… 数秒で1往復。ここが大きいと飛び跳ねて見える（R-035）
+   *   - ゆっくりした上下（遅い）… 150秒で1往復。これが無いと、
+   *     生まれた高さの帯から出られず、下で生まれた絵が飾りに埋もれる
+   */
+  it('S字の波（短い間の上下）は、画面の高さの10〜25%に収まる', () => {
     for (const species of ['tako', 'umigame'] as const) {
-      const { swing } = measure(species)
-      expect(swing).toBeGreaterThan(tank.height * 0.15)
-      expect(swing).toBeLessThan(tank.height * 0.35)
+      const { swing } = measure(species, 8)
+      expect(swing).toBeGreaterThan(tank.height * 0.1)
+      expect(swing).toBeLessThan(tank.height * 0.25)
+    }
+  })
+
+  it('長い目で見ると、画面の高さの半分より広く上下する（同じ帯に居続けない）', () => {
+    for (const species of ['tako', 'umigame'] as const) {
+      const { swing } = measure(species, 300)
+      expect(swing).toBeGreaterThan(tank.height * 0.5)
     }
   })
 
