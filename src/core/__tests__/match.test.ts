@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createImage, type RgbaImage } from '../image'
 import {
   MATCH_THRESHOLD,
+  MATCH_TILTS,
   matchTemplates,
   mirrorSilhouette,
   overlap,
@@ -129,6 +130,74 @@ describe('matchTemplates', () => {
     ]
     expect(matchTemplates(tall, both)?.score).toBe(1)
     expect(matchTemplates(wide, both)?.score).toBe(1)
+  })
+
+  /*
+   * ここから下は「紙がまっすぐ置かれない」問題（R-042）。
+   *
+   * クラゲの触手のように**細い線が並んだ形**は、数度傾いただけで升目から外れ、
+   * 自分の台紙との重なりが落ちる。実測でクラゲは 6 度で 0.45 まで落ち、
+   * しきい値（0.7）を割っていた。
+   */
+  const COMB = 120
+  const comb = (): RgbaImage => {
+    // 触手を並べた形。太い胴の下に、細い縦線が等間隔に伸びる。
+    // **升目（48）より粗く作らない。** 1本が1升より細いと、この試験は
+    // 傾きの探索ではなく画素の粗さを測ることになる
+    const image = createImage(COMB, COMB)
+    const paint = (x: number, y: number) => {
+      image.data[(y * COMB + x) * 4 + 3] = 255
+    }
+    for (let y = 12; y < 40; y++) for (let x = 16; x < 104; x++) paint(x, y)
+    for (let strand = 0; strand < 7; strand++) {
+      const x0 = 20 + strand * 12
+      for (let y = 40; y < 108; y++) for (let x = x0; x < x0 + 5; x++) paint(x, y)
+    }
+    return image
+  }
+
+  /** 絵を回す（回した先から元の画素を引く）。試験のためだけの素朴な実装。 */
+  const rotate = (source: RgbaImage, degrees: number): RgbaImage => {
+    const radians = (degrees * Math.PI) / 180
+    const cos = Math.cos(radians)
+    const sin = Math.sin(radians)
+    const out = createImage(source.width, source.height)
+    const centre = source.width / 2
+    for (let y = 0; y < source.height; y++) {
+      for (let x = 0; x < source.width; x++) {
+        const dx = x - centre
+        const dy = y - centre
+        const sx = Math.round(centre + dx * cos + dy * sin)
+        const sy = Math.round(centre - dx * sin + dy * cos)
+        if (sx < 0 || sx >= source.width || sy < 0 || sy >= source.height) continue
+        out.data[(y * source.width + x) * 4 + 3] = source.data[(sy * source.width + sx) * 4 + 3]
+      }
+    }
+    return out
+  }
+
+  it('少し傾いた紙でも、細い形が自分の台紙と重なる（傾きを試すから）', () => {
+    const shapes = [{ id: 'クラゲ', shape: silhouette(comb()) }]
+    const tilted = rotate(comb(), 6)
+    // 傾きを試さないと、しきい値を割って「どの台紙でもない」になっていた
+    expect(overlap(silhouette(tilted), shapes[0].shape)).toBeLessThan(MATCH_THRESHOLD)
+    const found = matchTemplates(tilted, shapes)
+    expect(found?.id).toBe('クラゲ')
+    expect(found?.score).toBeGreaterThan(MATCH_THRESHOLD)
+  })
+
+  it('まっすぐ置かれた紙は、傾き 0 のまま選ばれる', () => {
+    // 傾きを足したせいで、まっすぐな絵まで斜めに合わせてしまうと、
+    // 手足の位置（リグ）がずれる
+    const found = matchTemplates(comb(), [{ id: 'クラゲ', shape: silhouette(comb()) }])
+    expect(found?.tilt).toBe(0)
+    expect(found?.score).toBe(1)
+  })
+
+  it('試す傾きは 0 をはさんで左右対称', () => {
+    // 片側だけだと、逆向きに置かれた紙が救えない
+    expect(MATCH_TILTS).toContain(0)
+    expect(MATCH_TILTS.map((tilt) => -tilt || 0).sort()).toEqual([...MATCH_TILTS].sort())
   })
 
   it('しきい値は本物の台紙で決め直す前提の暫定値', () => {

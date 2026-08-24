@@ -40,6 +40,11 @@ ALPHA_MIN = 12
 CLOSED_RATIO = 2.0
 # どの2種もこれ未満であること
 MAX_OVERLAP = 0.55
+# 2位との差がこれ未満なら「際どい」。実物の写真ではもっと悪くなるので余裕を見る
+MIN_MARGIN = 0.05
+# 照合のときに試す傾き（度）。**`src/core/match.ts` の `MATCH_TILTS` と同じにする。**
+# ここだけ変えると、この道具が実物より甘い（または厳しい）数字を出す
+MATCH_TILTS = (-8, -4, 0, 4, 8)
 
 
 def load_silhouette_mask(path):
@@ -171,6 +176,15 @@ def overlap(a, b):
     return 0.0 if either == 0 else both / either
 
 
+def tilted_cells(image, tilt):
+    """絵を少し傾けてから升目に落とす。`match.ts` の `tiltedSilhouette` と同じ考え方。"""
+    if tilt:
+        image = image.rotate(tilt, expand=True, resample=Image.BILINEAR, fillcolor=0).point(
+            lambda value: 255 if value >= 128 else 0
+        )
+    return cells_from_image(image)
+
+
 def best_overlap(a, b):
     """8通りの向きで一番よく重なった値。"""
     best = 0.0
@@ -253,10 +267,14 @@ def main():
                 (max(1, int(turned.width * scale_x)), max(1, int(turned.height * scale_y))),
                 Image.BILINEAR,
             ).point(lambda value: 255 if value >= 128 else 0)
-            cells = cells_from_image(stretched)
-            if cells is None:
+            # **アプリと同じように、少し傾けても試す**（match.ts の MATCH_TILTS）。
+            # ここを 0 だけにすると、実物より厳しい数字が出る
+            grids = [g for g in (tilted_cells(stretched, tilt) for tilt in MATCH_TILTS) if g]
+            if not grids:
                 continue
-            scores = [(best_overlap(cells, shapes[other]), names[other]) for other in range(len(names))]
+            cells = grids[len(grids) // 2]
+            scores = [(max(best_overlap(g, shapes[other]) for g in grids), names[other])
+                      for other in range(len(names))]
             scores.sort(reverse=True)
             total += 1
             mine = next(score for score, who in scores if who == name)
@@ -276,20 +294,34 @@ def main():
     print(f'\n  {total - wrong}/{total} 回、正しい台紙が1位になった')
     print(f'  いちばん際どい組: {worst_margin[1]} ↔ {worst_margin[2]}  差 {worst_margin[0]:+.2f}')
 
-    print(f'\n== 判定（どの2種も {MAX_OVERLAP} 未満なら合格）==')
+    # **合否は「見分けの試験」で見る。** 総当たりの重なりは警告として出すだけ。
+    # 重なりが高くても、自分の台紙との重なりのほうが高ければ見分けはつく
+    # （照合は一番よく重なった台紙を選ぶ）。実際、まる魚 ↔ タコは 0.66 と高いが、
+    # 差は +0.20 あって一度も入れ替わらない。
+    # ここを「0.55 未満なら合格」にしていたころは、通っている台紙を
+    # 「作り直しが要る」と言い続けていた
+    print(f'\n== 似ている組（{MAX_OVERLAP} 以上は警告。合否は上の見分けの試験）==')
     worst.sort(reverse=True)
     for score, a, b in worst[:5]:
-        mark = 'NG' if score >= MAX_OVERLAP else 'ok'
+        mark = '警告' if score >= MAX_OVERLAP else 'ok '
         print(f'  [{mark}] {a} ↔ {b}  {score:.2f}')
-    over = [w for w in worst if w[0] >= MAX_OVERLAP]
+
+    print('\n== 判定 ==')
+    if bad:
+        print(f'**作り直しが要る**: 輪郭が閉じていない台紙が {bad} 枚。'
+              '切り抜きで穴だらけになる')
+        return 1
     if wrong:
-        print(f'\n**見分けに失敗した回が {wrong} 回ある。形を直す必要がある**')
+        print(f'**作り直しが要る**: 見分けに失敗した回が {wrong} 回ある。'
+              'しきい値を下げて逃げないこと。本番で別の生き物として判定される')
         return 1
-    if over or bad:
-        print(f'\n**作り直しが要る**: 閉じていない {bad} 枚 / 似すぎている組 {len(over)}')
-        print('しきい値を下げて逃げないこと。本番で別の生き物として判定される。')
+    if worst_margin[0] < MIN_MARGIN:
+        print(f'**際どい**: 2位との差が最小 {worst_margin[0]:+.2f}'
+              f'（{worst_margin[1]} ↔ {worst_margin[2]}）。'
+              f'{MIN_MARGIN:+.2f} は欲しい。紙の置き方が少しずれると入れ替わる')
         return 1
-    print('\n合格。次は台紙ごとの正解（芯と尾びれの位置）を書く（docs/やること.md T-1）')
+    print(f'合格。{total} 回すべてで正しい台紙が1位、'
+          f'2位との差は最小でも {worst_margin[0]:+.2f}')
     return 0
 
 

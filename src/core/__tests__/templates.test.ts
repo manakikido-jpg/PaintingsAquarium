@@ -56,6 +56,32 @@ function turned(image: RgbaImage): RgbaImage {
   return out
 }
 
+/**
+ * 紙を斜めに置いたときの絵。台紙をそのまま少し回す。
+ *
+ * 画素を落とさないよう、回した先から元の画素を引く（拡大はしない）。
+ */
+function tilted(image: RgbaImage, degrees: number): RgbaImage {
+  const radians = (degrees * Math.PI) / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  const side = Math.ceil((image.width + image.height) * 0.75)
+  const out = createImage(side, side)
+  for (let y = 0; y < side; y++) {
+    for (let x = 0; x < side; x++) {
+      const dx = x - side / 2
+      const dy = y - side / 2
+      const sx = Math.round(image.width / 2 + dx * cos + dy * sin)
+      const sy = Math.round(image.height / 2 - dx * sin + dy * cos)
+      if (sx < 0 || sx >= image.width || sy < 0 || sy >= image.height) continue
+      const from = (sy * image.width + sx) * 4
+      const to = (y * side + x) * 4
+      for (let k = 0; k < 4; k++) out.data[to + k] = image.data[from + k]
+    }
+  }
+  return out
+}
+
 describe('台紙のデータ', () => {
   it('水族館6種・恐竜5種がそろっている', () => {
     expect(TEMPLATES).toHaveLength(11)
@@ -112,6 +138,18 @@ describe('identifySpecies', () => {
       expect(identifySpecies(mirrored(pieceOf(id)))?.id).toBe(id)
       expect(identifySpecies(turned(pieceOf(id)))?.id).toBe(id)
       expect(identifySpecies(turned(turned(pieceOf(id))))?.id).toBe(id)
+    }
+  })
+
+  /*
+   * **紙は必ず少し斜めに置かれる**（R-042）。
+   * 傾きを試すようにする前は、6度でクラゲが 0.45 まで落ち、
+   * しきい値（0.7）を割って「どの台紙でもない」になっていた。
+   */
+  it.each([-6, -3, 3, 6])('紙が %d 度傾いていても、同じ台紙として見分けられる', (degrees) => {
+    for (const id of SPECIES_IDS) {
+      const found = identifySpecies(tilted(pieceOf(id, 8), degrees))
+      expect(found?.id).toBe(id)
     }
   })
 
