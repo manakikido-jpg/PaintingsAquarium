@@ -26,6 +26,12 @@ export function App(): React.JSX.Element {
    * 設定画面を開いている間だけ読みにいく（閉じている間は数える処理だけが動く）。
    */
   const [fps, setFps] = useState(0)
+  /*
+   * 落とし終えて、まだ入れ替えていない版。
+   * **設定画面を開き直しても残る。** ここが無いと、落としたことを忘れて
+   * 「押したのに変わらない」になる（R-047）。
+   */
+  const [pending, setPending] = useState<string | null>(null)
   const [updating, setUpdating] = useState(false)
   const [pieces, setPieces] = useState<Piece[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
@@ -54,6 +60,7 @@ export function App(): React.JSX.Element {
       setFps((window as unknown as { __aquaFps?: number }).__aquaFps ?? 0)
     read()
     const timer = window.setInterval(read, 1000)
+    void window.aquarium.pendingUpdate().then(setPending)
     return () => window.clearInterval(timer)
   }, [panelOpen])
 
@@ -319,11 +326,32 @@ export function App(): React.JSX.Element {
                   disabled={updating}
                   onClick={async () => {
                     setUpdating(true)
-                    setUpdate(await window.aquarium.installUpdate())
+                    const done = await window.aquarium.installUpdate()
+                    setUpdate(done)
+                    if (done.kind === 'downloaded') setPending(done.version)
                     setUpdating(false)
                   }}
                 >
-                  新しい版 {update.version} を入れる
+                  新しい版 {update.version} を落とす
+                </button>
+              )}
+              {/*
+                **落としただけでは入れ替わらない。**
+                終了時に静かに入れる仕組みだけだと、未署名のこのアプリでは
+                Windows に止められて「押したのに何も変わらない」になる（R-047）。
+                その場で入れ替えて再起動する道を用意する。
+              */}
+              {pending && (
+                <button
+                  type="button"
+                  disabled={updating}
+                  onClick={async () => {
+                    setUpdating(true)
+                    setUpdate(await window.aquarium.restartAndInstall())
+                    setUpdating(false)
+                  }}
+                >
+                  いま入れ替えて再起動する
                 </button>
               )}
             </div>
@@ -333,7 +361,12 @@ export function App(): React.JSX.Element {
                 {update.kind === 'available' &&
                   `新しい版 ${update.version} があります。押すと落として入れ替えます。`}
                 {update.kind === 'downloaded' &&
-                  '落とし終えました。アプリを閉じると入れ替わります。会期中なら、終わってから閉じてください。'}
+                  `新しい版 ${update.version} を落としました。まだ入れ替わっていません。` +
+                    '「いま入れ替えて再起動する」を押すか、アプリを閉じてください。' +
+                    '会期中なら、終わってから入れ替えてください。'}
+                {update.kind === 'installing' &&
+                  `入れ替えの画面を出しました（${update.version}）。` +
+                    '「WindowsによってPCが保護されました」が出たら「詳細情報」→「実行」で進めてください。'}
                 {(update.kind === 'portable' || update.kind === 'unavailable') && update.message}
               </p>
             )}

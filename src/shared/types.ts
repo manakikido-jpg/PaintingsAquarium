@@ -120,6 +120,8 @@ export type UpdateStatus =
   | { readonly kind: 'latest'; readonly version: string }
   | { readonly kind: 'available'; readonly version: string }
   | { readonly kind: 'downloaded'; readonly version: string }
+  /** 入れ替えの画面を出したところ。このあとアプリは終了する */
+  | { readonly kind: 'installing'; readonly version: string }
   | { readonly kind: 'portable'; readonly message: string }
   | { readonly kind: 'unavailable'; readonly message: string }
 
@@ -137,8 +139,12 @@ export interface AquariumApi {
   getVersion(): Promise<string>
   /** 新しい版があるか見に行く。押したときだけ通信する */
   checkForUpdate(): Promise<UpdateStatus>
-  /** 新しい版を落として入れ替える。落とし終えたら再起動でいれかわる */
+  /** 新しい版を落とす。**落としただけでは入れ替わらない** */
   installUpdate(): Promise<UpdateStatus>
+  /** いま入れ替えて再起動する（入れ替えの画面が出る） */
+  restartAndInstall(): Promise<UpdateStatus>
+  /** 落とし終えて、まだ入れ替えていない版。無ければ null */
+  pendingUpdate(): Promise<string | null>
   onIncoming(handler: (photo: IncomingPhoto) => void): () => void
   onNotice(handler: (notice: Notice) => void): () => void
 }

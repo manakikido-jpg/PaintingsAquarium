@@ -20,6 +20,8 @@ const api: AquariumApi = {
   getVersion: () => ipcRenderer.invoke('aquarium:getVersion'),
   checkForUpdate: () => ipcRenderer.invoke('aquarium:checkForUpdate'),
   installUpdate: () => ipcRenderer.invoke('aquarium:installUpdate'),
+  restartAndInstall: () => ipcRenderer.invoke('aquarium:restartAndInstall'),
+  pendingUpdate: () => ipcRenderer.invoke('aquarium:pendingUpdate'),
 
   onIncoming: (handler: (photo: IncomingPhoto) => void) => {
     const listener = (_event: unknown, photo: IncomingPhoto): void => handler(photo)

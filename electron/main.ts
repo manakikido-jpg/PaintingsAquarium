@@ -241,14 +241,26 @@ app.whenReady().then(() => {
     }
   })
 
+  /*
+   * 落とし終えた版。**「入れ替え待ち」があるかどうかをここで持つ。**
+   * 落としただけでは何も変わらないので、アプリ側が
+   * 「まだ入れ替わっていない」と言えるようにしておく（R-047）。
+   */
+  let pending: string | null = null
+
   ipcMain.handle('aquarium:installUpdate', async (): Promise<UpdateStatus> => {
     if (portable()) return cannotUpdate()
     try {
+      const found = await autoUpdater.checkForUpdates()
+      const version = found?.updateInfo.version ?? app.getVersion()
       const done = await autoUpdater.downloadUpdate()
-      return {
-        kind: 'downloaded',
-        version: done.length > 0 ? autoUpdater.currentVersion.version : app.getVersion(),
+      if (done.length === 0) {
+        return { kind: 'unavailable', message: '落としましたが、入れ替える中身がありませんでした。' }
       }
+      // **落とした版を返す。** ここで `autoUpdater.currentVersion` を返していたが、
+      // それは「いま動いている版」なので、画面には古い番号が出ていた
+      pending = version
+      return { kind: 'downloaded', version }
     } catch (error) {
       return {
         kind: 'unavailable',
@@ -256,6 +268,26 @@ app.whenReady().then(() => {
       }
     }
   })
+
+  /*
+   * いま入れ替えて再起動する。
+   *
+   * **静かに入れない**（第1引数 false）。未署名なので、終了時に黙って入れようとすると
+   * Windows に止められて**何も起きずに終わる**。画面を出せば、利用者が
+   * 「詳細情報」→「実行」で通せる。
+   * 第2引数は入れ替えたあとに起動し直す指定。
+   */
+  ipcMain.handle('aquarium:restartAndInstall', (): UpdateStatus => {
+    if (portable()) return cannotUpdate()
+    if (!pending) {
+      return { kind: 'unavailable', message: '先に「新しい版を入れる」を押してください。' }
+    }
+    setImmediate(() => autoUpdater.quitAndInstall(false, true))
+    return { kind: 'installing', version: pending }
+  })
+
+  /** 落とし終えて、まだ入れ替えていない版があるか。 */
+  ipcMain.handle('aquarium:pendingUpdate', (): string | null => pending)
 
   ipcMain.handle('aquarium:toggleFullscreen', () => {
     if (!mainWindow) return false
