@@ -1,4 +1,5 @@
 import type { RgbaImage } from './image'
+import { FIN_MAX_ANGLE } from './undulate'
 
 /**
  * 絵の「骨格」（リグ）を求める。
@@ -237,7 +238,8 @@ export function estimateRig(image: RgbaImage, columns = 24): Rig {
   const bodyFrom = headsRight ? pivotX : 0
   const bodyTo = headsRight ? 1 : pivotX
   const body = { from: bodyFrom, to: bodyTo }
-  const fins = [...findFins(spans, 'top', body), ...findFins(spans, 'bottom', body)]
+  const aspect = image.width / image.height
+  const fins = [...findFins(spans, 'top', body, aspect), ...findFins(spans, 'bottom', body, aspect)]
 
   return {
     spine,
@@ -578,6 +580,14 @@ function median(values: readonly number[]): number {
 
 /** ひれとみなす出っ張りの深さ（絵の高さに対する割合）。 */
 export const MIN_FIN_DEPTH = 0.05
+/**
+ * ひれを回したときに、切り目で開いてよい隙間（絵の高さに対する割合）。
+ *
+ * `tools/check-parts.py` の `GAP_LIMIT` と同じ値。あちらが台紙と
+ * 取り込んだ絵をまとめて測る道具で、こちらが取り込みのときに落とす関門。
+ * 数字を変えるときは両方を変えること。
+ */
+export const FIN_MAX_GAP = 0.03
 
 /**
  * 上または下の縁から、突き出している部分を探す。
@@ -590,6 +600,12 @@ export function findFins(
   side: 'top' | 'bottom',
   /** 胴として見る範囲（絵の左端からの割合）。尾びれの側は除く */
   body: { readonly from: number; readonly to: number } = { from: 0, to: 1 },
+  /**
+   * 絵の縦横比（幅÷高さ）。開く隙間を測るのに要る。
+   * 既定の 1 は正方形として測る＝横方向のずれを小さく見積もる側なので、
+   * 呼ぶ側は必ず実際の比を渡すこと（`estimateRig` が渡している）。
+   */
+  aspect = 1,
   minDepth = MIN_FIN_DEPTH,
 ): FinGuess[] {
   const count = spans.length
@@ -642,6 +658,65 @@ export function findFins(
   // 幅が狭すぎるものは輪郭のギザギザ。広すぎるものは胴そのもの
   return fins.filter((fin) => {
     const width = fin.to - fin.from
-    return width >= 0.04 && width <= 0.4
+    if (width < 0.04 || width > 0.4) return false
+    // 回すと段差になる箱は持たない。胴の帯のままにしておけば、
+    // 帯どうしは傾きでつながるので裂けようがない（R-048）
+    return finGap(spans, fin, aspect) <= FIN_MAX_GAP
   })
 }
+
+/**
+ * ひれを回したときに、切り目でどれだけ絵がずれるか（絵の高さに対する割合）。
+ *
+ * **「切り目が絵を何%横切るか」では測れない。** ひれの箱は軸（付け根）の
+ * すぐそばでは胴と重なっていてよく、そこは回してもほとんど動かない。
+ * 横切る割合で測ると、動かない所まで失格になる。
+ *
+ * 見るのは**開く隙間**。切り目の上に絵が乗っている点は、
+ * 軸からの距離だけずれる。その最大値が、目に見える段差の大きさ。
+ *
+ * 実測（サメ）: 背びれの箱は右の縁で 4.3%・付け根の線で 4.2% ずれていて、
+ * 会場向けの絵で**背中に青い筋**が走っていた。
+ * 同じサメの胸びれは 1.7%、まる魚の背びれは 2.0% で、どちらも段差は見えない。
+ *
+ * 縦横の距離は、絵の**高さ**を単位に揃える（横は縦横比を掛ける）。
+ * 割合のまま足すと、横長の絵で横方向のずれを小さく見積もる。
+ */
+function finGap(spans: readonly ColumnSpan[], fin: FinGuess, aspect: number): number {
+  const count = spans.length
+  const pivotX = (fin.from + fin.to) / 2
+  let worst = 0
+
+  const reach = (x: number, y: number): void => {
+    worst = Math.max(worst, Math.hypot((x - pivotX) * aspect, y - fin.base))
+  }
+
+  /*
+   * **箱の外側の列だけを見る。** 箱の中の列には、ひれ自身が写っている。
+   * それを「縁に乗った絵」と数えると、ひれの先まで裂ける扱いになる。
+   * 知りたいのは「箱の外にも絵が続いているか」なので、隣の列で測る。
+   */
+  const outside = [Math.round(fin.from * count) - 1, Math.round(fin.to * count)]
+  for (const index of outside) {
+    if (index < 0 || index >= count) continue
+    const span = spans[index]
+    if (span.height === 0) continue
+    const x = (index + 0.5) / count
+    // 付け根より先（回る側）に、隣の列の絵がどれだけ残っているか
+    const past = fin.side === 'top' ? fin.base - span.top : span.bottom - fin.base
+    if (past > 0) reach(x, fin.side === 'top' ? span.top : span.bottom)
+  }
+
+  // 付け根の線そのもの。箱の中でこの線が絵を横切っていれば、そこで段差になる
+  for (let index = 0; index < count; index++) {
+    const span = spans[index]
+    if (span.height === 0) continue
+    const x = (index + 0.5) / count
+    if (x < fin.from || x > fin.to) continue
+    if (span.top <= fin.base && span.bottom >= fin.base) reach(x, fin.base)
+  }
+
+  return worst * FIN_MAX_ANGLE
+}
+
+

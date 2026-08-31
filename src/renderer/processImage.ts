@@ -9,7 +9,7 @@ import {
 import { trimTransparent } from '../core/trim'
 import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
-import { orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
+import { estimateRig, orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
 import { identifySpecies, rigForSpecies, type SpeciesId } from '../core/templates'
 import type { ThemeId } from '../core/theme'
 
@@ -174,9 +174,20 @@ export async function processPhoto(
    * 左右反転はしない。反転は描画側が進む向きに合わせてやるので、
    * ここで子どもの塗った絵を鏡に映す必要はない。
    */
+  let measured = oriented.rig
   if (found && found.turns !== 0) {
     image = rotateQuarter(image, found.turns)
     found = identifySpecies(image, theme)
+    /*
+     * **回したあとの絵で測り直す。**
+     *
+     * `oriented.rig` の背びれ・胸びれ・体の芯は、回す前の絵で測った位置。
+     * それを回したあとの絵に当てると、箱が胴の別の場所を掴む。
+     * 実際、サメは 180 度回して保存されるので、腹の下（0.33〜0.54）に置いた
+     * ひれの箱が、回した絵では背中側の胴の真ん中に当たり、
+     * 動かすたびに胴が裂けて見えていた（R-048）。
+     */
+    measured = estimateRig(image)
   }
 
   /*
@@ -189,7 +200,7 @@ export async function processPhoto(
   const answer = found ? rigForSpecies(found.id, found.mirrored) : null
   const rig: Rig = answer
     ? {
-        ...oriented.rig,
+        ...measured,
         kind: answer.kind,
         headsRight: answer.headsRight,
         headKnown: true,
@@ -199,12 +210,12 @@ export async function processPhoto(
          * 絵からの推定は、実測でタコ4匹のうち2匹を外していた。
          * 外すと波の向きが逆になり、**止めるべき頭が大きく振れて顔が揺れる**（R-044）。
          */
-        tipsDown: answer.tipsDown ?? oriented.rig.tipsDown,
+        tipsDown: answer.tipsDown ?? measured.tipsDown,
         // ひれは絵から実測したものを使う（台紙の手置きの矩形は胴を裂いた）
         // 台紙どおりなので推定ではない。動きに使ってよい
         confidence: 1,
       }
-    : oriented.rig
+    : measured
 
   const blob = await new Promise<Blob | null>((resolve) =>
     toCanvas(image).toBlob(resolve, 'image/png'),

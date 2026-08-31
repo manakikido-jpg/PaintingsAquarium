@@ -244,58 +244,40 @@ const KAME_PARTS: readonly SpritePart[] = [
 ]
 
 /**
- * 四足の恐竜: **前足の組と後ろ足の組**を、逆の拍で前後に振る。
+ * 四足の恐竜: **切らずに、体ごと沈んで起きる。**
  *
- * 足を4本別々に切らないのは、横から見た絵では手前の足と奥の足が
- * 重なって描かれていて、**切り目が足の真ん中を通る**ため（R-033 と同じ壊れ方）。
- * 2組にまとめれば、切り目は足と足の隙間に落ちる。
+ * 以前は前足の組と後ろ足の組に切って前後に振っていた。**これが裂けていた。**
+ * 会場から「足が避けている」と言われて測ったら、切り目に選んだ列は
+ * どれも**胴を貫いていた**（アンキロ 40〜47%・ブロント 46〜58%・
+ * ステゴ 36〜54%・トリケラ 20〜46%）。
  *
- * 足の帯は**腰の線より少し上から**切り出し、**胴より後に描く**。
- * こうすると、回したときに腰にできる楔形の隙間を、足の上端の腹の絵が覆う。
- * 上端は軸のすぐそばなので、回してもほとんど動かない。
+ * なぜ気づかなかったか。切る位置は**足元の列だけ**を数えて決めていた。
+ * 足の隙間は足先にしか無く、その上は腹でつながっている。
+ * 足元だけ見れば 0%、箱の高さ全体で見れば半分を横切る。
+ * 測る帯を間違えていた（R-048）。
+ *
+ * 隙間が本当に空くのは y>0.74〜0.93 から下だけ。そこを箱の上端にすると
+ * 箱の高さは 0.04〜0.23 しか残らず、足先の動きは絵の高さの 2.8% 以下、
+ * 実寸で 3px。**切っても見えない。**
+ *
+ * だから切るのをやめた。代わりに絵を1枚のまま、地面を軸に
+ * **縦に縮めて、少し傾ける**。伸び縮みも回転も切り目が無いので裂けようがなく、
+ * 体重が前足に乗って沈む歩き方に見える。
  */
-const HIP_OVERLAP = 0.06
-const LEG_SWING = 0.12
+const WALK_SQUASH = 0.05
+const WALK_LEAN = 0.035
 
-/**
- * 切り目は**足と足の隙間**に置く。
- *
- * 最初は「前足のあたり」で切ったら、切り目が2本目の足の**真ん中**を通り、
- * 振ったときに足が縦に裂けた（実機で確認）。R-033 と同じ壊れ方。
- * いまは台紙の足元を列ごとに数えて、**空いている列の真ん中**を切っている。
- *
- * 足は**胴より先に描く**。あとから胴を重ねれば、腰にできる継ぎ目が隠れる。
- */
-function walkerParts(
-  hipY: number,
-  front: readonly [number, number],
-  back: readonly [number, number],
-): readonly SpritePart[] {
-  const still = (x: number, w: number): SpritePart => ({
-    box: { x, y: hipY, w, h: 1 - hipY },
-    pivot: { x: x + w / 2, y: hipY },
-    swing: 0,
+const WALKER_PARTS: readonly SpritePart[] = [
+  {
+    box: { x: 0, y: 0, w: 1, h: 1 },
+    // 軸は地面。足は地に着いたまま、体だけが沈んで起きる
+    pivot: { x: 0.5, y: 1 },
+    swing: WALK_LEAN,
     beat: 0,
-  })
-  const leg = (range: readonly [number, number], beat: number): SpritePart => ({
-    box: { x: range[0], y: hipY - HIP_OVERLAP, w: range[1] - range[0], h: 1 - hipY + HIP_OVERLAP },
-    pivot: { x: (range[0] + range[1]) / 2, y: hipY - HIP_OVERLAP },
-    swing: LEG_SWING,
-    beat,
-  })
-  const gaps: SpritePart[] = []
-  if (front[0] > 0) gaps.push(still(0, front[0]))
-  if (back[0] > front[1]) gaps.push(still(front[1], back[0] - front[1]))
-  if (back[1] < 1) gaps.push(still(back[1], 1 - back[1]))
-  return [
-    // 足が先。あとで胴を重ねて腰の継ぎ目を隠す
-    leg(front, 0),
-    leg(back, 0.5),
-    ...gaps,
-    // 胴（腰から上）。最後に描く
-    { box: { x: 0, y: 0, w: 1, h: hipY }, pivot: { x: 0.5, y: 0 }, swing: 0, beat: 0 },
-  ]
-}
+    lift: WALK_SQUASH,
+    liftAxis: 'y',
+  },
+]
 
 /**
  * プテラノドン: **翼を開いて、たたむ。**
@@ -334,17 +316,14 @@ export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
   umigame: KAME_PARTS,
   pteranodon: PTERA_PARTS,
   /*
-   * 数字は台紙を**余白を詰めた状態**で測って決めた（取り込んだ絵と同じ状態）。
-   * 腹の下端 = 腰の線。前後の切り目は、足元の列を数えて**空いている列**に置いた。
-   *   アンキロ  足 0.14〜0.69・隙間 0.41〜0.43
-   *   ブロント  足 0.16〜0.64・隙間 0.41〜0.42（0.64 より右は尾）
-   *   ステゴ    足 0.15〜0.64・隙間 0.39〜0.41
-   *   トリケラ  足 0.24〜0.87・隙間 0.39〜0.41
+   * 四足はどれも同じ動かし方（切らない）。台紙ごとの数字はもう要らない。
+   * 尾のリグ（`TEMPLATE_RIG`）はここに分割がある間は使われない。
+   * 使うと切り目が絵を 3.1〜10.9% ずらして段差になる（`tools/check-parts.py`）。
    */
-  ankylosaurus: walkerParts(0.62, [0.13, 0.417], [0.417, 0.7]),
-  brontosaurus: walkerParts(0.72, [0.15, 0.415], [0.415, 0.67]),
-  stegosaurus: walkerParts(0.72, [0.15, 0.396], [0.396, 0.65]),
-  triceratops: walkerParts(0.72, [0.23, 0.399], [0.399, 0.88]),
+  ankylosaurus: WALKER_PARTS,
+  brontosaurus: WALKER_PARTS,
+  stegosaurus: WALKER_PARTS,
+  triceratops: WALKER_PARTS,
 }
 
 /** 左右反転。 */

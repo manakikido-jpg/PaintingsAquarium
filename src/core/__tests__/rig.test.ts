@@ -104,6 +104,31 @@ describe('findTail', () => {
     expect(findTail(heights)).toBeNull()
   })
 
+  /*
+   * 回すと段差になる箱は持たない（R-048）。
+   *
+   * 会場で見えたのはサメの背びれで、箱の縁の外にも胴が続いていた。
+   * 箱ごと回すと、続いている胴が付け根の線でずれて、背中に青い筋が走った。
+   */
+  it('箱の外にも胴が続いているひれは持たない', () => {
+    // 上へ 0.2 だけ出っ張った台形。出っ張りの外側も同じ高さまで胴が続く
+    const image = createImage(240, 120)
+    for (let x = 20; x < 220; x++) fill(image, x, 40, x + 1, 90)
+    for (let x = 100; x < 140; x++) fill(image, x, 10, x + 1, 40)
+    const clean = findFins(columnSpans(image, 24), 'top', { from: 0, to: 1 }, 2)
+    expect(clean.length).toBeGreaterThan(0)
+
+    // 同じ出っ張りの右隣にも、付け根より上へ伸びる胴を足す
+    const torn = createImage(240, 120)
+    for (let x = 20; x < 220; x++) fill(torn, x, 40, x + 1, 90)
+    for (let x = 100; x < 140; x++) fill(torn, x, 10, x + 1, 40)
+    for (let x = 140; x < 200; x++) fill(torn, x, 12, x + 1, 40)
+    // 出っ張りだけを切り出す箱は残らない（同じ出っ張りが、隣に胴が続くだけで落ちる）
+    const kept = findFins(columnSpans(torn, 24), 'top', { from: 0, to: 1 }, 2)
+    const same = clean[0]
+    expect(kept.some((fin) => Math.abs(fin.from - same.from) < 0.05)).toBe(false)
+  })
+
   it('区間が少なすぎるときは判定しない', () => {
     expect(findTail([0.5, 0.2, 0.9])).toBeNull()
   })
@@ -485,6 +510,31 @@ describe('findFins', () => {
     expect(fins[0].base).toBeLessThan(1)
     // 背びれの付け根は絵の真ん中より上
     expect(fins[0].base).toBeLessThan(0.5)
+  })
+
+  /*
+   * 回すと段差になる箱は持たない（R-048）。
+   *
+   * 会場で見えたのはサメの背びれで、箱の縁の外にも胴が続いていた。
+   * 箱ごと回すと、続いている胴が付け根の線でずれて、背中に青い筋が走った。
+   */
+  it('箱の外にも胴が続いているひれは持たない', () => {
+    // 上へ 0.2 だけ出っ張った台形。出っ張りの外側も同じ高さまで胴が続く
+    const image = createImage(240, 120)
+    for (let x = 20; x < 220; x++) fill(image, x, 40, x + 1, 90)
+    for (let x = 100; x < 140; x++) fill(image, x, 10, x + 1, 40)
+    const clean = findFins(columnSpans(image, 24), 'top', { from: 0, to: 1 }, 2)
+    expect(clean.length).toBeGreaterThan(0)
+
+    // 同じ出っ張りの右隣にも、付け根より上へ伸びる胴を足す
+    const torn = createImage(240, 120)
+    for (let x = 20; x < 220; x++) fill(torn, x, 40, x + 1, 90)
+    for (let x = 100; x < 140; x++) fill(torn, x, 10, x + 1, 40)
+    for (let x = 140; x < 200; x++) fill(torn, x, 12, x + 1, 40)
+    // 出っ張りだけを切り出す箱は残らない（同じ出っ張りが、隣に胴が続くだけで落ちる）
+    const kept = findFins(columnSpans(torn, 24), 'top', { from: 0, to: 1 }, 2)
+    const same = clean[0]
+    expect(kept.some((fin) => Math.abs(fin.from - same.from) < 0.05)).toBe(false)
   })
 
   it('区間が少なすぎるときは判定しない', () => {

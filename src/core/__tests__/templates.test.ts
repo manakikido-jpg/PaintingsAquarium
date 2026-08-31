@@ -327,73 +327,49 @@ describe('台紙の向きへ起こす（R-034）', () => {
   })
 })
 
-describe('恐竜の足の分割', () => {
+describe('四足の恐竜', () => {
   const walkers: SpeciesId[] = ['ankylosaurus', 'brontosaurus', 'stegosaurus', 'triceratops']
 
   /*
-   * 分割は**絵を余さず覆う**必要がある。1か所でも抜けると、そこだけ
-   * 描かれずに背景が透ける（甲羅を切ったときに実際にやった間違い）。
+   * **切らない。** 足の組に切って振っていたときは、切り目に選んだ列が
+   * どれも胴を 20〜58% 貫いていて、動かすたびに足が胴から外れて見えた（R-048）。
+   * 隙間が本当に空くのは足先だけで、そこを上端にすると足はほとんど動かない。
    */
-  it('絵の全面を覆う', () => {
+  it('絵を切らない（動く部分は絵の全面ひとつだけ）', () => {
     for (const id of walkers) {
       const parts = partsForPiece(id)
-      expect(parts.length).toBeGreaterThan(2)
-      // 48×48 の升目で、どの升も1回以上どこかの矩形に入っている
-      for (let row = 0; row < 48; row++) {
-        for (let column = 0; column < 48; column++) {
-          const x = (column + 0.5) / 48
-          const y = (row + 0.5) / 48
-          const covered = parts.some(
-            (part) =>
-              x >= part.box.x &&
-              x < part.box.x + part.box.w &&
-              y >= part.box.y &&
-              y < part.box.y + part.box.h,
-          )
-          expect(covered, `${id} の (${x.toFixed(2)}, ${y.toFixed(2)}) が抜けている`).toBe(true)
-        }
-      }
-    }
-  })
-
-  it('前足と後ろ足が逆の拍で動く', () => {
-    for (const id of walkers) {
-      const moving = partsForPiece(id).filter((part) => part.swing !== 0)
-      expect(moving).toHaveLength(2)
-      expect(Math.abs(moving[0].beat - moving[1].beat)).toBeCloseTo(0.5)
+      expect(parts).toHaveLength(1)
+      const [only] = parts
+      expect(only.box).toEqual({ x: 0, y: 0, w: 1, h: 1 })
     }
   })
 
   /*
-   * 足の帯は**腰より上から**切り出す。回したときに腰にできる隙間を、
-   * 足の上端に写っている腹の絵で覆うため。軸のすぐそばなので歪まない。
+   * 伸び縮みと傾きは、どちらも**切り目を持たない**動かし方。
+   * 回して切る動かし方（`swing` を持つ部分が2つ以上）へ戻したら、
+   * また裂ける。ここで止める。
    */
-  it('足の帯は腰より上から始まり、胴より先に描かれる', () => {
+  it('地面を軸に、縦に縮んで少し傾く', () => {
     for (const id of walkers) {
-      const parts = partsForPiece(id)
-      // 胴＝画面の上端から始まる帯。**最後に描く**ので腰の継ぎ目を隠せる
-      const bodyIndex = parts.findIndex((part) => part.box.y === 0 && part.box.w === 1)
-      expect(bodyIndex).toBe(parts.length - 1)
-      const legIndexes = parts
-        .map((part, index) => (part.swing !== 0 ? index : -1))
-        .filter((index) => index >= 0)
-      for (const index of legIndexes) expect(index).toBeLessThan(bodyIndex)
-      const body = parts[bodyIndex]
-      const hipY = body.box.y + body.box.h
-      for (const leg of partsForPiece(id).filter((part) => part.swing !== 0)) {
-        expect(leg.box.y).toBeLessThan(hipY)
-        expect(leg.pivot.y).toBeCloseTo(leg.box.y)
-        expect(leg.box.y + leg.box.h).toBeCloseTo(1)
-      }
+      const [only] = partsForPiece(id)
+      expect(only.pivot).toEqual({ x: 0.5, y: 1 })
+      expect(only.lift).toBeGreaterThan(0)
+      expect(only.liftAxis ?? 'y').toBe('y')
+      expect(Math.abs(only.swing)).toBeGreaterThan(0)
+      // 大きく傾けると絵が倒れる。2度前後まで
+      expect(Math.abs(only.swing)).toBeLessThan(0.05)
     }
   })
 
-  it('紙を回して置いても、動く部分の数は変わらない', () => {
+  it('紙を回して置いても、絵を切らないままでいる', () => {
     for (const id of walkers) {
       for (const turns of [0, 1, 2, 3]) {
         for (const mirrored of [false, true]) {
-          const moving = partsForPiece(id, turns, mirrored).filter((part) => part.swing !== 0)
-          expect(moving).toHaveLength(2)
+          const parts = partsForPiece(id, turns, mirrored)
+          expect(parts).toHaveLength(1)
+          const [only] = parts
+          expect(only.box.w).toBeCloseTo(1)
+          expect(only.box.h).toBeCloseTo(1)
         }
       }
     }
