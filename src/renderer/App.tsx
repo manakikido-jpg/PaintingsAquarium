@@ -21,6 +21,11 @@ export function App(): React.JSX.Element {
    */
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
   const [version, setVersion] = useState('')
+  /*
+   * いまの表示速度。水槽の描画ループが `window.__aquaFps` に置いた値を読む。
+   * 設定画面を開いている間だけ読みにいく（閉じている間は数える処理だけが動く）。
+   */
+  const [fps, setFps] = useState(0)
   const [updating, setUpdating] = useState(false)
   const [pieces, setPieces] = useState<Piece[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
@@ -38,6 +43,19 @@ export function App(): React.JSX.Element {
     setNotices((current) => [...current.slice(-4), notice])
     window.setTimeout(() => setNotices((current) => current.slice(1)), 12000)
   }, [])
+
+  /*
+   * 設定画面を開いている間だけ、いまの表示速度を読みにいく。
+   * 描画ループ側は常に数えているので、ここは読むだけ（1秒に1回）。
+   */
+  useEffect(() => {
+    if (!panelOpen) return
+    const read = (): void =>
+      setFps((window as unknown as { __aquaFps?: number }).__aquaFps ?? 0)
+    read()
+    const timer = window.setInterval(read, 1000)
+    return () => window.clearInterval(timer)
+  }, [panelOpen])
 
   useEffect(() => {
     void window.aquarium.getSettings().then(setSettings)
@@ -258,6 +276,21 @@ export function App(): React.JSX.Element {
               更新の確認。押したときだけ外へ通信する。
               会期中は誰も押さないので、これまでどおりオフラインで動く。
             */}
+            {/*
+              いまの表示速度。
+              **会場のPCでこれを見るために出している。** fps は開発機と会場で
+              いちばん食い違う数字で、ここが 30 を切ると絵がカクついて見える。
+              普段の運用でスタッフが見る必要は無いので、設定画面の中だけに置く
+              （画面に出しっぱなしにすると、来場者の目に数字が入る）。
+            */}
+            <div className="row">
+              <span>いまの表示速度</span>
+              <code>{fps > 0 ? `${fps.toFixed(0)} fps` : '測定中…'}</code>
+              <p className="note">
+                30 を下回るときは、下の「背景の強さ」を 0 にすると軽くなります。
+                途中の値では変わりません（0 のときだけ背景を描かなくなるため）。
+              </p>
+            </div>
             <div className="row">
               <span>アプリの版</span>
               <code>{version || '—'}</code>

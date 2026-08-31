@@ -110,15 +110,22 @@ export function Aquarium({
     const appStartedAt = Date.now()
 
     /*
-     * 速度の実測用。既定では動かない。
-     * 開発中に `?measure` を付けて開いたときだけ、実際の fps を画面の隅に出す。
+     * 速度の実測。
+     *
+     * **数える処理は常に動かす。** fps は会場のPCと開発機でいちばん食い違う数字なので、
+     * 会場で測れないと何も判断できない。配布版には URL を付ける方法が無く、
+     * `?measure` だけにしていたときは**会場で測る手段が無かった**。
+     * 数えるのは1フレームに足し算1回で、費用は無い。
+     *
+     * 画面の隅に出すのは `?measure` を付けたときだけ（会場の画面に数字を出さない）。
+     * 値は `window.__aquaFps` に置いてあり、設定画面がそれを読んで出す。
+     *
      * canvas の描画命令は非同期に処理されるので、JS の経過時間を測っても 0ms に
      * しかならず、なめらかさは分からない（R-012 の切り分けで判明）。
      */
-    const measure =
+    const measure = { frames: 0, total: 0, last: 0 }
+    const showMeasure =
       typeof window !== 'undefined' && window.location.search.includes('measure')
-        ? { frames: 0, total: 0, last: 0 }
-        : null
 
     let scene: Scene | null = null
     let builtFor = { width: -1, height: -1, theme: '', density: -1, size: -1 }
@@ -592,7 +599,7 @@ export function Aquarium({
 
       scene.drawFront(context, elapsed, strength)
 
-      if (measure) {
+      {
         measure.frames++
         // 実際に何コマ描けているかを測る。canvas の描画命令は非同期に処理されるので、
         // JS の経過時間を測っても 0ms にしかならず、なめらかさは分からない。
@@ -602,10 +609,10 @@ export function Aquarium({
           measure.frames = 0
           measure.total = now
         }
-        // 外から読めるようにしておく。fps は会場と開発機で最も食い違う数字なので、
-        // 目で読むだけでなく機械で取れる形が要る（R-012）。`?measure` のときだけ。
+        // 外から読めるようにしておく。設定画面（S キー）がここを読んで出す。
+        // fps は会場と開発機で最も食い違う数字なので、機械で取れる形が要る（R-012）。
         ;(window as unknown as { __aquaFps?: number }).__aquaFps = measure.last
-        if (measure.last > 0) {
+        if (showMeasure && measure.last > 0) {
           context.save()
           context.fillStyle = 'rgba(0,0,0,0.6)'
           context.fillRect(8, 8, 300, 34)
