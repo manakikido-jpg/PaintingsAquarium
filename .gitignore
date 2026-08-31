@@ -7,3 +7,6 @@ data/
 
 # Python の中間ファイル
 __pycache__/
+
+# アイコンの確認用（配布に使うのは build/icon.ico だけ）
+build/preview/
