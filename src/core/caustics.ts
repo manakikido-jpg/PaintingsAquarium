@@ -26,6 +26,20 @@ export interface CausticsOptions {
   readonly sharpness?: number
   /** 上（水面側）をどれだけ強くするか。0 で一様 */
   readonly topBias?: number
+  /**
+   * 1周する秒数。指定すると、**この秒数でぴったり元の模様に戻る**。
+   *
+   * 焼いておいて繰り返し出すために要る（`drawCaustics.ts`）。
+   * 波はふつう互いに割り切れない周期にしてあるので（下の `WAVES`）、
+   * そのままでは二度と同じ模様にならず、焼いたコマをつなぐと**継ぎ目が飛ぶ**。
+   *
+   * ここを指定すると、波ごとの流れる速さを「1周のあいだに整数回まわる」値へ丸める。
+   * 丸めるぶん見た目は少し変わるが、**空間の周期は触らない**ので、
+   * 格子模様（壁紙）に見えることはない。
+   *
+   * 短くするほど丸めが粗くなる（1周に入る回数が減るため）。180秒で誤差 2〜16%。
+   */
+  readonly loopSeconds?: number
 }
 
 /**
@@ -47,6 +61,23 @@ const WAVES = [
 ] as const
 
 const TOTAL_WEIGHT = WAVES.reduce((sum, wave) => sum + wave.weight, 0)
+
+/**
+ * 流れる速さを「1周のあいだに整数回まわる」値へ丸める。
+ *
+ * 位相は `時間 × speed × drift` で進むので、1周 `loopSeconds` で元へ戻るには
+ * `loopSeconds × speed × drift` が 2π の整数倍でなければならない。
+ *
+ * `loopSeconds` が 0（既定）なら何もしない＝今までどおり二度と同じ模様にならない。
+ * 1回転も入らないほど短い指定のときは 1 回転に切り上げる（0 にすると**止まって見える**）。
+ */
+export function loopingDrift(drift: number, speed: number, loopSeconds: number): number {
+  if (loopSeconds <= 0 || speed === 0) return drift
+  const perTurn = (Math.PI * 2) / (loopSeconds * speed)
+  const turns = Math.round(drift / perTurn)
+  const atLeastOne = turns === 0 ? Math.sign(drift) || 1 : turns
+  return atLeastOne * perTurn
+}
 
 const CURVE_STEPS = 256
 const curveCache = new Map<number, Uint8Array>()
@@ -79,7 +110,7 @@ export function renderCaustics(
   width: number,
   height: number,
   timeSeconds: number,
-  { scale = 26, speed = 0.35, sharpness = 12, topBias = 0.55 }: CausticsOptions = {},
+  { scale = 26, speed = 0.35, sharpness = 12, topBias = 0.55, loopSeconds = 0 }: CausticsOptions = {},
 ): Uint8ClampedArray {
   if (width <= 0 || height <= 0) return target
 
@@ -98,7 +129,7 @@ export function renderCaustics(
     const wave = WAVES[index]
     const kx = scale * wave.frequency * wave.dx
     const ky = scale * wave.frequency * wave.dy
-    const phase = t * wave.drift
+    const phase = t * loopingDrift(wave.drift, speed, loopSeconds)
 
     for (let x = 0; x < width; x++) {
       const nx = width === 1 ? 0 : x / (width - 1)
