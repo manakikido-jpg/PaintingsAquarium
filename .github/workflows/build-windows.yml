@@ -52,6 +52,7 @@ jobs:
           name: PaintingsAquarium-windows
           path: |
             release/*.exe
+            release/*.zip
           # 会期をまたいで取りに来られるだけの余裕を持たせる
           retention-days: 60
           if-no-files-found: error
@@ -72,20 +73,34 @@ jobs:
           tag_name: latest
           name: 最新版 0.1.${{ github.run_number }}（自動ビルド）
           body: |
-            **会場PCへはこの2つのどちらかを落として使ってください。**
+            ## ダウンロードできないときは `PaintingsAquarium.zip`
+
+            **未署名なので、ブラウザが `.exe` を落とす段階で止めることがあります。**
+            そのときは `.zip` を落としてください。**中身は同じです。**
 
             | ファイル | 使いどころ |
             |---|---|
-            | `PaintingsAquarium-Setup.exe` | 会場PCに入れて使う（ふつうはこちら） |
+            | `PaintingsAquarium.zip` | **exe が落とせないとき。** 展開して中の `PaintingsAquarium.exe` を叩くだけ。インストール不要 |
+            | `PaintingsAquarium-Setup.exe` | 会場PCに入れて使う（落とせるならこちらが楽） |
             | `PaintingsAquarium-portable.exe` | インストールできないPC用。USBから直接動く |
+
+            zip は**右クリック →「すべて展開」**で開いてください。
+            「ここに展開」だと 75 個のファイルがばらけます。
+
+            ### 起動のときに警告が出たら
+
+            「WindowsによってPCが保護されました」は未署名のため必ず出ます。
+            **青い窓の左下に小さく灰色の「詳細情報」**があり、押すと「実行」が出ます。
+
+            **USBメモリにコピーしてから起動すれば、そもそも出ません。**
+            詳しくは `docs/警告が出て起動できないとき.md`。
+
+            ### そのほか
 
             **ファイル名は毎回同じです。** いまの版は設定画面（`S` キー）に出ます。
 
             上書きしても**絵と設定は消えません**。
             保存先はアプリとは別（インストール版は `%APPDATA%`、持ち運び版は exe の隣）。
-
-            未署名のため「WindowsによってPCが保護されました」が出ます。
-            「詳細情報」→「実行」で進めてください。
           # 「いちばん新しい版」として扱わせる。
           # 下書き扱い（prerelease）にすると、更新の確認から見えなくなる
           prerelease: false
@@ -93,19 +108,20 @@ jobs:
           # latest.yml も置く。更新の仕組みがこれを見て新しい版か判断する
           files: |
             release/*.exe
+            release/*.zip
             release/latest.yml
 
       # 古い版のファイルを消す。
       #
       # 名前に版番号が入っていた頃のファイルが残ると、会場で
-      # 「どれを落とすのか」が分からなくなる。置くのは常にこの3つだけにする。
+      # 「どれを落とすのか」が分からなくなる。置くのは常にこの4つだけにする。
       - name: 古いファイルを消す
         if: github.ref_name == github.event.repository.default_branch
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          keep="PaintingsAquarium-Setup.exe PaintingsAquarium-portable.exe latest.yml"
+          keep="PaintingsAquarium.zip PaintingsAquarium-Setup.exe PaintingsAquarium-portable.exe latest.yml"
           for name in $(gh release view latest --json assets -q '.assets[].name'); do
             case " $keep " in
               *" $name "*) ;;

@@ -37,6 +37,20 @@ win:
     # exe 1個で動く版も一緒に作る。USB に入れて別PCへ持って行けるようにするため。
     - target: portable
       arch: [x64]
+    # **exe ではない形も置く。**
+    #
+    # 会場から「詳細からダウンロードもできない」と言われた。
+    # Edge は未署名の .exe を**落とす段階で**止める。「保持する」は
+    # ダウンロード一覧の「…」の奥にあり、組織のポリシーでは消えていることもある。
+    # そうなると exe はどうやっても手に入らない。
+    #
+    # .zip は同じ中身でも止められにくい。中は win-unpacked と同じ一式で、
+    # 展開して PaintingsAquarium.exe を叩けばインストール無しで動く。
+    - target: zip
+      arch: [x64]
+  # zip の名前を固定する。nsis と portable は下に自分の名前を持っているので、
+  # ここで決まるのは zip だけ。版番号を入れない理由は下の portable と同じ
+  artifactName: PaintingsAquarium.${ext}
   # 署名証明書は買っていない。未署名なので SmartScreen の警告が出る。
   # 会場PC1台に対して年数万円の証明書は見合わないと判断した（要件定義 §8）。
   signAndEditExecutable: true
