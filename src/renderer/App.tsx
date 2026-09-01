@@ -9,7 +9,7 @@ import type {
   StorageLocation,
   UpdateStatus,
 } from '../shared/types'
-import { THEMES, themeOf, type ThemeId } from '../core/theme'
+import { DINOSAUR_STYLES, THEMES, themeOf, type DinosaurStyle, type ThemeId } from '../core/theme'
 import { GALLERY_PAGE_SIZE, galleryPage } from '../core/gallery'
 
 export function App(): React.JSX.Element {
@@ -166,6 +166,7 @@ export function App(): React.JSX.Element {
         decorDensity={settings?.decorDensity ?? 2}
         swayStrength={settings?.swayStrength ?? 1}
         sizeScale={settings?.sizeScale ?? 1}
+        dinosaurStyle={settings?.dinosaurStyle ?? 'plain'}
       />
 
       {settings && settings.watchFolder !== null && forTheme.length === 0 && pieces.length > 0 && (
@@ -241,6 +242,39 @@ export function App(): React.JSX.Element {
               テーマを変えると、そのテーマで取り込んだ絵だけが出ます。
               いま {forTheme.length} 枚がこのテーマの絵です。
             </p>
+
+            {/*
+              背景の見た目は**恐竜のときだけ**出す。
+              水族館には関係のない項目なので、常に出すとスタッフが
+              「これは何に効くのか」を毎回考えることになる。
+            */}
+            {settings.theme === 'dinosaur' && (
+              <>
+                <div className="row">
+                  <span>背景の見た目</span>
+                  {DINOSAUR_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      type="button"
+                      aria-pressed={settings.dinosaurStyle === style.id}
+                      className={settings.dinosaurStyle === style.id ? 'chosen' : undefined}
+                      onClick={() =>
+                        void window.aquarium
+                          .updateSettings({ dinosaurStyle: style.id as DinosaurStyle })
+                          .then(setSettings)
+                      }
+                    >
+                      {style.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="note">
+                  {DINOSAUR_STYLES.find((style) => style.id === settings.dinosaurStyle)?.note}
+                  <br />
+                  絵は変わりません。<strong>背景だけ</strong>が変わります。
+                </p>
+              </>
+            )}
           </section>
 
           <section>

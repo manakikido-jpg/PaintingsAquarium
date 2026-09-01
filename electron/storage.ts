@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Piece, SavePieceInput, Settings } from '../src/shared/types'
 import { DEFAULT_CUTOUT_OPTIONS } from '../src/core/cutout'
-import { DEFAULT_THEME, isThemeId } from '../src/core/theme'
+import { DEFAULT_DINOSAUR_STYLE, DEFAULT_THEME, isDinosaurStyle, isThemeId } from '../src/core/theme'
 
 const DEFAULT_SETTINGS: Settings = {
   watchFolder: null,
@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   maxVisible: 50,
   sceneryStrength: 1,
   theme: DEFAULT_THEME,
+  dinosaurStyle: DEFAULT_DINOSAUR_STYLE,
   decorDensity: 2,
   swayStrength: 1,
   sizeScale: 1,
@@ -61,6 +62,11 @@ export function readSettings(): Settings {
     // 設定ファイルを人が触れる形で置いているので、知らない値が入りうる。
     // 落とさず既定に戻す。
     theme: isThemeId(stored.theme) ? stored.theme : DEFAULT_THEME,
+    // 知らない値が入っていたら既定に落とす。
+    // 前の版で保存した設定ファイルにはこの項目が無い
+    dinosaurStyle: isDinosaurStyle(stored.dinosaurStyle)
+      ? stored.dinosaurStyle
+      : DEFAULT_DINOSAUR_STYLE,
     cutout: { ...DEFAULT_SETTINGS.cutout, ...stored.cutout },
   }
 }

@@ -34,6 +34,33 @@ export const THEMES: readonly ThemeMeta[] = [
 
 export const DEFAULT_THEME: ThemeId = 'aquarium'
 
+/**
+ * 恐竜テーマの背景の見た目。
+ *
+ * **どちらが良いかは会場でしか決められない。** モニタの明るさ、部屋の照明、
+ * 来場者との距離で見え方が変わる。片方に決め打ちせず、現地で切り替えられるようにした。
+ * `plain` は 2026-08-22 に作ったもので、**そのまま残してある**。
+ */
+export type DinosaurStyle = 'plain' | 'vivid'
+
+export interface DinosaurStyleMeta {
+  readonly id: DinosaurStyle
+  readonly name: string
+  /** 設定画面に出す一行説明 */
+  readonly note: string
+}
+
+export const DINOSAUR_STYLES: readonly DinosaurStyleMeta[] = [
+  { id: 'plain', name: 'ふつう', note: '青空と砂の地面。絵がいちばん目立つ' },
+  { id: 'vivid', name: '派手', note: '朝焼けの空・大きな太陽・火山の光。彩度が高い' },
+]
+
+export const DEFAULT_DINOSAUR_STYLE: DinosaurStyle = 'plain'
+
+export function isDinosaurStyle(value: unknown): value is DinosaurStyle {
+  return DINOSAUR_STYLES.some((style) => style.id === value)
+}
+
 export function themeMeta(id: ThemeId): ThemeMeta {
   return THEMES.find((theme) => theme.id === id) ?? THEMES[0]
 }

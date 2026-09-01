@@ -1,5 +1,5 @@
 import type { CutoutOptions } from '../core/cutout'
-import type { ThemeId } from '../core/theme'
+import type { DinosaurStyle, ThemeId } from '../core/theme'
 import type { Rig } from '../core/rig'
 import type { Direction, SpeciesId } from '../core/templates'
 
@@ -55,6 +55,12 @@ export interface Settings {
   readonly sceneryStrength: number
   /** どの世界で見せるか */
   readonly theme: ThemeId
+  /**
+   * 恐竜テーマの背景の見た目。`plain`（ふつう）か `vivid`（派手）。
+   * 会場の明るさで見え方が変わるので、現場で切り替えられるようにしてある。
+   * 水族館テーマでは使わない。
+   */
+  readonly dinosaurStyle: DinosaurStyle
   /**
    * 絵の大きさの倍率。1 で標準（画面幅の 7%）。0.5〜2。
    * 会場の画面の大きさと、来場者との距離で見え方が変わるので現場で決める。

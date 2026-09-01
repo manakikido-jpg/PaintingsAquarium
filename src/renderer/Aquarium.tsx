@@ -42,7 +42,7 @@ const LIMB_SPEED = 3.4
  * 幅2画素の話なので、筋が見えるより良い。
  */
 const SEAM_OVERLAP = 2
-import type { ThemeId } from '../core/theme'
+import type { DinosaurStyle, ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
 import type { Piece } from '../shared/types'
@@ -73,6 +73,7 @@ export function Aquarium({
   decorDensity,
   swayStrength,
   sizeScale,
+  dinosaurStyle,
 }: {
   pieces: Piece[]
   theme: ThemeId
@@ -80,6 +81,7 @@ export function Aquarium({
   decorDensity: number
   swayStrength: number
   sizeScale: number
+  dinosaurStyle: DinosaurStyle
 }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const swimmersRef = useRef<Map<string, Swimmer>>(new Map())
@@ -96,6 +98,8 @@ export function Aquarium({
   swayRef.current = swayStrength
   const sizeRef = useRef(sizeScale)
   sizeRef.current = sizeScale
+  const styleRef = useRef(dinosaurStyle)
+  styleRef.current = dinosaurStyle
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -128,7 +132,7 @@ export function Aquarium({
       typeof window !== 'undefined' && window.location.search.includes('measure')
 
     let scene: Scene | null = null
-    let builtFor = { width: -1, height: -1, theme: '', density: -1, size: -1 }
+    let builtFor = { width: -1, height: -1, theme: '', density: -1, size: -1, style: '' }
 
     const resize = (): void => {
       // 4K の大画面でぼやけないように、実画素に合わせる。
@@ -145,20 +149,27 @@ export function Aquarium({
      * 毎フレーム作ると、泡や煙が進まず場所だけ変わってちらつく。
      * テーマが変わったら、動き方も変わるので絵も置き直す。
      */
-    const rebuild = (tank: Tank, theme: ThemeId, density: number, size: number): boolean => {
+    const rebuild = (
+      tank: Tank,
+      theme: ThemeId,
+      density: number,
+      size: number,
+      style: DinosaurStyle,
+    ): boolean => {
       if (
         builtFor.width === tank.width &&
         builtFor.height === tank.height &&
         builtFor.theme === theme &&
         builtFor.density === density &&
-        builtFor.size === size
+        builtFor.size === size &&
+        builtFor.style === style
       ) {
         return false
       }
       // 大きさを変えたら絵を置き直す。泳ぐ範囲が絵の大きさで決まるので、
       // 大きくしただけだと画面の外に出たままの絵が残る。
-      builtFor = { width: tank.width, height: tank.height, theme, density, size }
-      scene = createScene(theme, tank, density)
+      builtFor = { width: tank.width, height: tank.height, theme, density, size, style }
+      scene = createScene(theme, tank, density, style)
       swimmersRef.current.clear()
       return true
     }
@@ -171,7 +182,7 @@ export function Aquarium({
 
       const tank: Tank = { width: canvas.clientWidth, height: canvas.clientHeight }
       const strength = strengthRef.current
-      rebuild(tank, themeRef.current, densityRef.current, sizeRef.current)
+      rebuild(tank, themeRef.current, densityRef.current, sizeRef.current, styleRef.current)
       if (!scene) {
         animationId = requestAnimationFrame(frame)
         return
