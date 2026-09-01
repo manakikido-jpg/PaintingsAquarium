@@ -73,6 +73,19 @@ jobs:
           tag_name: latest
           name: 最新版 0.1.${{ github.run_number }}（自動ビルド）
           body: |
+            ## 0.1.73 以前を使っている人へ
+
+            **0.1.73 以前は、アプリの「更新」ボタンでは新しい版になりません。**
+            落とすところまでしかできず、入れ替えは Windows に止められて
+            何も起きないためです（直したのは 0.1.74 から）。
+
+            **1回だけ手で入れ替えてください。** 下の `PaintingsAquarium-Setup.exe`
+            を落として、そのまま実行するだけです（アンインストールは不要）。
+            **絵と設定は消えません。** 一度 0.1.74 以降にすれば、
+            次からは設定画面の「いま入れ替えて再起動する」で更新できます。
+
+            ---
+
             ## ダウンロードできないときは `PaintingsAquarium.zip`
 
             **未署名なので、ブラウザが `.exe` を落とす段階で止めることがあります。**
@@ -80,7 +93,7 @@ jobs:
 
             | ファイル | 使いどころ |
             |---|---|
-            | `PaintingsAquarium.zip` | **exe が落とせないとき。** 展開して中の `PaintingsAquarium.exe` を叩くだけ。インストール不要 |
+            | `PaintingsAquarium.zip` | **exe が落とせないとき。** 展開して中の `PaintingsAquarium.exe` を叩くだけ。インストール不要。**絵はインストール版と同じ場所を使う**ので、そのまま続きから見られます |
             | `PaintingsAquarium-Setup.exe` | 会場PCに入れて使う（落とせるならこちらが楽） |
             | `PaintingsAquarium-portable.exe` | インストールできないPC用。USBから直接動く |
 

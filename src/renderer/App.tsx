@@ -12,6 +12,12 @@ import type {
 import { DINOSAUR_STYLES, THEMES, themeOf, type DinosaurStyle, type ThemeId } from '../core/theme'
 import { GALLERY_PAGE_SIZE, galleryPage } from '../core/gallery'
 
+/**
+ * 最新版の置き場。**アプリからは見に行かない**（画面に出すだけ）。
+ * 更新の仕組みが効かないときの、唯一の逃げ道なので常に出しておく（R-049）。
+ */
+const RELEASE_PAGE = 'https://github.com/manakikido-jpg/PaintingsAquarium/releases/tag/latest'
+
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [storage, setStorage] = useState<StorageLocation | null>(null)
@@ -389,6 +395,22 @@ export function App(): React.JSX.Element {
                 </button>
               )}
             </div>
+            {/*
+              **手で入れ替える道を、いつでも見えるところに置く。**
+
+              更新の仕組みそのものが壊れている版は、更新の仕組みでは直せない。
+              実際 0.1.73 以前は「落とすだけ」で入れ替えができず、
+              そこから新しい版へは**手で入れ替えるしかなかった**（R-049）。
+              押したときだけ通信する方針は変えていない。ここはただの文字で、
+              表示しても外へは何も送らない。
+            */}
+            <p className="note">
+              うまくいかないときは、ここから落として上書きしてください。
+              <br />
+              <code>{RELEASE_PAGE}</code>
+              <br />
+              上書きしても<strong>絵と設定は消えません</strong>。
+            </p>
             {update && (
               <p className="note">
                 {update.kind === 'latest' && `いまが最新です（${update.version}）。`}
@@ -402,6 +424,8 @@ export function App(): React.JSX.Element {
                   `入れ替えの画面を出しました（${update.version}）。` +
                     '「WindowsによってPCが保護されました」が出たら「詳細情報」→「実行」で進めてください。'}
                 {(update.kind === 'portable' || update.kind === 'unavailable') && update.message}
+                {update.kind === 'downloaded' &&
+                  ' 押しても版が変わらないときは、上のページから落として上書きしてください。'}
               </p>
             )}
           </section>
