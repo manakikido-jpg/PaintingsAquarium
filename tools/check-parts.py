@@ -20,10 +20,9 @@
 見るのは**開く隙間の大きさ**。切り目の上で絵が乗っている点が、
 回したときに軸からの距離だけずれる。その最大値を絵の高さに対する割合で出す。
 
-ひれ（背びれ・胸びれ）は台紙ではなく**取り込んだ絵ごとに測って**決まるので、
-台紙だけ見ても確かめられない。取り込み済みの絵を渡すと、そちらも測る。
-
-    python3 tools/check-parts.py <userData>/data/pieces.json
+**回して動かすのは尾びれだけになった**（R-050）。ひれ・ウミガメのひれ・恐竜の足は
+どれも「下に絵が無い箱」を回していて、ずれた分がそのまま背景の色になっていた。
+いまはどれも伸び縮みか帯に変えてある。
 
 数字（切る位置・振れ角）は `src/core/templates.ts` と `src/core/undulate.ts`
 から読む。手で写すと、片方だけ直したときに黙って食い違う。
@@ -40,13 +39,21 @@ _spec = importlib.util.spec_from_file_location('check_cut', Path(__file__).paren
 _cc = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_cc)
 
-# 目に見える隙間の上限（絵の高さに対する割合）。
+# 回して動かす箱で、開いてよい隙間の上限（絵の高さに対する割合）。
 #
-# **仮の値。** 実機で見えた／見えなかった例からの線引きで、
-#   見えた  四足恐竜の足の切り目 3.1〜4.5%（会場から「足が避けている」）
-#   見えない ウミガメのひれ 0.9〜1.7%（指摘なし・録画でも段差なし）
-# この間のどこかにある。3% は安全側に寄せて置いた。
-# もっと確かな例が出たら、その実測で置き直すこと。
+# **この数字を信用して「見えない」と書かないこと（R-050）。**
+# 一度そうして外した。実測はこうだった。
+#   見えた  四足恐竜の足   3.1〜4.5%
+#   見えた  ウミガメのひれ  0.9〜1.7%  ← 上限の内側なのに、拡大したら青い隙間
+#   見えた  まる魚の背びれ  2.0%       ← 同上。付け根に細い青い筋
+#   見えない まる魚・サメの尾 3.1%      ← 一番大きいのに見えない
+#
+# 大きさでは分かれていない。**分かれているのは「下に絵があるか」。**
+# 尾は胴を全部描いた上に重ねるので、ずれても段差にしかならない。
+# ひれ・足の箱は下に何も無いので、ずれた分がそのまま背景の色になる。
+#
+# だから**下に絵の無い箱は、もう回していない**。この上限は、
+# 回す作りへ戻したときに気づくための番人として残してある。
 GAP_LIMIT = 0.03
 
 # 尾びれだけは別の上限。
@@ -55,9 +62,8 @@ GAP_LIMIT = 0.03
 # 穴は開かず、付け根に段差が出るだけ。ひれや足の箱は下に何も無いので、
 # ずれた分がそのまま背景の色になる。同じずれでも見え方が違う。
 #
-# まる魚とサメの尾は 3.1%。実機で拡大して見たが、段差は分からなかった
-#（`chk4` の捕捉画像）。上限はその少し上に置いてある。
-# これを超える台紙が出たら、目で見て確かめてから通すこと。
+# まる魚とサメの尾は 3.1%。実機で 4倍に拡大して見たが、段差は分からなかった。
+# これを超える台紙が出たら、**必ず拡大して目で見てから**通すこと。
 TAIL_GAP_LIMIT = 0.04
 
 TEMPLATES = {
@@ -134,54 +140,6 @@ def gap_on_row(filled, aspect, y, span, pivot, angle):
     return float(np.max(np.hypot(dx, dy))) * abs(angle)
 
 
-def load_piece(path: Path):
-    """取り込んだ絵（透過PNG）を、台紙と同じ「内側」の形にして返す。"""
-    from PIL import Image
-
-    image = Image.open(path).convert('RGBA')
-    box = image.getbbox()
-    if box is None:
-        return None, 0, 0
-    image = image.crop(box)
-    image.thumbnail((800, 800))
-    filled = np.asarray(image)[:, :, 3] > 40
-    return filled, image.width, image.height
-
-
-def check_pieces(path: Path, fin_max: float) -> list[tuple]:
-    """取り込んだ絵のひれの箱が、絵をどれだけずらすか。"""
-    import json
-
-    pieces = json.loads(path.read_text(encoding='utf-8'))
-    folder = path.parent / 'pieces'
-    over = []
-    for piece in pieces:
-        rig = piece.get('rig') or {}
-        fins = rig.get('fins') or []
-        name = f"{piece.get('species') or '台紙不明'}（{piece.get('fileName')}）"
-        filled, width, height = load_piece(folder / f"{piece['id']}.png")
-        if filled is None:
-            print(f'\n{name}  絵が読めない')
-            continue
-        aspect = width / height
-        print(f'\n{name}  {width}x{height}  ひれ {len(fins)} 枚')
-        for fin in fins:
-            base, side = fin['base'], fin['side']
-            span = (0.0, base) if side == 'top' else (base, 1.0)
-            pivot = ((fin['from'] + fin['to']) / 2, base)
-            gaps = [
-                (f"x={fin['from']:.2f}", gap_on_column(filled, aspect, fin['from'], span, pivot, fin_max)),
-                (f"x={fin['to']:.2f}", gap_on_column(filled, aspect, fin['to'], span, pivot, fin_max)),
-                (f'y={base:.2f}', gap_on_row(filled, aspect, base, (fin['from'], fin['to']), pivot, fin_max)),
-            ]
-            for at, gap in gaps:
-                mark = f'   ← 上限 {GAP_LIMIT * 100:.0f}% を超えている' if gap > GAP_LIMIT else ''
-                if gap > GAP_LIMIT:
-                    over.append((name, f"ひれ({side})", at, gap))
-                print(f"  ひれ({side}) {fin['from']:.2f}〜{fin['to']:.2f}  {at}  隙間 {gap * 100:4.1f}%{mark}")
-    return over
-
-
 def main() -> int:
     templates = (ROOT / 'src/core/templates.ts').read_text(encoding='utf-8')
     undulate = (ROOT / 'src/core/undulate.ts').read_text(encoding='utf-8')
@@ -189,12 +147,13 @@ def main() -> int:
     walkers = walker_cuts(templates)
     hip_overlap = number(templates, 'HIP_OVERLAP') if walkers else 0.0
     leg_swing = number(templates, 'LEG_SWING') if walkers else 0.0
-    kame_side = number(templates, 'KAME_SIDE')
-    kame_front = number(templates, 'KAME_FRONT')
-    kame_back = number(templates, 'KAME_BACK')
+    # ウミガメは分割をやめた（R-050）。表を戻したときだけ測る
+    kame = 'umigame: KAME_PARTS' in templates
+    kame_side = number(templates, 'KAME_SIDE') if kame else 0.0
+    kame_front = number(templates, 'KAME_FRONT') if kame else 0.0
+    kame_back = number(templates, 'KAME_BACK') if kame else 0.0
     ptera_shoulder = number(templates, 'PTERA_SHOULDER')
     tail_max = number(undulate, 'TAIL_MAX_ANGLE')
-    fin_max = number(undulate, 'FIN_MAX_ANGLE')
     head_hold = float(re.search(r'headHold: ([\d.]+)', undulate).group(1))
     kame_swing = 0.13  # KAME_PARTS の swing（表の中の値）
 
@@ -203,8 +162,6 @@ def main() -> int:
 
     worst = 0.0
     over = []
-    for name in sys.argv[1:]:
-        over.extend(check_pieces(Path(name), fin_max))
     for species, relative in TEMPLATES.items():
         filled, ink, width, height = _cc.load(ROOT / relative)
         if filled is None:
@@ -215,7 +172,7 @@ def main() -> int:
 
         # 分割（PARTITION）を持つ絵は、そちらの経路で描かれる。
         # 尾のリグは使われないので測らない（`Aquarium.tsx` の limbs / strips の分岐）
-        if species in tails and species not in walkers and species not in uncut and species != 'umigame':
+        if species in tails and species not in walkers and species not in uncut and not (species == 'umigame' and kame):
             from_ratio, tail_y = tails[species]
             # 頭側の割合をそのまま x に使える（台紙はすべて頭が左）
             past = (from_ratio - head_hold) / (1 - head_hold)
@@ -236,7 +193,8 @@ def main() -> int:
                     )
                 lines.append((f'{name}の腰', f'y={top:.2f}', gap_on_row(filled, aspect, top, box, pivot, leg_swing)))
 
-        if species == 'umigame':
+        # ウミガメは分割をやめた（R-050）。表がまだあれば測る
+        if species == 'umigame' and kame:
             for label, edge, span, pivot in (
                 ('左前ひれ', kame_side, (0, kame_front), (kame_side, kame_front)),
                 ('右前ひれ', 1 - kame_side, (0, kame_front), (1 - kame_side, kame_front)),
@@ -257,7 +215,7 @@ def main() -> int:
             print(f'  肩の線  y={ptera_shoulder:.2f}  伸縮なので切り目が動かない。裂けない')
         if not lines:
             if species in uncut:
-                print('  絵を切らない（1枚のまま縦に縮めて傾ける）。裂けようがない')
+                print('  回さない（腰から下を帯に分け、縦に伸び縮みさせる）。裂けようがない')
             else:
                 print('  回して切る線は無い（帯としなりだけ。裂けようがない）')
             continue
@@ -277,7 +235,7 @@ def main() -> int:
             print(f'  {species} の {label}（{at}）  {gap * 100:.1f}%')
         return 1
     print(
-        f'すべて上限以内（ひれ・足 {GAP_LIMIT * 100:.0f}% / 尾 {TAIL_GAP_LIMIT * 100:.0f}%）。'
+        f'すべて上限以内（回す箱 {GAP_LIMIT * 100:.0f}% / 尾 {TAIL_GAP_LIMIT * 100:.0f}%）。'
         f'一番大きい隙間は {worst * 100:.1f}%'
     )
     return 0

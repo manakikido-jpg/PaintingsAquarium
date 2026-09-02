@@ -215,10 +215,6 @@ export interface SpritePart {
   readonly liftAxis?: 'x' | 'y'
 }
 
-const KAME_SIDE = 0.19
-const KAME_FRONT = 0.23
-const KAME_BACK = 0.77
-
 /*
  * タコの足はここで分けない（R-033）。
  *
@@ -229,52 +225,111 @@ const KAME_BACK = 0.77
  * 帯は隣と傾きでつながるので、どれだけ動かしても開かない。
  */
 
-/**
- * ウミガメ: 四隅のひれだけを回す。甲羅は切らない。
- * 前足と後ろ足は逆の拍にして、漕いでいるように見せる。
+/*
+ * ウミガメは分割しない（R-050）。
+ *
+ * 四隅のひれだけを回していた。**これが裂けていた。**
+ * 会場向けの絵を拡大したら、**左前のひれと甲羅のあいだに青い隙間**が開いていた
+ *（`scratchpad/kame.png`）。
+ *
+ * 台紙を測ると、ひれの箱の内側の縁（x=0.19 / 0.81）は絵を **58%** 横切る。
+ * 甲羅を貫いている。回せば必ずそこが開く。
+ *
+ * **私はこれを「見えない」と報告していた。** 道具（`tools/check-parts.py`）の
+ * 数字は 0.9〜1.7% で上限の内側だったが、**拡大して見ていなかった**。
+ * ひれの箱は**下に何も描かれていない**ので、ずれた分がそのまま背景の青になる。
+ * 同じ 1.7% でも、段差より穴のほうがずっと目立つ（R-050）。
+ *
+ * ウミガメは `tentacled` なので、分割を外すと**タコと同じ「横帯＋せん断」**になる。
+ * 帯は隣と傾きでつながるので、どれだけ動かしても開かない。
+ * ひれも甲羅もまとめて、ゆっくりうねる。
  */
-const KAME_PARTS: readonly SpritePart[] = [
-  { box: { x: 0, y: 0, w: KAME_SIDE, h: KAME_FRONT }, pivot: { x: KAME_SIDE, y: KAME_FRONT }, swing: 0.13, beat: 0 },
-  { box: { x: KAME_SIDE, y: 0, w: 1 - KAME_SIDE * 2, h: KAME_FRONT }, pivot: { x: 0.5, y: 0 }, swing: 0, beat: 0 },
-  { box: { x: 1 - KAME_SIDE, y: 0, w: KAME_SIDE, h: KAME_FRONT }, pivot: { x: 1 - KAME_SIDE, y: KAME_FRONT }, swing: 0.13, beat: 0.5 },
-  { box: { x: 0, y: KAME_FRONT, w: 1, h: KAME_BACK - KAME_FRONT }, pivot: { x: 0.5, y: 0.5 }, swing: 0, beat: 0 },
-  { box: { x: 0, y: KAME_BACK, w: KAME_SIDE, h: 1 - KAME_BACK }, pivot: { x: KAME_SIDE, y: KAME_BACK }, swing: 0.13, beat: 0.5 },
-  { box: { x: KAME_SIDE, y: KAME_BACK, w: 1 - KAME_SIDE * 2, h: 1 - KAME_BACK }, pivot: { x: 0.5, y: 1 }, swing: 0, beat: 0 },
-  { box: { x: 1 - KAME_SIDE, y: KAME_BACK, w: KAME_SIDE, h: 1 - KAME_BACK }, pivot: { x: 1 - KAME_SIDE, y: KAME_BACK }, swing: 0.13, beat: 0 },
-]
 
 /**
- * 四足の恐竜: **切らずに、体ごと沈んで起きる。**
+ * 四足の恐竜: **切らずに、足を伸び縮みさせて歩かせる。**
  *
  * 以前は前足の組と後ろ足の組に切って前後に振っていた。**これが裂けていた。**
- * 会場から「足が避けている」と言われて測ったら、切り目に選んだ列は
- * どれも**胴を貫いていた**（アンキロ 40〜47%・ブロント 46〜58%・
- * ステゴ 36〜54%・トリケラ 20〜46%）。
+ * 切り目に選んだ列はどれも胴を貫いていた（アンキロ 40〜47%・ブロント 46〜58%・
+ * ステゴ 36〜54%・トリケラ 20〜46%）。足の隙間は足先にしか無く、
+ * その上は腹でつながっている。足元の列だけを数えて決めたのが誤りだった（R-048）。
  *
- * なぜ気づかなかったか。切る位置は**足元の列だけ**を数えて決めていた。
- * 足の隙間は足先にしか無く、その上は腹でつながっている。
- * 足元だけ見れば 0%、箱の高さ全体で見れば半分を横切る。
- * 測る帯を間違えていた（R-048）。
+ * そのあと「絵を1枚のまま縦に縮めて傾ける」に変えた。裂けはしないが、
+ * **足が動かない**（本人の指摘）。
  *
- * 隙間が本当に空くのは y>0.74〜0.93 から下だけ。そこを箱の上端にすると
- * 箱の高さは 0.04〜0.23 しか残らず、足先の動きは絵の高さの 2.8% 以下、
- * 実寸で 3px。**切っても見えない。**
+ * いまは**腰から下を縦の細い帯に分け、帯ごとに縦へ伸び縮みさせる**。
  *
- * だから切るのをやめた。代わりに絵を1枚のまま、地面を軸に
- * **縦に縮めて、少し傾ける**。伸び縮みも回転も切り目が無いので裂けようがなく、
- * 体重が前足に乗って沈む歩き方に見える。
+ * なぜこれなら裂けないか。**回さずに、縦に伸び縮みさせるだけ**だから。
+ *   - 軸は腰の線。**軸の上の画素は動かない**ので、胴との境目は開きようがない
+ *   - 隣り合う帯の伸び率は**なめらかに変わる**ので、縦の切り目に段差が出ない
+ *     （魚の胴を帯に切ってせん断でつないでいるのと同じ考え方）
+ *
+ * 伸び率の山と谷は、**足と足の隙間**（どの台紙も x=0.40 あたり）に
+ * 変化の一番大きいところが来るように置いてある。
+ * 伸び率が一番急に変わるのはそこなので、**絵の無い所で変化を使い切る**。
+ * 前足の組と後ろ足の組が逆に伸び縮みして、体重が前後に移って見える。
  */
-const WALK_SQUASH = 0.05
-const WALK_LEAN = 0.035
+
+/** 腰の線。ここから下だけが動く。ここより上は動かない */
+const WALK_HIP = 0.6
+/*
+ * 腰から下を何本の帯に分けるか。
+ *
+ * **振れ幅と一緒に上げること。** 隣との段差は「振れ幅 ÷ 帯の数」で決まるので、
+ * 振れ幅だけ上げると足元に段差が出る。実測で、
+ * 14本・0.09 と 20本・0.14 は同じ段差（絵の高さの 1.7%）で、動きだけが 1.5 倍になる。
+ */
+const WALK_STRIPS = 20
+/**
+ * 足の伸び縮みの幅（倍率のふり幅）。
+ * 0.09 では「動いているのは分かるが小さい」と言われた（本人の指摘）。
+ */
+const WALK_STRETCH = 0.14
+/** 胴の上下。足より小さくする。大きいと絵が波打って見える */
+const WALK_BODY_LIFT = 0.03
+/**
+ * 伸び率が 0 になる位置（＝前後で向きが入れ替わる所）。
+ * どの台紙も足と足の隙間がこのあたりにある。
+ *   アンキロ 0.40〜0.56 ／ ブロント 0.39〜0.41
+ *   ステゴ  0.38〜0.41 ／ トリケラ 0.37〜0.40
+ */
+const WALK_PIVOT_X = 0.4
+
+/**
+ * 帯の中心での伸び率の重み（-1〜1）。
+ *
+ * `WALK_PIVOT_X` で 0 になり、その前後で符号が反転する。
+ * **段差が一番大きく出るのは 0 を横切る所**なので、そこを足の隙間に合わせてある。
+ */
+function walkWeight(x: number): number {
+  return Math.sin((x - WALK_PIVOT_X) * Math.PI * 2)
+}
 
 const WALKER_PARTS: readonly SpritePart[] = [
+  // 腰から下。帯ごとに縦へ伸び縮み。軸は腰の線なので、上端は動かない
+  ...Array.from({ length: WALK_STRIPS }, (_, index): SpritePart => {
+    const from = index / WALK_STRIPS
+    const width = 1 / WALK_STRIPS
+    const centre = from + width / 2
+    return {
+      box: { x: from, y: WALK_HIP, w: width, h: 1 - WALK_HIP },
+      pivot: { x: centre, y: WALK_HIP },
+      swing: 0,
+      beat: 0,
+      lift: WALK_STRETCH * walkWeight(centre),
+      liftAxis: 'y',
+    }
+  }),
+  /*
+   * 胴（腰から上）。**軸は足と同じ腰の線**にする。
+   * 別の軸にすると、腰のところで足と胴がずれて段差になる。
+   * 拍を少しずらして、足の動きに遅れて背中が上下するようにしてある。
+   */
   {
-    box: { x: 0, y: 0, w: 1, h: 1 },
-    // 軸は地面。足は地に着いたまま、体だけが沈んで起きる
-    pivot: { x: 0.5, y: 1 },
-    swing: WALK_LEAN,
-    beat: 0,
-    lift: WALK_SQUASH,
+    box: { x: 0, y: 0, w: 1, h: WALK_HIP },
+    pivot: { x: 0.5, y: WALK_HIP },
+    swing: 0,
+    beat: 0.25,
+    lift: WALK_BODY_LIFT,
     liftAxis: 'y',
   },
 ]
@@ -313,7 +368,6 @@ const PTERA_PARTS: readonly SpritePart[] = [
 ]
 
 export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
-  umigame: KAME_PARTS,
   pteranodon: PTERA_PARTS,
   /*
    * 四足はどれも同じ動かし方（切らない）。台紙ごとの数字はもう要らない。

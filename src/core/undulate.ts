@@ -152,30 +152,3 @@ export function tailAngle(
 export function headRatioToImageX(fromHead: number, headsRight: boolean): number {
   return headsRight ? 1 - fromHead : fromHead
 }
-
-/** 背びれ・腹びれの最大の振れ角（ラジアン）。約 12 度。 */
-export const FIN_MAX_ANGLE = 0.21
-
-/**
- * 背びれ・腹びれの角度。
- *
- * 尾びれよりずっと小さく振る。実際の魚も、背びれは進む向きを保つための
- * ひれで、尾のように打ち振るものではない。
- * 大きく振ると、ひれが体から外れて別の生き物が付いているように見える。
- *
- * 位相を体の位置でずらすのは、複数のひれが同時に同じ方向へ動くと
- * **絵全体が波打っているようにしか見えない**ため。
- */
-export function finAngle(
-  centreRatio: number,
-  timeSeconds: number,
-  phase: number,
-  sway: number,
-  options: UndulateOptions = DEFAULT_UNDULATE,
-): number {
-  if (sway <= 0) return 0
-  const wave = Math.sin(
-    (centreRatio / options.waveLength) * TAU - timeSeconds * options.speed * TAU + phase,
-  )
-  return wave * FIN_MAX_ANGLE * Math.min(1, Math.max(0, sway))
-}

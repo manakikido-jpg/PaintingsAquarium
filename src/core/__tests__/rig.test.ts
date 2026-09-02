@@ -5,7 +5,6 @@ import {
   backIsUp,
   columnSpans,
   estimateRig,
-  findFins,
   findTail,
   flareConfidence,
   flipVertical,
@@ -105,28 +104,16 @@ describe('findTail', () => {
   })
 
   /*
-   * 回すと段差になる箱は持たない（R-048）。
+   * ひれは探さない（R-050）。
    *
-   * 会場で見えたのはサメの背びれで、箱の縁の外にも胴が続いていた。
-   * 箱ごと回すと、続いている胴が付け根の線でずれて、背中に青い筋が走った。
+   * 探して箱ごと回していたのをやめた。回すには胴の帯から
+   * **ひれの側を除いて**描く必要があり、ひれの下に何も無くなる。
+   * ずれた分がそのまま背景の色になり、実機で背びれの付け根に青い筋が出た。
+   * いまはひれも胴の帯の一部として描く。
    */
-  it('箱の外にも胴が続いているひれは持たない', () => {
-    // 上へ 0.2 だけ出っ張った台形。出っ張りの外側も同じ高さまで胴が続く
-    const image = createImage(240, 120)
-    for (let x = 20; x < 220; x++) fill(image, x, 40, x + 1, 90)
-    for (let x = 100; x < 140; x++) fill(image, x, 10, x + 1, 40)
-    const clean = findFins(columnSpans(image, 24), 'top', { from: 0, to: 1 }, 2)
-    expect(clean.length).toBeGreaterThan(0)
-
-    // 同じ出っ張りの右隣にも、付け根より上へ伸びる胴を足す
-    const torn = createImage(240, 120)
-    for (let x = 20; x < 220; x++) fill(torn, x, 40, x + 1, 90)
-    for (let x = 100; x < 140; x++) fill(torn, x, 10, x + 1, 40)
-    for (let x = 140; x < 200; x++) fill(torn, x, 12, x + 1, 40)
-    // 出っ張りだけを切り出す箱は残らない（同じ出っ張りが、隣に胴が続くだけで落ちる）
-    const kept = findFins(columnSpans(torn, 24), 'top', { from: 0, to: 1 }, 2)
-    const same = clean[0]
-    expect(kept.some((fin) => Math.abs(fin.from - same.from) < 0.05)).toBe(false)
+  it('リグはひれを持たない', () => {
+    const rig = estimateRig(fishFacingRight()) as unknown as Record<string, unknown>
+    expect('fins' in rig).toBe(false)
   })
 
   it('区間が少なすぎるときは判定しない', () => {
@@ -453,91 +440,3 @@ describe('tipsAtBottom', () => {
   })
 })
 
-/** 背びれと腹びれのある魚。胴は滑らかで、上下に三角の出っ張りが1つずつ。 */
-function finnedFish(): RgbaImage {
-  const image = createImage(120, 60)
-  // 胴（中央が厚い楕円）
-  for (let x = 10; x < 110; x++) {
-    const t = (x - 10) / 100
-    const half = Math.round(16 * Math.sin(Math.PI * t) + 4)
-    fill(image, x, 30 - half, x + 1, 30 + half)
-  }
-  // 背びれ（上）と腹びれ（下）
-  for (let x = 52; x < 68; x++) {
-    const rise = 12 - Math.abs(x - 60)
-    fill(image, x, 30 - 20 - rise, x + 1, 30 - 18)
-    fill(image, x, 30 + 18, x + 1, 30 + 20 + rise)
-  }
-  return image
-}
-
-describe('findFins', () => {
-  it('胴から突き出した部分を上下それぞれで見つける', () => {
-    const spans = columnSpans(finnedFish(), 24)
-    const top = findFins(spans, 'top')
-    const bottom = findFins(spans, 'bottom')
-    expect(top.length).toBeGreaterThan(0)
-    expect(bottom.length).toBeGreaterThan(0)
-    // 絵の真ん中あたりにある
-    expect((top[0].from + top[0].to) / 2).toBeGreaterThan(0.35)
-    expect((top[0].from + top[0].to) / 2).toBeLessThan(0.65)
-  })
-
-  it('突き出しの無い滑らかな胴では何も見つけない', () => {
-    const image = createImage(120, 60)
-    for (let x = 10; x < 110; x++) {
-      const t = (x - 10) / 100
-      const half = Math.round(20 * Math.sin(Math.PI * t) + 4)
-      fill(image, x, 30 - half, x + 1, 30 + half)
-    }
-    const spans = columnSpans(image, 24)
-    expect(findFins(spans, 'top')).toHaveLength(0)
-    expect(findFins(spans, 'bottom')).toHaveLength(0)
-  })
-
-  it('胴の外は見ない。尾びれの上下の羽をひれとして二重に拾わないため', () => {
-    const spans = columnSpans(fishFacingRight(), 24)
-    // 尾は絵の左端。胴だけ（右 60%）を見れば、尾の羽は入らない
-    const all = findFins(spans, 'top')
-    const bodyOnly = findFins(spans, 'top', { from: 0.4, to: 1 })
-    expect(bodyOnly.length).toBeLessThanOrEqual(all.length)
-    for (const fin of bodyOnly) expect(fin.to).toBeGreaterThan(0.4)
-  })
-
-  it('付け根の高さを返す。ここを軸に回すため', () => {
-    const fins = findFins(columnSpans(finnedFish(), 24), 'top')
-    expect(fins[0].base).toBeGreaterThan(0)
-    expect(fins[0].base).toBeLessThan(1)
-    // 背びれの付け根は絵の真ん中より上
-    expect(fins[0].base).toBeLessThan(0.5)
-  })
-
-  /*
-   * 回すと段差になる箱は持たない（R-048）。
-   *
-   * 会場で見えたのはサメの背びれで、箱の縁の外にも胴が続いていた。
-   * 箱ごと回すと、続いている胴が付け根の線でずれて、背中に青い筋が走った。
-   */
-  it('箱の外にも胴が続いているひれは持たない', () => {
-    // 上へ 0.2 だけ出っ張った台形。出っ張りの外側も同じ高さまで胴が続く
-    const image = createImage(240, 120)
-    for (let x = 20; x < 220; x++) fill(image, x, 40, x + 1, 90)
-    for (let x = 100; x < 140; x++) fill(image, x, 10, x + 1, 40)
-    const clean = findFins(columnSpans(image, 24), 'top', { from: 0, to: 1 }, 2)
-    expect(clean.length).toBeGreaterThan(0)
-
-    // 同じ出っ張りの右隣にも、付け根より上へ伸びる胴を足す
-    const torn = createImage(240, 120)
-    for (let x = 20; x < 220; x++) fill(torn, x, 40, x + 1, 90)
-    for (let x = 100; x < 140; x++) fill(torn, x, 10, x + 1, 40)
-    for (let x = 140; x < 200; x++) fill(torn, x, 12, x + 1, 40)
-    // 出っ張りだけを切り出す箱は残らない（同じ出っ張りが、隣に胴が続くだけで落ちる）
-    const kept = findFins(columnSpans(torn, 24), 'top', { from: 0, to: 1 }, 2)
-    const same = clean[0]
-    expect(kept.some((fin) => Math.abs(fin.from - same.from) < 0.05)).toBe(false)
-  })
-
-  it('区間が少なすぎるときは判定しない', () => {
-    expect(findFins(columnSpans(finnedFish(), 6), 'top')).toHaveLength(0)
-  })
-})

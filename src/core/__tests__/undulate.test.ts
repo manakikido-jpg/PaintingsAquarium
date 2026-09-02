@@ -9,8 +9,6 @@ import {
   tailWeight,
   tailAngle,
   TAIL_MAX_ANGLE,
-  finAngle,
-  FIN_MAX_ANGLE,
   headRatioToImageX,
 } from '../undulate'
 
@@ -197,24 +195,3 @@ describe('headRatioToImageX', () => {
   })
 })
 
-describe('finAngle', () => {
-  it('しなり 0 なら振れない', () => {
-    expect(finAngle(0.5, 1.1, 0.2, 0)).toBe(0)
-  })
-
-  it('尾びれよりはっきり小さく振る。大きく振ると体から外れて見える', () => {
-    expect(FIN_MAX_ANGLE).toBeLessThan(TAIL_MAX_ANGLE / 2)
-  })
-
-  it('最大の振れ角を超えない', () => {
-    for (let time = 0; time < 3; time += 0.02) {
-      expect(Math.abs(finAngle(0.5, time, 1.3, 1))).toBeLessThanOrEqual(FIN_MAX_ANGLE + 1e-9)
-    }
-  })
-
-  it('体の前後で位相がずれる。全部のひれが揃うと絵全体が波打って見える', () => {
-    const front = finAngle(0.3, 0.5, 0, 1)
-    const back = finAngle(0.8, 0.5, 0, 1)
-    expect(Math.abs(front - back)).toBeGreaterThan(0.02)
-  })
-})

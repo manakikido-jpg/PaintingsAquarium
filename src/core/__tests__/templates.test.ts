@@ -240,52 +240,48 @@ describe('手足の分割', () => {
     return { area, overlap }
   }
 
-  it('ウミガメは、絵を隙間なく重なりなく分けている', () => {
-    for (const id of ['umigame'] as const) {
-      const { area, overlap } = covers(partsForPiece(id))
-      // 面積の合計が絵ぜんぶ（1）で、重なりが無い＝同じ画素を2度描かない
-      expect(area).toBeCloseTo(1, 5)
-      expect(overlap).toBeCloseTo(0, 5)
-    }
-  })
-
-  it('回しても反転しても、隙間なく重なりなくのまま', () => {
-    for (const id of ['umigame'] as const) {
+  /*
+   * **分割は絵を余さず覆う必要がある。** 1か所でも抜けると、そこだけ
+   * 描かれずに背景が透ける（甲羅を切ったときに実際にやった間違い）。
+   * 重なりも困る。同じ画素を2度描くと、半透明の線が濃く出る。
+   */
+  it('分割を持つ絵は、隙間なく重なりなく覆っている', () => {
+    const partitioned: SpeciesId[] = [
+      'pteranodon',
+      'ankylosaurus',
+      'brontosaurus',
+      'stegosaurus',
+      'triceratops',
+    ]
+    for (const id of partitioned) {
       for (const turns of [0, 1, 2, 3]) {
         for (const mirrored of [false, true]) {
           const { area, overlap } = covers(partsForPiece(id, turns, mirrored))
-          expect(area).toBeCloseTo(1, 5)
-          expect(overlap).toBeCloseTo(0, 5)
+          expect(area, `${id} turns=${turns}`).toBeCloseTo(1, 5)
+          expect(overlap, `${id} turns=${turns}`).toBeCloseTo(0, 5)
         }
       }
     }
   })
 
-  it('全部が絵の中に収まっている', () => {
-    for (const id of ['umigame'] as const) {
-      for (const turns of [0, 1, 2, 3]) {
-        for (const part of partsForPiece(id, turns, true)) {
-          expect(part.box.x).toBeGreaterThanOrEqual(-0.0001)
-          expect(part.box.y).toBeGreaterThanOrEqual(-0.0001)
-          expect(part.box.x + part.box.w).toBeLessThanOrEqual(1.0001)
-          expect(part.box.y + part.box.h).toBeLessThanOrEqual(1.0001)
-        }
+  /*
+   * ウミガメは分割しない（R-050）。
+   *
+   * 四隅のひれを回していたら、**甲羅とのあいだに青い隙間**が開いた（実機で確認）。
+   * ひれの箱の内側の縁は台紙の 58% を横切っていて、甲羅を貫いている。
+   * 分割を外すと `tentacled` の経路（横帯＋せん断）になり、帯は傾きでつながるので開かない。
+   */
+  it('ウミガメは分割しない（回すと甲羅とのあいだが開く・R-050）', () => {
+    expect(partsForPiece('umigame')).toEqual([])
+    for (const turns of [0, 1, 2, 3]) {
+      for (const mirrored of [false, true]) {
+        expect(partsForPiece('umigame', turns, mirrored)).toEqual([])
       }
     }
-  })
-
-  it('ウミガメはひれが4枚だけ動く', () => {
-    expect(partsForPiece('umigame').filter((part) => part.swing !== 0)).toHaveLength(4)
   })
 
   it('タコは分割しない（回すと足の付け根が裂ける・R-033）', () => {
     expect(partsForPiece('tako')).toEqual([])
-  })
-
-  it('ウミガメの前足と後ろ足は逆の拍で動く', () => {
-    const moving = partsForPiece('umigame').filter((part) => part.swing !== 0)
-    const beats = new Set(moving.map((part) => part.beat))
-    expect(beats).toEqual(new Set([0, 0.5]))
   })
 
   it('分割を持たない生き物では空を返す', () => {
@@ -331,45 +327,76 @@ describe('四足の恐竜', () => {
   const walkers: SpeciesId[] = ['ankylosaurus', 'brontosaurus', 'stegosaurus', 'triceratops']
 
   /*
-   * **切らない。** 足の組に切って振っていたときは、切り目に選んだ列が
+   * **回さない。** 足の組に切って振っていたときは、切り目に選んだ列が
    * どれも胴を 20〜58% 貫いていて、動かすたびに足が胴から外れて見えた（R-048）。
-   * 隙間が本当に空くのは足先だけで、そこを上端にすると足はほとんど動かない。
+   * いまは腰から下を帯に分け、帯ごとに**縦へ伸び縮み**させる。
+   * 伸び縮みは軸の上の画素を動かさないので、胴との境目が開きようがない。
    */
-  it('絵を切らない（動く部分は絵の全面ひとつだけ）', () => {
+  it('どの部分も回さない', () => {
+    for (const id of walkers) {
+      for (const part of partsForPiece(id)) expect(part.swing).toBe(0)
+    }
+  })
+
+  it('動くのは腰から下の帯と、胴の上下だけ', () => {
     for (const id of walkers) {
       const parts = partsForPiece(id)
-      expect(parts).toHaveLength(1)
-      const [only] = parts
-      expect(only.box).toEqual({ x: 0, y: 0, w: 1, h: 1 })
+      const body = parts[parts.length - 1]
+      // 胴は絵の上から腰まで。最後に描くので腰の継ぎ目を隠せる
+      expect(body.box.x).toBeCloseTo(0)
+      expect(body.box.y).toBeCloseTo(0)
+      expect(body.box.w).toBeCloseTo(1)
+      const hip = body.box.h
+
+      const legs = parts.slice(0, -1)
+      expect(legs.length).toBeGreaterThan(4)
+      for (const leg of legs) {
+        // 帯は腰から下端まで
+        expect(leg.box.y).toBeCloseTo(hip)
+        expect(leg.box.y + leg.box.h).toBeCloseTo(1)
+        // **軸は腰の線。** ここがずれると胴との境目が開く
+        expect(leg.pivot.y).toBeCloseTo(hip)
+        expect(leg.liftAxis ?? 'y').toBe('y')
+      }
+      // 胴の軸も腰の線。足と揃っていないと腰で段差になる
+      expect(body.pivot.y).toBeCloseTo(hip)
     }
   })
 
   /*
-   * 伸び縮みと傾きは、どちらも**切り目を持たない**動かし方。
-   * 回して切る動かし方（`swing` を持つ部分が2つ以上）へ戻したら、
-   * また裂ける。ここで止める。
+   * 隣り合う帯の伸び率の差が、そのまま足元の段差になる。
+   * **一番差が大きいのは伸び率が 0 を横切る所**なので、そこを
+   * 足と足の隙間（どの台紙も x=0.40 あたり）に合わせてある。
    */
-  it('地面を軸に、縦に縮んで少し傾く', () => {
+  it('隣り合う帯の伸び率の差が小さい（段差にならない）', () => {
     for (const id of walkers) {
-      const [only] = partsForPiece(id)
-      expect(only.pivot).toEqual({ x: 0.5, y: 1 })
-      expect(only.lift).toBeGreaterThan(0)
-      expect(only.liftAxis ?? 'y').toBe('y')
-      expect(Math.abs(only.swing)).toBeGreaterThan(0)
-      // 大きく傾けると絵が倒れる。2度前後まで
-      expect(Math.abs(only.swing)).toBeLessThan(0.05)
+      const parts = partsForPiece(id)
+      const legs = parts.slice(0, -1)
+      const body = parts[parts.length - 1]
+      const legHeight = 1 - body.box.h
+      for (let index = 1; index < legs.length; index++) {
+        const step = Math.abs((legs[index].lift ?? 0) - (legs[index - 1].lift ?? 0)) * legHeight
+        // 上限は `tools/check-parts.py` の 3%
+        expect(step).toBeLessThan(0.03)
+      }
     }
   })
 
-  it('紙を回して置いても、絵を切らないままでいる', () => {
+  it('前と後ろが逆に伸び縮みする（体重が移って見える）', () => {
+    for (const id of walkers) {
+      const legs = partsForPiece(id).slice(0, -1)
+      const lifts = legs.map((leg) => leg.lift ?? 0)
+      expect(Math.min(...lifts)).toBeLessThan(0)
+      expect(Math.max(...lifts)).toBeGreaterThan(0)
+    }
+  })
+
+  it('紙を回して置いても、回す部分は出てこない', () => {
     for (const id of walkers) {
       for (const turns of [0, 1, 2, 3]) {
         for (const mirrored of [false, true]) {
-          const parts = partsForPiece(id, turns, mirrored)
-          expect(parts).toHaveLength(1)
-          const [only] = parts
-          expect(only.box.w).toBeCloseTo(1)
-          expect(only.box.h).toBeCloseTo(1)
+          // 反転すると `-0` になる。値としては同じ
+          for (const part of partsForPiece(id, turns, mirrored)) expect(part.swing).toBeCloseTo(0)
         }
       }
     }
