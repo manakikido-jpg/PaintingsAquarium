@@ -5,9 +5,13 @@
 
 A4・300dpi。上にテーマの題を入れ、その下に生き物を大きく置く。
 
-  docs/お絵かき水族館-台紙.pdf     ← **これを印刷する**（6ページ）
-  docs/お絵かきダイナソー-台紙.pdf ← **これを印刷する**（5ページ）
+  docs/お絵かき台紙-全11枚.pdf     ← **全部まとめて刷るとき**
+  docs/お絵かき水族館-台紙.pdf     水族館だけ（6ページ）
+  docs/お絵かきダイナソー-台紙.pdf 恐竜だけ（5ページ）
   sheets/<テーマ>/<種類>.png       1枚ずつ要るとき（リポジトリには入れない）
+
+会期で使うのは片方のテーマだけなので、ふだんはテーマごとの PDF を刷る。
+全部まとめたものは、**下見や試し刷りで1枚ずつ確かめるとき**に使う。
 
 台紙を1枚でも差し替えたら、この道具を通し直すこと。
 
@@ -132,6 +136,7 @@ def main() -> int:
     # PNG は作り直せるのでリポジトリに入れない。PDF だけ docs に置く
     out = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / 'sheets')
     made = 0
+    all_pages = []
     for theme, spec in THEMES.items():
         target = out / theme
         target.mkdir(parents=True, exist_ok=True)
@@ -140,6 +145,7 @@ def main() -> int:
             page = sheet(path, spec['title'], spec['lead'])
             page.save(target / f'{path.stem}.png', dpi=(DPI, DPI))
             pages.append(page)
+            all_pages.append(page)
             made += 1
             print(f'  {theme}/{path.stem}.png  {page.width}x{page.height}')
         if pages:
@@ -152,6 +158,17 @@ def main() -> int:
                 title=spec['title'],
             )
             print(f'  → {pdf.name}  {len(pages)} ページ  {pdf.stat().st_size / 1024 / 1024:.1f}MB')
+
+    if all_pages:
+        every = (ROOT / 'docs' if out == ROOT / 'sheets' else out) / 'お絵かき台紙-全11枚.pdf'
+        all_pages[0].save(
+            every,
+            save_all=True,
+            append_images=all_pages[1:],
+            resolution=DPI,
+            title='お絵かき台紙（全11枚）',
+        )
+        print(f'  → {every.name}  {len(all_pages)} ページ  {every.stat().st_size / 1024 / 1024:.1f}MB')
 
     print(f'\n{made} 枚を書き出した（PNG は {out}）')
     print('印刷は A4・等倍（「用紙に合わせる」を切る）。ふちなしは要らない。')
