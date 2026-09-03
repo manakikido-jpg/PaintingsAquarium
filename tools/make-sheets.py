@@ -22,8 +22,17 @@ A4・300dpi。上にテーマの題を入れ、その下に生き物を大きく
 絵から十分離してあるので、はみ出して塗ってもつながらない。
 **これは実測で確かめること**（下の「確かめ方」）。
 
-紙の向きは絵ごとに変える。横に長い絵を縦の紙に置くと小さくしか刷れない。
-1つの PDF に縦と横が混ざるが、印刷のときは自動で向きが合う。
+**紙の向きは全種そろえて A4 よこ。** 会場で刷る設定を1つにするため。
+
+絵ごとに向きを変えれば1枚ずつは大きく刷れるが、1つの PDF に縦と横が混ざる。
+そろえるならどちらかだが、実測すると差がはっきりしていた（使える面積の合計）。
+
+    水族館6種   たて 161 / よこ 148   たてが 1.09 倍
+    恐竜5種     たて 110 / よこ 158   よこが 1.44 倍
+
+恐竜は横長ばかりで、たてに統一すると**アンキロサウルスが 182×86mm の細い帯**になり、
+紙の下半分が白く余る。よこに統一したときの水族館の損は 9% しかない。
+一番狭くなるのはクラゲ（74×147mm）だが、もともと縦に細い絵なので塗る面積は足りる。
 
 確かめ方:
 
@@ -44,14 +53,15 @@ def mm(value: float) -> int:
     return round(value / 25.4 * DPI)
 
 
-# A4。縦と横を絵に合わせて選ぶ
+# A4。**全種これで統一する**（上の説明）。縦に戻すなら PAGE を入れ替える
 A4_PORTRAIT = (mm(210), mm(297))
 A4_LANDSCAPE = (mm(297), mm(210))
+PAGE = A4_LANDSCAPE
 # 紙の端。ふちなし印刷でないと刷れないので、余裕を持たせる
 MARGIN = mm(14)
 # 題の下に空ける幅。**ここを詰めない。**
 # 詰めると、はみ出して塗った色が題につながり、文字ごと絵として拾われる
-TITLE_GAP = mm(12)
+TITLE_GAP = mm(9)
 
 FONT = '/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf'
 # 線と同じ濃さ。薄くすると印刷でかすれる
@@ -86,20 +96,18 @@ def fitted(font_path: str, text: str, width: int, cap: int) -> ImageFont.FreeTyp
 
 def sheet(art_path: Path, title: str, lead: str) -> Image.Image:
     art = Image.open(art_path).convert('L')
-    box = art.getbbox() if art.mode == 'L' else None
     # 台紙は白地に黒線。余白を詰めてから置き直す（元の余白の量に左右されないため）
     trimmed = art.point(lambda v: 0 if v < 250 else 255)
     bbox = trimmed.point(lambda v: 255 - v).getbbox()
     if bbox:
         art = art.crop(bbox)
 
-    # 縦長の絵は縦の紙、横長の絵は横の紙。大きく刷れるほうを選ぶ
-    page_size = A4_PORTRAIT if art.width / art.height < 0.95 else A4_LANDSCAPE
-    page = Image.new('L', page_size, 255)
+    page = Image.new('L', PAGE, 255)
     pen = ImageDraw.Draw(page)
 
     inner = page.width - MARGIN * 2
-    title_font = fitted(FONT, title, inner, mm(22))
+    # よこ向きは高さが 210mm しかない。題を大きく取りすぎると絵が痩せる
+    title_font = fitted(FONT, title, inner, mm(16))
     lead_font = fitted(FONT, lead, inner, mm(7))
 
     y = MARGIN
