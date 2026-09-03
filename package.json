@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "紙に描いた絵を、フォルダに置くだけで大画面の水槽に泳がせる（完全オフライン）",
+  "author": "manakikido",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev": "vite",
