@@ -10,6 +10,19 @@ import { drawParts, loadParts, type PartImages } from '../drawParts'
 import { DECOR_PARTS } from '../parts'
 import type { Scene } from './types'
 
+/**
+ * 揺らぎ模様を焼く1周の長さ（秒）と、1秒あたりのコマ数。
+ *
+ * 180秒・0.5コマ/秒 ＝ 90コマ。`loopingDrift` が波の進みを
+ * 「1周でちょうど戻る」値に丸めるので、90コマ目の次が1コマ目に
+ * **継ぎ目なく**つながる（`src/core/caustics.ts`）。
+ *
+ * 長くするほど繰り返しに気づかれないが、**焼いた絵の大きさが比例して増える**。
+ * いまの値だと 2枚あわせて GPU 側に約 140MB 持つ。
+ */
+const CAUSTICS_LOOP = 180
+const CAUSTICS_FPS = 0.5
+
 /*
  * 水族館の世界。
  *
@@ -145,7 +158,20 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
    * 揺らぎ模様は2枚。細かいほうは弱くしてある。
    * デフォルメした絵なので、水面の模様まで細かく描き込むと写実に寄ってしまう。
    */
+
+  /*
+   * **起動時に1周ぶんを焼いて、以降は貼るだけにする（F-348）。**
+   *
+   * 揺らぎ模様は画素ごとの三角関数で、GPU ではなく CPU が回している。
+   * 毎フレーム計算すると 2枚で約 23ms 掛かり、60fps の予算 16.7ms を
+   * それだけで超える（`docs/推奨スペック.md`）。
+   *
+   * `loopSeconds` を渡さないと**焼かない経路**に落ちる。既定が 0 なので、
+   * ここを書き忘れると黙って毎フレーム計算に戻る。実際に一度そうなっていた。
+   */
   const causticsFar = createCausticsLayer(tank, {
+    loopSeconds: CAUSTICS_LOOP,
+    loopFps: CAUSTICS_FPS,
     resolution: 640,
     scale: 15,
     speed: 0.1,
@@ -155,6 +181,8 @@ export function createAquariumScene(tank: Tank, decorDensity = 1): Scene {
     tint: [178, 236, 255],
   })
   const causticsNear = createCausticsLayer(tank, {
+    loopSeconds: CAUSTICS_LOOP,
+    loopFps: CAUSTICS_FPS,
     resolution: 520,
     scale: 29,
     speed: 0.16,
