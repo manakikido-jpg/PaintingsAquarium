@@ -110,11 +110,11 @@ jobs:
 
             ### 印刷する台紙
 
-            | ファイル | |
-            |---|---|
-            | `お絵かき台紙-全11枚.pdf` | 全部まとめて（下見・試し刷り用） |
-            | `お絵かき水族館-台紙.pdf` | 会期で刷るのはこちら（6ページ） |
-            | `お絵かきダイナソー-台紙.pdf` | 同上（5ページ） |
+            下のリンクを押すとそのまま落とせます（ログイン不要）。
+
+            - [お絵かき台紙-全11枚.pdf](https://github.com/manakikido-jpg/PaintingsAquarium/raw/HEAD/docs/%E3%81%8A%E7%B5%B5%E3%81%8B%E3%81%8D%E5%8F%B0%E7%B4%99-%E5%85%A811%E6%9E%9A.pdf) — 全部まとめて（下見・試し刷り用）
+            - [お絵かき水族館-台紙.pdf](https://github.com/manakikido-jpg/PaintingsAquarium/raw/HEAD/docs/%E3%81%8A%E7%B5%B5%E3%81%8B%E3%81%8D%E6%B0%B4%E6%97%8F%E9%A4%A8-%E5%8F%B0%E7%B4%99.pdf) — 会期で刷るのはこちら（6ページ）
+            - [お絵かきダイナソー-台紙.pdf](https://github.com/manakikido-jpg/PaintingsAquarium/raw/HEAD/docs/%E3%81%8A%E7%B5%B5%E3%81%8B%E3%81%8D%E3%83%80%E3%82%A4%E3%83%8A%E3%82%BD%E3%83%BC-%E5%8F%B0%E7%B4%99.pdf) — 同上（5ページ）
 
             **A4・よこ・等倍**で刷ってください（「用紙に合わせる」は切る／両面にしない）。
 
@@ -129,15 +129,19 @@ jobs:
           prerelease: false
           make_latest: true
           # latest.yml も置く。更新の仕組みがこれを見て新しい版か判断する
+          # **台紙の PDF はここに置かない。** 下の説明文からリンクする。
+          #
+          # 一度ここに並べたら、置き場の更新が毎回失敗するようになった（run 87〜88）。
+          # 既にあるファイルは「消す→上げ直す→ラベルを戻す」の順で処理されるが、
+          # その最後で `Not Found`（update-a-release-asset）になる。
+          # 日本語の名前のファイルで起きていた。
+          #
+          # 台紙はアプリと違って毎回変わらないので、ビルドのたびに上げ直す意味も無い。
+          # リポジトリの中のものが Public でそのまま落とせる（確認済み）。
           files: |
             release/*.exe
             release/*.zip
             release/latest.yml
-            # 印刷する台紙も同じ場所に置く。会場へ渡すリンクを1つにするため。
-            # ここのファイルはログイン無しで落とせる（リポジトリが Public）
-            docs/お絵かき台紙-全11枚.pdf
-            docs/お絵かき水族館-台紙.pdf
-            docs/お絵かきダイナソー-台紙.pdf
 
       # 古い版のファイルを消す。
       #
@@ -149,8 +153,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # 台紙の PDF はここに置かなくなったので、残っていれば消える（上の説明）
           keep="PaintingsAquarium.zip PaintingsAquarium-Setup.exe PaintingsAquarium-portable.exe latest.yml"
-          keep="$keep お絵かき台紙-全11枚.pdf お絵かき水族館-台紙.pdf お絵かきダイナソー-台紙.pdf"
           for name in $(gh release view latest --json assets -q '.assets[].name'); do
             case " $keep " in
               *" $name "*) ;;
