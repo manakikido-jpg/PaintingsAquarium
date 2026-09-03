@@ -108,6 +108,16 @@ jobs:
             **USBメモリにコピーしてから起動すれば、そもそも出ません。**
             詳しくは `docs/警告が出て起動できないとき.md`。
 
+            ### 印刷する台紙
+
+            | ファイル | |
+            |---|---|
+            | `お絵かき台紙-全11枚.pdf` | 全部まとめて（下見・試し刷り用） |
+            | `お絵かき水族館-台紙.pdf` | 会期で刷るのはこちら（6ページ） |
+            | `お絵かきダイナソー-台紙.pdf` | 同上（5ページ） |
+
+            **A4・よこ・等倍**で刷ってください（「用紙に合わせる」は切る／両面にしない）。
+
             ### そのほか
 
             **ファイル名は毎回同じです。** いまの版は設定画面（`S` キー）に出ます。
@@ -123,11 +133,16 @@ jobs:
             release/*.exe
             release/*.zip
             release/latest.yml
+            # 印刷する台紙も同じ場所に置く。会場へ渡すリンクを1つにするため。
+            # ここのファイルはログイン無しで落とせる（リポジトリが Public）
+            docs/お絵かき台紙-全11枚.pdf
+            docs/お絵かき水族館-台紙.pdf
+            docs/お絵かきダイナソー-台紙.pdf
 
       # 古い版のファイルを消す。
       #
       # 名前に版番号が入っていた頃のファイルが残ると、会場で
-      # 「どれを落とすのか」が分からなくなる。置くのは常にこの4つだけにする。
+      # 「どれを落とすのか」が分からなくなる。置くのは keep に並べたものだけにする。
       - name: 古いファイルを消す
         if: github.ref_name == github.event.repository.default_branch
         shell: bash
@@ -135,6 +150,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           keep="PaintingsAquarium.zip PaintingsAquarium-Setup.exe PaintingsAquarium-portable.exe latest.yml"
+          keep="$keep お絵かき台紙-全11枚.pdf お絵かき水族館-台紙.pdf お絵かきダイナソー-台紙.pdf"
           for name in $(gh release view latest --json assets -q '.assets[].name'); do
             case " $keep " in
               *" $name "*) ;;
