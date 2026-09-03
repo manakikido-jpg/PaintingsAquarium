@@ -2,6 +2,7 @@
 """台紙に色を塗った「取り込み用の見本」を作る。
 
     python3 tools/make-sample-scans.py 出力先フォルダ [枚数]
+    python3 tools/make-sample-scans.py 出力先フォルダ [枚数] --sheets <印刷用台紙のフォルダ>
 
 **何のために要るのか**
 
@@ -19,6 +20,10 @@
   - 線の内側を、その生き物らしい色で塗る
   - クレヨンのムラ（低い周波数のゆらぎ）と、白い塗り残しを入れる
   - 2枚目以降は**線からはみ出して塗る**。子どもの塗り方に近く、切り抜きの試験になる
+
+`--sheets` を付けると、`tools/make-sheets.py` が作った**題入りの台紙**を塗る。
+**題の文字が取り込みで落ちるかを確かめるのは、これでしかできない。**
+題は絵ではないので、拾われると外接矩形が紙の上端まで伸びて、泳ぐ絵が縦に潰れる。
 """
 import sys
 from pathlib import Path
@@ -113,9 +118,64 @@ def paint(path: Path, rng, spill: int) -> Image.Image:
     return grain.filter(ImageFilter.GaussianBlur(0.4))
 
 
+def paint_sheet(path: Path, rng, spill: int) -> Image.Image:
+    """**題の入った台紙**をそのまま塗る。紙の大きさも配置も変えない。
+
+    こちらは絵を置き直さない。印刷して配る紙と同じ配置のまま塗るので、
+    「題が取り込みで落ちるか」をそのまま試せる。
+    """
+    art = Image.open(path).convert('L')
+    grey = np.asarray(art)
+    ink = grey < INK
+    inside = inside_mask(ink)
+
+    palette = PALETTES.get(path.stem, DEFAULT_PALETTE)
+    canvas = np.full((*grey.shape, 3), PAPER, dtype=float)
+
+    labels, count = ndimage.label(inside & ~ink)
+    order = sorted(range(1, count + 1), key=lambda i: -(labels == i).sum())
+    painted = np.zeros(grey.shape, dtype=bool)
+    for rank, region in enumerate(order):
+        area = labels == region
+        # 文字の内側（「お」の穴など）は塗らない。紙の面積に対して小さすぎる
+        if area.sum() < grey.size * 0.0008:
+            continue
+        colour = np.clip(np.array(palette[rank % len(palette)], dtype=float) * (1 + rng.uniform(-0.09, 0.09)), 0, 255)
+        if spill:
+            area = ndimage.binary_dilation(area, iterations=spill)
+        canvas[area] = colour
+        painted |= area
+
+    shade = crayon(grey.shape, rng)
+    canvas[painted] *= shade[painted][:, None]
+    canvas[ink] = (28, 26, 26)
+
+    page = Image.fromarray(np.clip(canvas, 0, 255).astype('uint8'))
+    noisy = np.clip(np.asarray(page, dtype=float) + rng.normal(0, 1.6, (*page.size[::-1], 3)), 0, 255)
+    return Image.fromarray(noisy.astype('uint8')).filter(ImageFilter.GaussianBlur(0.4))
+
+
 def main() -> int:
-    out = Path(sys.argv[1] if len(sys.argv) > 1 else 'sample-scans')
-    count = int(sys.argv[2]) if len(sys.argv) > 2 else 2
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    out = Path(args[0] if args else 'sample-scans')
+    count = int(args[1]) if len(args) > 1 else 2
+
+    if '--sheets' in sys.argv:
+        sheets = Path(sys.argv[sys.argv.index('--sheets') + 1])
+        made = 0
+        for theme in ('aquarium', 'dinosaur'):
+            target = out / theme
+            target.mkdir(parents=True, exist_ok=True)
+            for path in sorted((sheets / theme).glob('*.png')):
+                for index in range(count):
+                    rng = np.random.default_rng(abs(hash(path.stem)) % 9973 + index * 101)
+                    page = paint_sheet(path, rng, spill=0 if index == 0 else 2 + index)
+                    name = f'{path.stem}-{index + 1}.jpg'
+                    page.save(target / name, quality=92, subsampling=0)
+                    made += 1
+                    print(f'  {theme}/{name}')
+        print(f'\n{made} 枚を書き出した（題入りの台紙を塗ったもの）→ {out}')
+        return 0
 
     made = 0
     for theme, folder in (('aquarium', ROOT / 'assets/templates'), ('dinosaur', ROOT / 'assets/templates/dinosaur')):

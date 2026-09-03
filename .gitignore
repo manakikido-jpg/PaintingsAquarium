@@ -10,3 +10,6 @@ __pycache__/
 
 # アイコンの確認用（配布に使うのは build/icon.ico だけ）
 build/preview/
+
+# 印刷用台紙の PNG（PDF は docs/ にある。どちらも tools/make-sheets.py で作り直せる）
+sheets/
