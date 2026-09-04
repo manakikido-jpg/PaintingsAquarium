@@ -247,6 +247,7 @@ describe('手足の分割', () => {
    */
   it('分割を持つ絵は、隙間なく重なりなく覆っている', () => {
     const partitioned: SpeciesId[] = [
+      'umigame',
       'pteranodon',
       'ankylosaurus',
       'brontosaurus',
@@ -265,17 +266,36 @@ describe('手足の分割', () => {
   })
 
   /*
-   * ウミガメは分割しない（R-050）。
+   * ウミガメは**絵の全面ひとつ**だけを持つ（R-050 と、その後の直し）。
    *
-   * 四隅のひれを回していたら、**甲羅とのあいだに青い隙間**が開いた（実機で確認）。
-   * ひれの箱の内側の縁は台紙の 58% を横切っていて、甲羅を貫いている。
-   * 分割を外すと `tentacled` の経路（横帯＋せん断）になり、帯は傾きでつながるので開かない。
+   * 四隅のひれを回していたら甲羅とのあいだが開いた。分割をやめたら
+   * 今度はタコと同じ帯の経路に落ちて、**後ろのひれが触手のように振れた**
+   *（甲羅の硬い生き物に合わない）。
+   *
+   * **ここを空にすると帯の経路に戻る。** 分割を1つ持つこと自体が止めている。
    */
-  it('ウミガメは分割しない（回すと甲羅とのあいだが開く・R-050）', () => {
-    expect(partsForPiece('umigame')).toEqual([])
+  it('ウミガメは絵を切らない（全面ひとつだけ）', () => {
+    const parts = partsForPiece('umigame')
+    expect(parts).toHaveLength(1)
+    expect(parts[0].box).toEqual({ x: 0, y: 0, w: 1, h: 1 })
+  })
+
+  it('ウミガメは真ん中を軸に傾く（端を軸にすると尾びれに見える）', () => {
+    const [only] = partsForPiece('umigame')
+    expect(only.pivot).toEqual({ x: 0.5, y: 0.5 })
+    expect(Math.abs(only.swing)).toBeGreaterThan(0)
+    // 大きく傾けると、泳ぐのではなく回っているように見える
+    expect(Math.abs(only.swing)).toBeLessThan(0.12)
+    expect(only.lift ?? 0).toBe(0)
+  })
+
+  it('紙を回して置いても、絵を切らないままでいる', () => {
     for (const turns of [0, 1, 2, 3]) {
       for (const mirrored of [false, true]) {
-        expect(partsForPiece('umigame', turns, mirrored)).toEqual([])
+        const parts = partsForPiece('umigame', turns, mirrored)
+        expect(parts).toHaveLength(1)
+        expect(parts[0].box.w).toBeCloseTo(1)
+        expect(parts[0].box.h).toBeCloseTo(1)
       }
     }
   })
