@@ -161,13 +161,18 @@ jobs:
           #
           # 残すかどうかの判定は **jq の中**でやる。あそこは UTF-8 のまま扱えるので、
           # 名前がどんな文字でも壊れない。シェルを渡るのは数字の id だけになる。
+          #
+          # **`.name` はパイプの前で受けておく。** `[...] | index(.name)` と書くと
+          # パイプの中では `.` が配列になり、`expected an object but got: array` で
+          # 落ちる（run 90 で実際に落とした）。`.name as $n` で先に取る。
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/latest" --jq '
             .assets[]
+            | .name as $n
             | select(["PaintingsAquarium.zip",
                       "PaintingsAquarium-Setup.exe",
                       "PaintingsAquarium-portable.exe",
-                      "latest.yml"] | index(.name) | not)
-            | "\(.id) \(.name)"' \
+                      "latest.yml"] | index($n) | not)
+            | "\(.id) \($n)"' \
           | while IFS=' ' read -r id name; do
               echo "消す: $name (id=$id)"
               gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id"
