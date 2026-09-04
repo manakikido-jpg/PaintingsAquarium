@@ -153,11 +153,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 台紙の PDF はここに置かなくなったので、残っていれば消える（上の説明）
-          keep="PaintingsAquarium.zip PaintingsAquarium-Setup.exe PaintingsAquarium-portable.exe latest.yml"
-          for name in $(gh release view latest --json assets -q '.assets[].name'); do
-            case " $keep " in
-              *" $name "*) ;;
-              *) echo "消す: $name"; gh release delete-asset latest "$name" -y ;;
-            esac
-          done
+          # **名前ではなく id で消す（R-052）。**
+          #
+          # 名前で回していたら、日本語の名前の PDF が Windows のシェルを通る間に
+          # `-.11.pdf` に化けた。`-` で始まるので `gh` がフラグと解釈して落ちる:
+          #     unknown shorthand flag: '.' in -.11.pdf
+          #
+          # 残すかどうかの判定は **jq の中**でやる。あそこは UTF-8 のまま扱えるので、
+          # 名前がどんな文字でも壊れない。シェルを渡るのは数字の id だけになる。
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/latest" --jq '
+            .assets[]
+            | select(["PaintingsAquarium.zip",
+                      "PaintingsAquarium-Setup.exe",
+                      "PaintingsAquarium-portable.exe",
+                      "latest.yml"] | index(.name) | not)
+            | "\(.id) \(.name)"' \
+          | while IFS=' ' read -r id name; do
+              echo "消す: $name (id=$id)"
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id"
+            done
