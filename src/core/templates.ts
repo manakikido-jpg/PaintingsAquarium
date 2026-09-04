@@ -251,16 +251,68 @@ export interface SpritePart {
 
 /** 甲羅を傾ける角度（ラジアン）。約 3.5 度。大きくすると回っているように見える */
 const KAME_ROLL = 0.06
+/** 横帯の数。多いほど帯どうしの段差が小さい */
+const KAME_STRIPS = 20
+/** ひれを横に伸び縮みさせる幅（倍率のふり幅） */
+const KAME_STROKE = 0.12
+/**
+ * 甲羅の範囲（上からの割合）。**ここは伸び縮みさせない。**
+ * 台紙を測った値: 甲羅の縁は y=0.23 と y=0.77 のあたりにあり、
+ * その外側が前後のひれ。
+ */
+const KAME_SHELL_TOP = 0.28
+const KAME_SHELL_BOTTOM = 0.72
 
-const KAME_PARTS: readonly SpritePart[] = [
-  {
-    box: { x: 0, y: 0, w: 1, h: 1 },
-    // 軸は絵の真ん中。頭や尾に寄せると、そこを支点に振って尾びれに見える
-    pivot: { x: 0.5, y: 0.5 },
-    swing: KAME_ROLL,
-    beat: 0,
+/**
+ * その高さで、横にどれだけ伸び縮みさせるか（-1〜1）。
+ *
+ * 甲羅の中は 0（動かさない）。前のひれで +1、後ろのひれで -1 に向かう。
+ * 前が伸びるとき後ろが縮むので、水を掻いているように見える。
+ *
+ * **端でなめらかに 0 になる形（smoothstep）を使う。**
+ * 直線で 0 に落とすと、甲羅との境目で隣の帯との差が最大になり、
+ * ちょうど甲羅の縁に段差が出る。smoothstep なら境目での傾きが 0 になる。
+ */
+function kameStroke(y: number): number {
+  const smooth = (t: number): number => {
+    const clamped = Math.min(1, Math.max(0, t))
+    return clamped * clamped * (3 - 2 * clamped)
+  }
+  if (y < KAME_SHELL_TOP) return smooth((KAME_SHELL_TOP - y) / KAME_SHELL_TOP)
+  if (y > KAME_SHELL_BOTTOM) return -smooth((y - KAME_SHELL_BOTTOM) / (1 - KAME_SHELL_BOTTOM))
+  return 0
+}
+
+/**
+ * ウミガメ: **甲羅は動かさず、ひれだけ水を掻く。**
+ *
+ * 横の帯に分け、帯ごとに**横へ伸び縮み**させる。軸は絵の縦の中心線。
+ *   - 軸の上の画素は動かないので、左右がちぎれない
+ *   - 帯の境目は横線。横に伸び縮みしても、画素はその線を越えない
+ *   - 伸び率は上下になめらかに変わるので、輪郭の段差も小さい
+ *     （実測で絵の幅の 1.5% 以下。上限は 3%）
+ *
+ * **甲羅の中は伸び率 0。** 硬いものを伸ばすと、それだけで作り物に見える。
+ *
+ * すべての帯に**同じ傾き**（`KAME_ROLL`）を掛けてあるので、
+ * 絵ぜんぶが1枚として傾きながら、ひれだけが掻く。
+ */
+const KAME_PARTS: readonly SpritePart[] = Array.from(
+  { length: KAME_STRIPS },
+  (_, index): SpritePart => {
+    const from = index / KAME_STRIPS
+    const height = 1 / KAME_STRIPS
+    return {
+      box: { x: 0, y: from, w: 1, h: height },
+      // **全部の帯で同じ軸・同じ拍。** ずらすと帯ごとに別々に回り、絵が割れる
+      pivot: { x: 0.5, y: 0.5 },
+      swing: KAME_ROLL,
+      beat: 0,
+      lift: KAME_STROKE * kameStroke(from + height / 2),
+      liftAxis: 'x',
+    }
   },
-]
+)
 
 /**
  * 四足の恐竜: **切らずに、足を伸び縮みさせて歩かせる。**

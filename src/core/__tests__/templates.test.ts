@@ -266,36 +266,81 @@ describe('手足の分割', () => {
   })
 
   /*
-   * ウミガメは**絵の全面ひとつ**だけを持つ（R-050 と、その後の直し）。
+   * ウミガメ（R-050 と、その後の2回の直し）。
    *
    * 四隅のひれを回していたら甲羅とのあいだが開いた。分割をやめたら
-   * 今度はタコと同じ帯の経路に落ちて、**後ろのひれが触手のように振れた**
-   *（甲羅の硬い生き物に合わない）。
-   *
-   * **ここを空にすると帯の経路に戻る。** 分割を1つ持つこと自体が止めている。
+   * 今度はタコと同じ帯の経路に落ちて、後ろのひれが触手のように振れた。
+   * いまは横帯に分けて**横へ伸び縮み**させる。回さないので裂けない。
    */
-  it('ウミガメは絵を切らない（全面ひとつだけ）', () => {
+  it('ウミガメは回さない（伸び縮みだけ）', () => {
     const parts = partsForPiece('umigame')
-    expect(parts).toHaveLength(1)
-    expect(parts[0].box).toEqual({ x: 0, y: 0, w: 1, h: 1 })
+    expect(parts.length).toBeGreaterThan(8)
+    for (const part of parts) {
+      expect(part.liftAxis).toBe('x')
+      // 帯は絵の横幅いっぱい。縦に切ると左右がちぎれる
+      expect(part.box.x).toBeCloseTo(0)
+      expect(part.box.w).toBeCloseTo(1)
+    }
   })
 
-  it('ウミガメは真ん中を軸に傾く（端を軸にすると尾びれに見える）', () => {
-    const [only] = partsForPiece('umigame')
-    expect(only.pivot).toEqual({ x: 0.5, y: 0.5 })
-    expect(Math.abs(only.swing)).toBeGreaterThan(0)
-    // 大きく傾けると、泳ぐのではなく回っているように見える
-    expect(Math.abs(only.swing)).toBeLessThan(0.12)
-    expect(only.lift ?? 0).toBe(0)
+  /*
+   * **全部の帯が同じ軸・同じ拍で傾く。** ずれると帯ごとに別々に回って絵が割れる。
+   */
+  it('全部の帯が同じ軸・同じ拍で傾く', () => {
+    const parts = partsForPiece('umigame')
+    const pivots = new Set(parts.map((part) => `${part.pivot.x},${part.pivot.y}`))
+    const swings = new Set(parts.map((part) => part.swing))
+    const beats = new Set(parts.map((part) => part.beat))
+    expect(pivots).toEqual(new Set(['0.5,0.5']))
+    expect(swings.size).toBe(1)
+    expect(beats.size).toBe(1)
+    expect(Math.abs([...swings][0])).toBeLessThan(0.12)
   })
 
-  it('紙を回して置いても、絵を切らないままでいる', () => {
+  /*
+   * **甲羅は伸ばさない。** 硬いものを伸ばすと、それだけで作り物に見える。
+   * 前と後ろは逆向きに伸び縮みして、水を掻いているように見せる。
+   */
+  it('甲羅の帯は伸び縮みせず、前と後ろは逆に動く', () => {
+    const parts = partsForPiece('umigame')
+    const middle = parts.filter((part) => {
+      const centre = part.box.y + part.box.h / 2
+      return centre > 0.35 && centre < 0.65
+    })
+    for (const part of middle) expect(part.lift ?? 0).toBeCloseTo(0)
+
+    const lifts = parts.map((part) => part.lift ?? 0)
+    expect(Math.max(...lifts)).toBeGreaterThan(0)
+    expect(Math.min(...lifts)).toBeLessThan(0)
+  })
+
+  /*
+   * 隣り合う帯の伸び率の差が、そのまま輪郭の段差になる。
+   * ずれは「軸からの距離 × 伸び率の差」で、一番遠いのは絵の端（0.5）。
+   */
+  it('隣り合う帯の伸び率の差が小さい（段差にならない）', () => {
+    const lifts = partsForPiece('umigame').map((part) => part.lift ?? 0)
+    for (let index = 1; index < lifts.length; index++) {
+      const step = Math.abs(lifts[index] - lifts[index - 1]) * 0.5
+      // 上限は `tools/check-parts.py` の 3%
+      expect(step).toBeLessThan(0.03)
+    }
+  })
+
+  it('紙を回して置いても、回す部分は出てこない', () => {
     for (const turns of [0, 1, 2, 3]) {
       for (const mirrored of [false, true]) {
         const parts = partsForPiece('umigame', turns, mirrored)
-        expect(parts).toHaveLength(1)
-        expect(parts[0].box.w).toBeCloseTo(1)
-        expect(parts[0].box.h).toBeCloseTo(1)
+        expect(parts.length).toBeGreaterThan(8)
+        /*
+         * 回して置くと、伸び縮みの向きも一緒に回る。
+         * **伸び縮みする帯だけを見る。** 甲羅の帯は伸び率 0 なので、
+         * 向きが何であっても動かない（`turnBackPart` もそこは回していない）。
+         */
+        const axes = new Set(parts.filter((part) => part.lift).map((part) => part.liftAxis))
+        expect(axes.size).toBe(1)
+        // 傾きは全部の帯で揃ったまま（ばらけると帯ごとに回って絵が割れる）
+        expect(new Set(parts.map((part) => part.swing)).size).toBe(1)
       }
     }
   })
