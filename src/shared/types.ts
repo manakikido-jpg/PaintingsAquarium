@@ -1,5 +1,6 @@
 import type { CutoutOptions } from '../core/cutout'
 import type { DinosaurStyle, ThemeId } from '../core/theme'
+import type { NoticeMode } from '../core/notices'
 import type { Rig } from '../core/rig'
 import type { Direction, SpeciesId } from '../core/templates'
 
@@ -61,6 +62,12 @@ export interface Settings {
    * 水族館テーマでは使わない。
    */
   readonly dinosaurStyle: DinosaurStyle
+  /**
+   * 左下のお知らせをどこまで出すか。
+   * 会期中の画面は来場者が見ているので絞れるようにしてあるが、
+   * `none` にすると**取り込めなかったことに気づけなくなる**。
+   */
+  readonly noticeDisplay: NoticeMode
   /**
    * 絵の大きさの倍率。1 で標準（画面幅の 7%）。0.5〜2。
    * 会場の画面の大きさと、来場者との距離で見え方が変わるので現場で決める。

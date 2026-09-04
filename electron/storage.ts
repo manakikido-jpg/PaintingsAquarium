@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { Piece, SavePieceInput, Settings } from '../src/shared/types'
 import { DEFAULT_CUTOUT_OPTIONS } from '../src/core/cutout'
 import { DEFAULT_DINOSAUR_STYLE, DEFAULT_THEME, isDinosaurStyle, isThemeId } from '../src/core/theme'
+import { DEFAULT_NOTICE_MODE, isNoticeMode } from '../src/core/notices'
 
 const DEFAULT_SETTINGS: Settings = {
   watchFolder: null,
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS: Settings = {
   sceneryStrength: 1,
   theme: DEFAULT_THEME,
   dinosaurStyle: DEFAULT_DINOSAUR_STYLE,
+  noticeDisplay: DEFAULT_NOTICE_MODE,
   decorDensity: 2,
   swayStrength: 1,
   sizeScale: 1,
@@ -67,6 +69,8 @@ export function readSettings(): Settings {
     dinosaurStyle: isDinosaurStyle(stored.dinosaurStyle)
       ? stored.dinosaurStyle
       : DEFAULT_DINOSAUR_STYLE,
+    // 前の版で保存した設定ファイルにはこの項目が無い
+    noticeDisplay: isNoticeMode(stored.noticeDisplay) ? stored.noticeDisplay : DEFAULT_NOTICE_MODE,
     cutout: { ...DEFAULT_SETTINGS.cutout, ...stored.cutout },
   }
 }

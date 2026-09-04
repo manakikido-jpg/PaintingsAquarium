@@ -10,6 +10,7 @@ import type {
   UpdateStatus,
 } from '../shared/types'
 import { DINOSAUR_STYLES, THEMES, themeOf, type DinosaurStyle, type ThemeId } from '../core/theme'
+import { NOTICE_MODES, showsNotice, type NoticeMode } from '../core/notices'
 import { GALLERY_PAGE_SIZE, galleryPage } from '../core/gallery'
 
 /**
@@ -51,7 +52,16 @@ export function App(): React.JSX.Element {
   const settingsRef = useRef<Settings | null>(null)
   settingsRef.current = settings
 
+  /*
+   * 出さない設定のものは**溜めもしない**。
+   * 溜めてから隠すと、設定を戻した瞬間に古いお知らせが一斉に出る。
+   *
+   * `settingsRef` を見るのは、取り込みの途中で設定が変わっても
+   * そのときの値で判断するため（`settings` を見ると古い値で閉じ込められる）。
+   */
   const pushNotice = useCallback((notice: Notice) => {
+    const mode = settingsRef.current?.noticeDisplay ?? 'all'
+    if (!showsNotice(mode, notice.level)) return
     setNotices((current) => [...current.slice(-4), notice])
     window.setTimeout(() => setNotices((current) => current.slice(1)), 12000)
   }, [])
@@ -254,6 +264,33 @@ export function App(): React.JSX.Element {
               水族館には関係のない項目なので、常に出すとスタッフが
               「これは何に効くのか」を毎回考えることになる。
             */}
+            <div className="row">
+              <span>左下のお知らせ</span>
+              {NOTICE_MODES.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  aria-pressed={settings.noticeDisplay === mode.id}
+                  className={settings.noticeDisplay === mode.id ? 'chosen' : undefined}
+                  onClick={() =>
+                    void window.aquarium
+                      .updateSettings({ noticeDisplay: mode.id as NoticeMode })
+                      .then(setSettings)
+                  }
+                >
+                  {mode.name}
+                </button>
+              ))}
+            </div>
+            <p className="note">
+              取り込んだときに画面の左下へ出る文字です。
+              <strong>会期中は「失敗だけ」</strong>をおすすめします。
+              来場者が見ている画面なので、向きを直した等の知らせは邪魔になります。
+              <br />
+              <strong>「出さない」にすると、紙が1枚取り込めなくても気づけません。</strong>
+              取り込めたかどうかは、この設定画面の一覧で確かめてください。
+            </p>
+
             {settings.theme === 'dinosaur' && (
               <>
                 <div className="row">
