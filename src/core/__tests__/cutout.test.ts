@@ -141,6 +141,47 @@ describe('cutoutPaper', () => {
     expect(alphaAt(result, 4, 4)).toBe(255)
   })
 
+  /*
+   * **輪郭に小さな切れ目があっても、中の白を食わない（R-056）。**
+   *
+   * 会場から「絵の中の白色は紙の色でも表示してほしい」
+   * 「中に塗った絵が表示すらエラーでされない」。
+   * 台紙の線が印刷のかすれやスキャンで数画素途切れると、
+   * そこから塗りつぶしが中へ入り、塗っていない白い所を食っていた。
+   */
+  it('輪郭に数画素の切れ目があっても、中の白は残る', () => {
+    // 実寸に近い大きさで試す。塞げる切れ目の幅は画像の大きさに比例する
+    const side = 600
+    const image = createImage(side, side)
+    const put = (x: number, y: number, colour: readonly number[]): void => {
+      const offset = (y * side + x) * 4
+      image.data[offset] = colour[0]
+      image.data[offset + 1] = colour[1]
+      image.data[offset + 2] = colour[2]
+      image.data[offset + 3] = 255
+    }
+    for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) put(x, y, PAPER)
+    // 四角い輪郭
+    for (let t = 120; t < 480; t++) {
+      for (let w = 0; w < 3; w++) {
+        put(t, 120 + w, BLACK_LINE)
+        put(t, 477 + w, BLACK_LINE)
+        put(120 + w, t, BLACK_LINE)
+        put(477 + w, t, BLACK_LINE)
+      }
+    }
+    // **上の辺に 3px の切れ目**（印刷のかすれ）。塞げる幅は 600px なら 4px まで
+    for (let t = 300; t < 303; t++) for (let w = 0; w < 3; w++) put(t, 120 + w, PAPER)
+
+    const result = cutoutPaper(image)
+
+    // 中の白（塗っていない所）は残る
+    expect(alphaAt(result, 300, 300)).toBe(255)
+    // 外の紙は消える
+    expect(alphaAt(result, 5, 5)).toBe(0)
+    expect(alphaAt(result, 300, 40)).toBe(0)
+  })
+
   it('大きさ 0 の画像でも落ちない', () => {
     expect(() => cutoutPaper(createImage(0, 0))).not.toThrow()
   })

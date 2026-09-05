@@ -186,9 +186,67 @@ export function cutoutPaper(
     return tintDistance(r, g, b, paper) <= PAPER_TINT_TOLERANCE
   }
 
+  /*
+   * **輪郭の小さな切れ目から中へ漏れないようにする（R-056）。**
+   *
+   * 塗りつぶしは「紙らしい画素」を辿って広がる。台紙の線が印刷のかすれや
+   * スキャンで数画素でも途切れていると、そこから絵の中へ入り込み、
+   * **塗っていない白い所（＝紙と同じ色）を中まで食う**。
+   * 会場から「絵の中の白色は紙の色でも表示してほしい」。
+   *
+   * そこで、まず**紙らしい範囲を少し痩せさせてから**辿る。
+   * 痩せさせると切れ目が塞がるので、中へ入れない。
+   * そのままだと絵のまわりに紙の縁が残るので、**辿り終えてから同じ幅だけ太らせる**
+   *（紙らしい画素の上だけ）。開いていた所は元どおり消え、
+   * 切れ目から入った分だけが残る。
+   */
+  const paperLike = new Uint8Array(total)
+  for (let index = 0; index < total; index++) {
+    if (looksLikePaper(index)) paperLike[index] = 1
+  }
+
+  /*
+   * 塞げる切れ目の幅は、この 2 倍まで。大きくすると細い隙間の紙が残る。
+   *
+   * **小さい画像では 0 にする。** 取り込む絵は長辺 1200px 前後で、
+   * 4px ほど痩せさせても影響が無い。数十画素の画像で同じことをすると
+   * 紙が丸ごと痩せて何も消えなくなる（単体テストの絵がそれ）。
+   */
+  const seal = Math.floor(Math.min(width, height) * 0.004)
+
+  /** 紙らしい範囲を `steps` 画素ぶん痩せさせる（縦横に分けて数える）。 */
+  const shrink = (mask: Uint8Array, steps: number): Uint8Array => {
+    let current = mask
+    for (let pass = 0; pass < 2; pass++) {
+      const next = new Uint8Array(total)
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const index = y * width + x
+          if (current[index] === 0) continue
+          let keep = 1
+          for (let step = 1; step <= steps && keep === 1; step++) {
+            const a = pass === 0 ? x - step : y - step
+            const b = pass === 0 ? x + step : y + step
+            const limit = pass === 0 ? width : height
+            const before = a < 0 ? -1 : pass === 0 ? y * width + a : a * width + x
+            const after = b >= limit ? -1 : pass === 0 ? y * width + b : b * width + x
+            // 画像の外は紙とみなす。端の紙まで痩せさせない
+            if (before >= 0 && current[before] === 0) keep = 0
+            if (after >= 0 && current[after] === 0) keep = 0
+          }
+          next[index] = keep
+        }
+      }
+      current = next
+    }
+    return current
+  }
+
+  const passable = seal > 0 ? shrink(paperLike, seal) : paperLike
+
   const push = (index: number): void => {
     if (isBackground[index] === 1) return
-    if (!looksLikePaper(index)) return
+    if (passable[index] === 0) return
     isBackground[index] = 1
     stack[stackSize++] = index
   }
@@ -210,6 +268,28 @@ export function cutoutPaper(
     if (x < width - 1) push(index + 1)
     if (y > 0) push(index - width)
     if (y < height - 1) push(index + width)
+  }
+
+  /*
+   * 痩せさせたぶんを戻す。**紙らしい画素の上だけ**に広げるので、
+   * 絵の中へは入らない（絵は紙らしくないので通れない）。
+   */
+  for (let step = 0; step < seal && passable !== paperLike; step++) {
+    const grown: number[] = []
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = y * width + x
+        if (isBackground[index] === 1 || paperLike[index] === 0) continue
+        const touching =
+          (x > 0 && isBackground[index - 1] === 1) ||
+          (x < width - 1 && isBackground[index + 1] === 1) ||
+          (y > 0 && isBackground[index - width] === 1) ||
+          (y < height - 1 && isBackground[index + width] === 1)
+        if (touching) grown.push(index)
+      }
+    }
+    if (grown.length === 0) break
+    for (const index of grown) isBackground[index] = 1
   }
 
   for (let index = 0; index < total; index++) {
