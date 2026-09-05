@@ -7,6 +7,7 @@ import {
   type CutoutOptions,
 } from '../core/cutout'
 import { trimTransparent } from '../core/trim'
+import { insideOutline } from '../core/outline'
 import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
 import { estimateRig, orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
@@ -161,7 +162,17 @@ export async function processPhoto(
    * 形から当てる推定は、当たらないことがある（R-030）。
    */
   let image = oriented.image
-  let found = identifySpecies(image, theme)
+  /*
+   * **照合は「印刷された線の内側」の形で行う（R-055）。**
+   *
+   * 塗った色まで形に含めると、枠外へはみ出して塗った紙で種類が付かなくなる
+   *（実測: 5mm はみ出すと、こい色でも外れる）。
+   * 線はクレヨンより暗いので、線に囲まれていない所を外してから照合する。
+   *
+   * **保存する絵は元のまま。** はみ出して描いたものを消したりはしない。
+   */
+  const shapeOf = (from: typeof image): typeof image => insideOutline(from)
+  let found = identifySpecies(shapeOf(image), theme)
 
   /*
    * 台紙が分かったら、**絵そのものを台紙の向きへ起こす**。
@@ -177,7 +188,7 @@ export async function processPhoto(
   let measured = oriented.rig
   if (found && found.turns !== 0) {
     image = rotateQuarter(image, found.turns)
-    found = identifySpecies(image, theme)
+    found = identifySpecies(shapeOf(image), theme)
     /*
      * **回したあとの絵で測り直す。**
      *
