@@ -42,6 +42,100 @@ export const DEFAULT_CUTOUT_OPTIONS: CutoutOptions = {
 }
 
 /**
+ * 紙の色から、どれだけ色が離れていたら「絵」とみなすか（0〜1）。
+ *
+ * **鮮やかさの上限だけでは、うすい色が消える。**
+ * 会場から「オレンジで書いた絵も透明になることがある」と言われて測ったら、
+ * 鮮やかさはこうだった（上限は 0.18＋ぼかし 0.1 ＝ 0.28）。
+ *
+ *     こいオレンジ 0.83 ／ ふつうのオレンジ 0.65 → 残る
+ *     うすいオレンジ 0.33                      → 残る
+ *     とてもうすいオレンジ 0.18 ／ はだ色 0.23 ／ うすい黄色 0.25 → **消えていた**
+ *
+ * 軽く塗ったクレヨンはここに入る。しかも塗りつぶしは紙の外周から広がるので、
+ * **枠外まではみ出して塗ると、その色が紙とつながって食われる**。
+ *
+ * そこで「絵ごとに紙の色を実測して、そこからのズレを見る」ようにした。
+ * うすいオレンジ (255,214,170) と紙 (252,251,247) は、鮮やかさは近いが
+ * **色そのものは遠い**（明るさを揃えて比べると 0.31 離れている）。
+ *
+ * この判定は**残す方向にしか効かない**（鮮やかさの上限はそのまま残してある）。
+ * 消しすぎるより残しすぎるほうが直しやすい。残ったら設定のつまみで下げられるが、
+ * 消えた絵は戻らない。
+ */
+export const PAPER_TINT_TOLERANCE = 0.08
+
+/**
+ * その絵の「紙の色」。外周の帯の中央値を採る。
+ *
+ * **平均ではなく中央値。** 絵が紙の端まで写っていると（`touchedBorder`）、
+ * 平均だとその色に引きずられる。中央値なら、外周の半分以上が紙である限り効く。
+ */
+export function paperColour(image: RgbaImage): readonly [number, number, number] {
+  const { width, height, data } = image
+  if (width === 0 || height === 0) return [255, 255, 255]
+
+  // 外周の帯。細すぎると影を拾い、太すぎると絵に食い込む
+  const band = Math.max(1, Math.round(Math.min(width, height) * 0.02))
+  const reds: number[] = []
+  const greens: number[] = []
+  const blues: number[] = []
+
+  const take = (x: number, y: number): void => {
+    const offset = (y * width + x) * 4
+    reds.push(data[offset])
+    greens.push(data[offset + 1])
+    blues.push(data[offset + 2])
+  }
+
+  // 1画素ずつは要らない。中央値を出すだけなので間引く
+  const step = Math.max(1, Math.floor(Math.max(width, height) / 200))
+  for (let x = 0; x < width; x += step) {
+    for (let y = 0; y < band && y < height; y++) {
+      take(x, y)
+      take(x, height - 1 - y)
+    }
+  }
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < band && x < width; x++) {
+      take(x, y)
+      take(width - 1 - x, y)
+    }
+  }
+
+  const middle = (values: number[]): number => {
+    if (values.length === 0) return 255
+    values.sort((a, b) => a - b)
+    return values[Math.floor(values.length / 2)]
+  }
+  return [middle(reds), middle(greens), middle(blues)]
+}
+
+/**
+ * 紙の色からの離れ具合（0〜1）。
+ *
+ * **明るさを揃えてから比べる。** 紙は影で暗くなるが色は変わらない。
+ * 揃えずに比べると、影の部分が「別の色」になって紙が残る。
+ */
+export function tintDistance(
+  r: number,
+  g: number,
+  b: number,
+  paper: readonly [number, number, number],
+): number {
+  const brightest = Math.max(r, g, b)
+  if (brightest === 0) return 1
+  const scale = Math.max(paper[0], paper[1], paper[2]) / brightest
+  return (
+    Math.max(
+      Math.abs(r * scale - paper[0]),
+      Math.abs(g * scale - paper[1]),
+      Math.abs(b * scale - paper[2]),
+    ) / 255
+  )
+}
+
+/**
  * 紙の白を透明にする。AI は使わない。明るさと鮮やかさのしきい値だけ。
  * 線の形も色も一切変えない（アルファしか触らない）。
  *
@@ -74,12 +168,22 @@ export function cutoutPaper(
   const stack = new Int32Array(total)
   let stackSize = 0
 
+  /*
+   * その絵の紙の色。**絵ごとに測る。**
+   * 紙の黄ばみ・照明・スキャナの色味は毎回違うので、決め打ちの白とは比べない。
+   */
+  const paper = paperColour(source)
+
   const looksLikePaper = (index: number): boolean => {
     const offset = index * 4
     const r = data[offset]
     const g = data[offset + 1]
     const b = data[offset + 2]
-    return value(r, g, b) >= looseValue && saturation(r, g, b) <= looseSaturation
+    if (value(r, g, b) < looseValue) return false
+    if (saturation(r, g, b) > looseSaturation) return false
+    // **紙と色が違うものは、うすくても絵として残す。**
+    // ここが無いと、軽く塗ったオレンジや肌色が紙と一緒に消える
+    return tintDistance(r, g, b, paper) <= PAPER_TINT_TOLERANCE
   }
 
   const push = (index: number): void => {

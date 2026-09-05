@@ -94,13 +94,51 @@ describe('cutoutPaper', () => {
     expect(Uint8Array.from(image.data)).toEqual(before)
   })
 
-  it('しきい値を上げると、より暗い画素まで紙として消える', () => {
+  /*
+   * **明るさのつまみを下げても、線は消えない。**
+   *
+   * 以前はここで黒い線まで消えていた。明るさだけで判断していたため。
+   * いまは「紙の色からどれだけ離れているか」も見るので、
+   * 紙と色の違うもの（線・クレヨン）は、つまみを何処に置いても残る。
+   * 会場で一番怖いのは**絵が丸ごと消える**ことなので、これでよい（R-018）。
+   */
+  it('明るさのつまみを下げても、紙と色の違う線は残る', () => {
     const image = imageFromPattern(['aaa', 'a#a', 'aaa'], palette)
 
     const loose = cutoutPaper(image, { ...DEFAULT_CUTOUT_OPTIONS, paperValue: 0.05, feather: 0 })
 
-    // 黒い線まで紙とみなされて消える
-    expect(alphaAt(loose, 1, 1)).toBe(0)
+    expect(alphaAt(loose, 1, 1)).toBe(255)
+  })
+
+  /*
+   * **うすい色も残る（会場の指摘）。**
+   * 「オレンジで書いた絵も透明になることがある」。
+   * 軽く塗ったクレヨンは鮮やかさが紙に近く、しかも枠外へはみ出すと
+   * 紙とつながるので、外周からの塗りつぶしに食われていた。
+   */
+  it('うすいオレンジや肌色が、紙とつながっていても残る', () => {
+    const PALE_ORANGE: [number, number, number, number] = [255, 214, 170, 255]
+    const SKIN: [number, number, number, number] = [255, 222, 196, 255]
+    const image = imageFromPattern(
+      [
+        '.....',
+        '.oo..',
+        '.oo..',
+        '...ss',
+        '...ss',
+      ],
+      { ...palette, o: PALE_ORANGE, s: SKIN },
+    )
+
+    const result = cutoutPaper(image)
+
+    // 紙は消える
+    expect(alphaAt(result, 0, 0)).toBe(0)
+    // うすい色は、外周とつながっていても残る
+    expect(alphaAt(result, 1, 1)).toBe(255)
+    expect(alphaAt(result, 2, 2)).toBe(255)
+    expect(alphaAt(result, 3, 3)).toBe(255)
+    expect(alphaAt(result, 4, 4)).toBe(255)
   })
 
   it('大きさ 0 の画像でも落ちない', () => {
