@@ -131,7 +131,7 @@ export function App(): React.JSX.Element {
           fileName: photo.fileName,
           width: result.width,
           height: result.height,
-          pngBase64: result.pngBase64,
+          imageBase64: result.imageBase64,
           // 取り込んだ時点のテーマを絵に記録する。あとでテーマを変えても、
           // その会期の絵だけを出せるようにするため。
           theme: current.theme,

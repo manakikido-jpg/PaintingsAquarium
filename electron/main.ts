@@ -60,7 +60,10 @@ function sendPhoto(filePath: string): void {
     return
   }
 
-  const decision = decideIngest({ fileName, sizeBytes: stats.size }, storage.ingestedKeys())
+  const decision = decideIngest(
+    { fileName, sizeBytes: stats.size, modifiedMs: stats.mtimeMs },
+    storage.ingestedKeys(),
+  )
   if (!decision.ingest) {
     // 隠しファイルと取り込み済みは毎回出ると邪魔なので黙らせる。
     if (decision.reason === 'unsupported-extension') {
@@ -159,7 +162,7 @@ app.whenReady().then(() => {
     const id = new URL(request.url).pathname.replace(/^\/+/, '')
     // パス区切りを含む id を弾く。保存フォルダの外を読ませないため。
     if (!/^[a-z0-9-]+$/i.test(id)) return new Response(null, { status: 400 })
-    return net.fetch(pathToFileURL(storage.pieceFile(id)).toString())
+    return net.fetch(pathToFileURL(storage.findPieceFile(id)).toString())
   })
 
   ipcMain.handle('aquarium:getSettings', () => storage.readSettings())

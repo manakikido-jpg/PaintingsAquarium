@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { decideIngest, extensionOf, ingestKey, isSupportedImage } from '../ingest'
+import {
+  decideIngest,
+  extensionOf,
+  ingestKey,
+  isSupportedImage,
+  legacyIngestKey,
+} from '../ingest'
 
 describe('extensionOf', () => {
   it('大文字でも小文字に揃える', () => {
@@ -65,5 +71,39 @@ describe('decideIngest', () => {
   it('同じ名前でもサイズが違えば別の写真として取り込む', () => {
     const seen = new Set([ingestKey({ fileName: 'IMG_0001.jpg', sizeBytes: 1234 })])
     expect(decideIngest({ fileName: 'IMG_0001.jpg', sizeBytes: 9999 }, seen).ingest).toBe(true)
+  })
+})
+
+describe('鍵に更新時刻を入れる（R-064）', () => {
+  /*
+   * **スキャナは番号を振り直す。** `img001.jpg` が使い回されると、
+   * 別の絵なのに名前が同じになる。サイズまで一致すると
+   * 取り込み済み扱いで黙って落ちていた。
+   */
+  it('名前とサイズが同じでも、撮った時刻が違えば別の絵とみなす', () => {
+    const morning = { fileName: 'img001.jpg', sizeBytes: 120_000, modifiedMs: 1_000_000 }
+    const afternoon = { fileName: 'img001.jpg', sizeBytes: 120_000, modifiedMs: 2_000_000 }
+    expect(ingestKey(morning)).not.toBe(ingestKey(afternoon))
+
+    const seen = new Set([ingestKey(morning)])
+    expect(decideIngest(afternoon, seen).ingest).toBe(true)
+  })
+
+  it('同じファイルなら、何度見ても取り込まない', () => {
+    const facts = { fileName: 'img001.jpg', sizeBytes: 120_000, modifiedMs: 1_000_000 }
+    const seen = new Set([ingestKey(facts)])
+    expect(decideIngest(facts, seen).ingest).toBe(false)
+  })
+
+  /*
+   * **見張るフォルダは起動のたびに丸ごと読み直される。**
+   * 鍵の形を変えただけだと、すでに取り込んだ絵が次の起動で全部もう一度入る。
+   */
+  it('更新時刻を入れる前の鍵で取り込んだ絵も、取り込み済みとみなす', () => {
+    const facts = { fileName: 'img001.jpg', sizeBytes: 120_000, modifiedMs: 1_000_000 }
+    const seen = new Set([legacyIngestKey(facts)])
+    const decision = decideIngest(facts, seen)
+    expect(decision.ingest).toBe(false)
+    if (!decision.ingest) expect(decision.reason).toBe('already-ingested')
   })
 })

@@ -93,14 +93,37 @@ export function ingestedKeys(): Set<string> {
   return new Set(readPieces().map((piece) => piece.key))
 }
 
-export function pieceFile(id: string): string {
-  return path.join(piecesDir(), `${id}.png`)
+/**
+ * 保存する形式（R-063）。
+ *
+ * **WebP にすると PNG の 10 分の 1 になる**（実測 498KB → 48KB）。
+ * 会期後半に数百枚たまると効いてくる（600枚で 214MB → 28MB）。
+ *
+ * 非可逆だが、線の上の色のずれは平均 4.8/255 で、
+ * **透明と不透明の境目は 1 画素も変わらなかった**（切り抜きの形は保たれる）。
+ * 拡大して見比べると、むしろスキャンのノイズが消えて綺麗になる。
+ */
+export const PIECE_FORMAT = 'webp' as const
+export const PIECE_QUALITY = 0.9
+
+/** 書き込む先。新しい絵は WebP で保存する。 */
+export function pieceFile(id: string, format: 'png' | 'webp' = PIECE_FORMAT): string {
+  return path.join(piecesDir(), `${id}.${format}`)
+}
+
+/**
+ * 読む先。**古い絵は PNG のまま置いてある**ので、両方を見る。
+ * 全部を変換し直すより、次に画面へ出るときに変わればよい（R-062 と同じ考え方）。
+ */
+export function findPieceFile(id: string): string {
+  const webp = pieceFile(id, 'webp')
+  return fs.existsSync(webp) ? webp : pieceFile(id, 'png')
 }
 
 export function savePiece(input: SavePieceInput): Piece {
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
   fs.mkdirSync(piecesDir(), { recursive: true })
-  fs.writeFileSync(pieceFile(id), Buffer.from(input.pngBase64, 'base64'))
+  fs.writeFileSync(pieceFile(id), Buffer.from(input.imageBase64, 'base64'))
 
   const piece: Piece = {
     id,
@@ -135,7 +158,7 @@ export function savePiece(input: SavePieceInput): Piece {
  */
 export function readPieceImage(id: string): string | null {
   try {
-    return fs.readFileSync(pieceFile(id)).toString('base64')
+    return fs.readFileSync(findPieceFile(id)).toString('base64')
   } catch {
     return null
   }
@@ -143,16 +166,19 @@ export function readPieceImage(id: string): string | null {
 
 export function updatePiece(
   id: string,
-  patch: Partial<Omit<Piece, 'id' | 'key' | 'createdAt'>> & { pngBase64?: string },
+  patch: Partial<Omit<Piece, 'id' | 'key' | 'createdAt'>> & { imageBase64?: string },
 ): Piece | null {
   const pieces = readPieces()
   const index = pieces.findIndex((piece) => piece.id === id)
   if (index < 0) return null
 
-  const { pngBase64, ...rest } = patch
-  if (pngBase64) {
+  const { imageBase64, ...rest } = patch
+  if (imageBase64) {
     fs.mkdirSync(piecesDir(), { recursive: true })
-    fs.writeFileSync(pieceFile(id), Buffer.from(pngBase64, 'base64'))
+    fs.writeFileSync(pieceFile(id), Buffer.from(imageBase64, 'base64'))
+    // 作り直したついでに WebP へ移す。古い PNG は置いておかない
+    const old = pieceFile(id, 'png')
+    if (fs.existsSync(old) && old !== pieceFile(id)) fs.unlinkSync(old)
   }
 
   const next = { ...pieces[index], ...rest }
@@ -167,7 +193,7 @@ export function deletePiece(id: string): void {
     readPieces().filter((piece) => piece.id !== id),
   )
   try {
-    fs.unlinkSync(pieceFile(id))
+    fs.unlinkSync(findPieceFile(id))
   } catch {
     // 画像だけ先に消えていても、台帳から消せていれば実害はない。
   }

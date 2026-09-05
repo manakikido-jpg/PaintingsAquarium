@@ -31,7 +31,7 @@ const MAX_SIDE = 1200
 export type ProcessResult =
   | {
       ok: true
-      pngBase64: string
+      imageBase64: string
       width: number
       height: number
       /** 絵が写真の縁に接していた。撮り方の助言を出すために画面へ返す */
@@ -204,7 +204,29 @@ export function settle(start: RgbaImage, theme?: ThemeId): Settled {
   }
 }
 
-/** 作り直した結果。絵そのものが変わったときだけ `pngBase64` が入る。 */
+/**
+ * 絵を保存する形（R-063）。**WebP にすると PNG の 10 分の 1 になる**
+ *（実測 498KB → 48KB・600枚で 214MB → 28MB）。
+ *
+ * 非可逆だが、透明と不透明の境目は 1 画素も変わらないので切り抜きの形は保たれる。
+ * 線の上の色のずれは平均 4.8/255。拡大して見比べると、
+ * むしろスキャンのノイズが消えて綺麗になる。
+ */
+const PIECE_MIME = 'image/webp'
+const PIECE_QUALITY = 0.9
+
+async function encodePiece(image: RgbaImage): Promise<string | null> {
+  const blob = await new Promise<Blob | null>((resolve) =>
+    toCanvas(image).toBlob(resolve, PIECE_MIME, PIECE_QUALITY),
+  )
+  if (!blob) return null
+  const buffer = new Uint8Array(await blob.arrayBuffer())
+  let binary = ''
+  for (const byte of buffer) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
+/** 作り直した結果。絵そのものが変わったときだけ `imageBase64` が入る。 */
 export interface Rebuilt {
   readonly rig: Rig
   readonly species?: SpeciesId
@@ -212,7 +234,7 @@ export interface Rebuilt {
   readonly fit?: { readonly turns: number; readonly mirrored: boolean }
   readonly width: number
   readonly height: number
-  readonly pngBase64?: string
+  readonly imageBase64?: string
 }
 
 /**
@@ -238,19 +260,14 @@ export async function rebuildPiece(src: string, theme?: ThemeId): Promise<Rebuil
   const before = context.getImageData(0, 0, canvas.width, canvas.height)
 
   const settled = settle(before, theme)
-  const changed = settled.image !== before
 
-  let pngBase64: string | undefined
-  if (changed) {
-    const blob = await new Promise<Blob | null>((resolve) =>
-      toCanvas(settled.image).toBlob(resolve, 'image/png'),
-    )
-    if (!blob) return null
-    const buffer = new Uint8Array(await blob.arrayBuffer())
-    let binary = ''
-    for (const byte of buffer) binary += String.fromCharCode(byte)
-    pngBase64 = btoa(binary)
-  }
+  /*
+   * **絵はいつも書き戻す。** 向きが変わらなくても、
+   * 古い PNG を WebP へ移すために書き直す価値がある（R-063）。
+   * 作り直しは画面に出ている 60枚だけなので、書き直す量も知れている。
+   */
+  const imageBase64 = (await encodePiece(settled.image)) ?? undefined
+  if (!imageBase64) return null
 
   return {
     rig: settled.rig,
@@ -259,7 +276,7 @@ export async function rebuildPiece(src: string, theme?: ThemeId): Promise<Rebuil
     fit: settled.fit,
     width: settled.image.width,
     height: settled.image.height,
-    pngBase64,
+    imageBase64,
   }
 }
 
@@ -400,18 +417,14 @@ export async function processPhoto(
   const image = settled.image
   const rig = settled.rig
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    toCanvas(image).toBlob(resolve, 'image/png'),
-  )
-  if (!blob) return { ok: false, message: `${fileName}: PNG に変換できませんでした。` }
-
-  const buffer = new Uint8Array(await blob.arrayBuffer())
-  let binary = ''
-  for (const byte of buffer) binary += String.fromCharCode(byte)
+  const imageBase64 = await encodePiece(image)
+  if (!imageBase64) {
+    return { ok: false, message: `${fileName}: 画像に変換できませんでした。` }
+  }
 
   return {
     ok: true,
-    pngBase64: btoa(binary),
+    imageBase64,
     width: image.width,
     height: image.height,
     touchedBorder,

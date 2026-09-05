@@ -69,7 +69,7 @@ export const RIG_VERSION = 1
 /** 作り直した結果を書き戻すときに渡すもの。 */
 export type UpdatePiecePatch = Partial<
   Pick<Piece, 'rig' | 'species' | 'head' | 'fit' | 'width' | 'height' | 'built'>
-> & { pngBase64?: string }
+> & { imageBase64?: string }
 
 export interface Settings {
   /** 見張るフォルダ。未設定なら null */
@@ -129,8 +129,8 @@ export interface SavePieceInput {
   readonly fileName: string
   readonly width: number
   readonly height: number
-  /** 透過・トリミング済み PNG の base64（data URL の接頭辞なし） */
-  readonly pngBase64: string
+  /** 透過・トリミング済みの絵の base64（data URL の接頭辞なし・形式は `PIECE_FORMAT`） */
+  readonly imageBase64: string
   readonly theme: ThemeId
   readonly rig?: Rig
   readonly species?: SpeciesId
@@ -178,7 +178,7 @@ export interface AquariumApi {
   savePiece(input: SavePieceInput): Promise<Piece>
   /** 保存してある絵を base64 で返す（作り直しに使う） */
   readPieceImage(id: string): Promise<string | null>
-  /** 作り直した結果で置き換える（R-062）。絵が変わったときだけ `pngBase64` を渡す */
+  /** 作り直した結果で置き換える（R-062）。絵が変わったときだけ `imageBase64` を渡す */
   updatePiece(id: string, patch: UpdatePiecePatch): Promise<Piece | null>
   deletePiece(id: string): Promise<void>
   rescan(): Promise<void>

@@ -14,18 +14,36 @@ export type IngestDecision =
 export interface FileFacts {
   readonly fileName: string
   readonly sizeBytes: number
+  /** 最終更新時刻（ミリ秒）。古い呼び出しには入っていない */
+  readonly modifiedMs?: number
 }
 
 /**
  * 同じ写真を二重に泳がせないための鍵。
  *
- * 中身のハッシュではなくファイル名とサイズにしている。
- * 会場では 1 日 200 枚をカメラから流し込むだけで、同じ写真が別名で
- * 入ることは想定していない。全画素を読んでハッシュを取るほうが正確だが、
- * 取り込みが目に見えて遅くなり、「置いたらすぐ泳ぐ」体験を壊す。
- * 別名の同一写真が問題になったらここをハッシュに変える。
+ * 中身のハッシュではなく**ファイル名・サイズ・更新時刻**にしている。
+ * 全画素を読んでハッシュを取るほうが正確だが、取り込みが目に見えて遅くなり、
+ * 「置いたらすぐ泳ぐ」体験を壊す。
+ *
+ * **更新時刻を入れているのは、スキャナが番号を振り直すため（R-064）。**
+ * `img001.jpg` が使い回されると、別の絵なのに名前が同じになる。
+ * サイズまで一致すると**取り込み済み扱いで黙って落ちる**
+ *（お知らせを「出さない」にしていると、落ちたことにも気づけない）。
+ * 更新時刻まで見れば、別のときに取り込んだ紙は必ず別の鍵になる。
  */
 export function ingestKey(facts: FileFacts): string {
+  const stamp = facts.modifiedMs === undefined ? '' : `:${Math.round(facts.modifiedMs)}`
+  return `${facts.fileName}:${facts.sizeBytes}${stamp}`
+}
+
+/**
+ * 更新時刻を入れる前の鍵。
+ *
+ * **見張るフォルダは起動のたびに丸ごと読み直される**（`ignoreInitial: false`）ので、
+ * 鍵の形を変えただけだと、**すでに取り込んだ絵が次の起動で全部もう一度入る**。
+ * 古い鍵でも取り込み済みとみなすことで、それを防ぐ。
+ */
+export function legacyIngestKey(facts: FileFacts): string {
   return `${facts.fileName}:${facts.sizeBytes}`
 }
 
@@ -69,7 +87,8 @@ export function decideIngest(facts: FileFacts, alreadyIngested: ReadonlySet<stri
   }
 
   const key = ingestKey(facts)
-  if (alreadyIngested.has(key)) {
+  // 古い形の鍵で取り込んだ絵も「取り込み済み」とみなす（R-064）
+  if (alreadyIngested.has(key) || alreadyIngested.has(legacyIngestKey(facts))) {
     return {
       ingest: false,
       reason: 'already-ingested',
