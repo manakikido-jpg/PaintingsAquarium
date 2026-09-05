@@ -375,7 +375,7 @@ export async function processPhoto(
 
     // 影で残った紙の隅やゴミを落としてからトリミングする。順番が逆だと、
     // 捨てるはずの塊を含んだ外接矩形で切ってしまう（R-003）。
-    const { image: cleaned, touchedBorder } = keepMainRegions(cut)
+    const { image: cleaned, touchedBorder, keptRegions } = keepMainRegions(cut)
 
     const trimmed = trimTransparent(cleaned)
     if (!trimmed) {
@@ -391,8 +391,24 @@ export async function processPhoto(
       continue
     }
 
-    attempt = { cut, cleaned, touchedBorder, trimmed }
-    break
+    /*
+     * **絵が 1 つに繋がる幅を選ぶ（R-066）。**
+     *
+     * 「絵として通る」だけでは足りない。輪郭の切れ目から塗りつぶしが入ると、
+     * 中身が食われて**絵が線ごとに割れる**が、割れたままでも中身の割合は
+     * 下限（16%）を超えることがあり、そのまま通ってしまう。
+     * 実際、台紙の題を落とすようにしたら外接矩形が小さくなり、
+     * **中身が抜けた魚が通るようになった**（青い水槽が絵の中に透けて見えた）。
+     *
+     * 台紙どおりに取り込めた絵は**必ず 1 つの塊**になる（実測 33/33）。
+     * それを満たす一番狭い幅を採る。満たす幅が無ければ、通った中で一番狭いもの。
+     */
+    const whole = { cut, cleaned, touchedBorder, trimmed }
+    if (!attempt) attempt = whole
+    if (keptRegions === 1) {
+      attempt = whole
+      break
+    }
   }
 
   if (!attempt) return { ok: false, message: `${fileName}: ${refusal}` }
