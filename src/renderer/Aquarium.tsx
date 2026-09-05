@@ -341,8 +341,14 @@ export function Aquarium({
              * 軸の線上は動かないので、隣の帯との継ぎ目が開かない。
              */
             const lift = part.lift ? 1 + part.lift * sway * wave : 1
+            /*
+             * 傾け（せん断）。**足を前後に振るのに使う（R-060）。**
+             * 軸の線の上は動かず、そこから離れるほど横へずれる。
+             * 回すのと違って切り目の両側が同じだけずれるので、隣と離れない。
+             */
+            const shear = part.shear ? part.shear * sway * wave : 0
             context.save()
-            if (angle !== 0 || lift !== 1) {
+            if (angle !== 0 || lift !== 1 || shear !== 0) {
               const pivotX = left + place.width * part.pivot.x
               const pivotY = top + place.height * part.pivot.y
               context.translate(pivotX, pivotY)
@@ -351,18 +357,36 @@ export function Aquarium({
                 const sideways = part.liftAxis === 'x'
                 context.scale(sideways ? lift : 1, sideways ? 1 : lift)
               }
+              if (shear !== 0) {
+                /*
+                 * `transform(1, 0, c, 1, 0, 0)` は x' = x + c·y。
+                 * ここでは軸を原点に持ってきてあるので、y は軸からの距離。
+                 * 箱の端（軸から箱の高さぶん）でのずれが `shear × 箱の高さ` になり、
+                 * 「箱の大きさに対する割合」という決めどおりになる。
+                 */
+                if (part.shearAxis === 'x') context.transform(1, shear, 0, 1, 0, 0)
+                else context.transform(1, 0, shear, 1, 0, 0)
+              }
               context.translate(-pivotX, -pivotY)
             }
+            /*
+             * **隣との継ぎ目を隠すため、元画像と出力の両方を同じだけ広げる。**
+             *
+             * 傾けた帯は隣とわずかに違う量だけ横へずれるので、
+             * 0.5 画素の重ねでは足りず、**足に細い縦の筋**が出た（実機で確認）。
+             * 出力だけ広げると縮尺が変わって、隙間の代わりに筋が見える（帯の描画と同じ）。
+             */
+            const seam = part.shear ? SEAM_OVERLAP : 0.5
+            const growX = Math.min(1 - (part.box.x + part.box.w), place.width > 0 ? seam / place.width : 0)
             context.drawImage(
               swimmer.element,
               source * part.box.x,
               sourceHeight * part.box.y,
-              source * part.box.w,
+              source * (part.box.w + growX),
               sourceHeight * part.box.h,
               left + place.width * part.box.x,
               top + place.height * part.box.y,
-              // わずかに広げて、隣との継ぎ目に髪の毛ほどの隙間が出るのを防ぐ
-              place.width * part.box.w + 0.5,
+              place.width * (part.box.w + growX) + 0.5,
               place.height * part.box.h + 0.5,
             )
             context.restore()

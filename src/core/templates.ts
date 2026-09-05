@@ -213,6 +213,17 @@ export interface SpritePart {
   readonly lift?: number
   /** 伸び縮みさせる向き。既定は縦（`y`）。紙を回して置いたときに入れ替わる */
   readonly liftAxis?: 'x' | 'y'
+  /**
+   * **傾け（せん断）の幅。0 なら傾けない。**
+   *
+   * 軸の線の上は動かず、そこから離れるほど**横へ**ずれる。
+   * 足を前後に振るのに使う。回すのと違って切り目の両側がずれないので裂けない。
+   *
+   * 値は「軸から箱の端までの距離に対する、ずれの割合」。
+   */
+  readonly shear?: number
+  /** 傾ける向き。既定は「縦に離れるほど横へずれる」（＝足の振り） */
+  readonly shearAxis?: 'x' | 'y'
 }
 
 /*
@@ -338,64 +349,102 @@ const KAME_PARTS: readonly SpritePart[] = Array.from(
  * 前足の組と後ろ足の組が逆に伸び縮みして、体重が前後に移って見える。
  */
 
-/** 腰の線。ここから下だけが動く。ここより上は動かない */
-const WALK_HIP = 0.6
-/*
- * 腰から下を何本の帯に分けるか。
- *
- * **振れ幅と一緒に上げること。** 隣との段差は「振れ幅 ÷ 帯の数」で決まるので、
- * 振れ幅だけ上げると足元に段差が出る。実測で、
- * 14本・0.09 と 20本・0.14 は同じ段差（絵の高さの 1.7%）で、動きだけが 1.5 倍になる。
- */
-const WALK_STRIPS = 20
 /**
- * 足の伸び縮みの幅（倍率のふり幅）。
- * 0.09 では「動いているのは分かるが小さい」と言われた（本人の指摘）。
+ * **足の付け根の線。ここから下だけが前後に振れる（R-060）。**
+ *
+ * 台紙を実測して決めた。**四足の胴は 0.78 あたりまで1つに繋がっていて、
+ * 4本の足に分かれるのは 0.85 より下**（線の内側を塗りつぶして行ごとに数えた）。
+ *
+ * | 台紙 | y=0.78 | y=0.85 |
+ * |---|---|---|
+ * | アンキロサウルス | 4本 | 4本 |
+ * | ブロントサウルス | 1本（胴） | 4本 |
+ * | ステゴサウルス | 1本（胴） | 4本 |
+ * | トリケラトプス | 2本 | 4本 |
+ *
+ * **以前はここが 0.6 だった。** 胴の半分から下を丸ごと縦に伸び縮みさせていたので、
+ * 足が前後に動かず、腹ごと上下に波打っていた。
+ * 会場から「恐竜の足がゆらゆらしてます。もともとの歩いているように直して」。
  */
-const WALK_STRETCH = 0.14
-/** 胴の上下。足より小さくする。大きいと絵が波打って見える */
+const WALK_KNEE = 0.8
+/*
+ * 足元を何本の帯に分けるか。
+ *
+ * 帯を細かくするのは、**前の足と後ろの足を逆に振るため**だけ。
+ * 同じ向きに振る帯どうしはぴったり同じだけずれるので、何本あっても裂けない。
+ */
+const WALK_STRIPS = 24
+/**
+ * 足先が前後に動く幅（足の長さに対する割合）。
+ *
+ * 足の長さは絵の高さの 2 割（`1 - WALK_KNEE`）なので、
+ * 足先は絵の高さの ±4% ほど前後に動く。
+ */
+const WALK_SWING = 0.2
+/** 胴の上下。足の動きに遅れて背中が沈む。大きいと絵が波打って見える */
 const WALK_BODY_LIFT = 0.03
 /**
- * 伸び率が 0 になる位置（＝前後で向きが入れ替わる所）。
- * どの台紙も足と足の隙間がこのあたりにある。
- *   アンキロ 0.40〜0.56 ／ ブロント 0.39〜0.41
- *   ステゴ  0.38〜0.41 ／ トリケラ 0.37〜0.40
+ * 振りの向きが入れ替わる所（前足と後足の境目）。
+ *
+ * 実測（線の内側を塗りつぶし、行ごとに足の位置を測ったもの）:
+ *
+ * | 台紙 | y=0.85 の隙間 | y=0.92 の隙間 |
+ * |---|---|---|
+ * | アンキロサウルス | 0.41〜0.43 | 0.40〜0.56 |
+ * | ブロントサウルス | 0.40〜0.43 | 0.39〜0.41 |
+ * | ステゴサウルス | 0.38〜0.42 | 0.38〜0.41 |
+ * | トリケラトプス | 0.39〜0.43 | 0.38〜0.41 |
+ *
+ * **4台紙すべてで空いているのは 0.41 の一点しかない。**
+ * 足先は下へ行くほど広がるので、隙間は下ほど狭くなる。
  */
-const WALK_PIVOT_X = 0.4
+const WALK_PIVOT_X = 0.41
+/**
+ * 振りが +1 から -1 まで変わりきる幅（片側・絵の幅に対する割合）。
+ *
+ * **ここで急に反転させてはいけない。** 隙間が 1 点しか無いので、
+ * 反転させると必ずどれかの台紙で足の途中を横に切る。
+ * 実機で、ステゴサウルスの足の付け根が割れて破片が浮いた。
+ *
+ * なだらかに変えれば、隣り合う帯の差は
+ * 「振り幅 ÷ (この幅 × 帯の数)」に薄まり、裂けない。
+ * 0.25 にすると、前足（x≈0.2）と後足（x≈0.65）がほぼ振り切る。
+ */
+const WALK_BLEND = 0.25
 
 /**
- * 帯の中心での伸び率の重み（-1〜1）。
+ * 帯の中心での振りの向き（-1〜1）。頭側が +、尾側が -。
  *
- * `WALK_PIVOT_X` で 0 になり、その前後で符号が反転する。
- * **段差が一番大きく出るのは 0 を横切る所**なので、そこを足の隙間に合わせてある。
+ * **正弦波を1周期ぶん使ってはいけない。** 以前はそうしていたため、
+ * 0 を横切る所が絵の真ん中と尾に来て、足ではなく胴が波打っていた。
  */
-function walkWeight(x: number): number {
-  return Math.sin((x - WALK_PIVOT_X) * Math.PI * 2)
+export function walkWeight(x: number): number {
+  return Math.max(-1, Math.min(1, (WALK_PIVOT_X - x) / WALK_BLEND))
 }
 
 const WALKER_PARTS: readonly SpritePart[] = [
-  // 腰から下。帯ごとに縦へ伸び縮み。軸は腰の線なので、上端は動かない
+  // 足元。帯ごとに前後へ振る。軸は足の付け根なので、付け根は動かない
   ...Array.from({ length: WALK_STRIPS }, (_, index): SpritePart => {
     const from = index / WALK_STRIPS
     const width = 1 / WALK_STRIPS
     const centre = from + width / 2
     return {
-      box: { x: from, y: WALK_HIP, w: width, h: 1 - WALK_HIP },
-      pivot: { x: centre, y: WALK_HIP },
+      box: { x: from, y: WALK_KNEE, w: width, h: 1 - WALK_KNEE },
+      pivot: { x: centre, y: WALK_KNEE },
       swing: 0,
       beat: 0,
-      lift: WALK_STRETCH * walkWeight(centre),
-      liftAxis: 'y',
+      shear: WALK_SWING * walkWeight(centre),
+      shearAxis: 'y',
     }
   }),
   /*
-   * 胴（腰から上）。**軸は足と同じ腰の線**にする。
-   * 別の軸にすると、腰のところで足と胴がずれて段差になる。
-   * 拍を少しずらして、足の動きに遅れて背中が上下するようにしてある。
+   * 胴（足の付け根から上）。**軸は足と同じ付け根の線**にする。
+   * 別の軸にすると、そこで足と胴がずれて段差になる。
+   * 拍を少しずらして、足の動きに遅れて背中が上下する（体重が移って見える）。
    */
   {
-    box: { x: 0, y: 0, w: 1, h: WALK_HIP },
-    pivot: { x: 0.5, y: WALK_HIP },
+    box: { x: 0, y: 0, w: 1, h: WALK_KNEE },
+    pivot: { x: 0.5, y: WALK_KNEE },
     swing: 0,
     beat: 0.25,
     lift: WALK_BODY_LIFT,
@@ -460,6 +509,9 @@ function mirrorPart(part: SpritePart): SpritePart {
     beat: part.beat,
     lift: part.lift,
     liftAxis: part.liftAxis,
+    // 鏡に映すと前後が入れ替わるので、足の振りも逆になる
+    shear: part.shear === undefined ? undefined : -part.shear,
+    shearAxis: part.shearAxis,
   }
 }
 
@@ -473,6 +525,9 @@ function turnBackPart(part: SpritePart): SpritePart {
     lift: part.lift,
     // 絵を90度まわすと、縦の伸び縮みは横の伸び縮みになる
     liftAxis: part.lift ? ((part.liftAxis ?? 'y') === 'y' ? 'x' : 'y') : part.liftAxis,
+    // 絵を90度まわすと、縦に離れて横へずれる傾けは、横に離れて縦へずれる傾けになる
+    shear: part.shear,
+    shearAxis: part.shear ? ((part.shearAxis ?? 'y') === 'y' ? 'x' : 'y') : part.shearAxis,
   }
 }
 

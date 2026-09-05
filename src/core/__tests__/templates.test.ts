@@ -394,8 +394,8 @@ describe('四足の恐竜', () => {
   /*
    * **回さない。** 足の組に切って振っていたときは、切り目に選んだ列が
    * どれも胴を 20〜58% 貫いていて、動かすたびに足が胴から外れて見えた（R-048）。
-   * いまは腰から下を帯に分け、帯ごとに**縦へ伸び縮み**させる。
-   * 伸び縮みは軸の上の画素を動かさないので、胴との境目が開きようがない。
+   * いまは足元を帯に分け、帯ごとに**前後へ傾ける（せん断）**。
+   * 傾けは軸の上の画素を動かさないので、胴との境目が開きようがない。
    */
   it('どの部分も回さない', () => {
     for (const id of walkers) {
@@ -403,56 +403,100 @@ describe('四足の恐竜', () => {
     }
   })
 
-  it('動くのは腰から下の帯と、胴の上下だけ', () => {
+  /*
+   * **足の付け根から下だけを動かす（R-060）。**
+   *
+   * 以前はここが絵の高さの 0.6 で、胴の半分から下を丸ごと縦に伸び縮みさせていた。
+   * 足が前後に動かず腹ごと波打つので、会場から
+   * 「恐竜の足がゆらゆらしてます。もともとの歩いているように直して」。
+   */
+  it('動くのは足元の帯と、胴の上下だけ', () => {
     for (const id of walkers) {
       const parts = partsForPiece(id)
       const body = parts[parts.length - 1]
-      // 胴は絵の上から腰まで。最後に描くので腰の継ぎ目を隠せる
+      // 胴は絵の上から足の付け根まで。最後に描くので継ぎ目を隠せる
       expect(body.box.x).toBeCloseTo(0)
       expect(body.box.y).toBeCloseTo(0)
       expect(body.box.w).toBeCloseTo(1)
-      const hip = body.box.h
+      const knee = body.box.h
+      // 台紙を測ると、4本の足に分かれるのは 0.85 より下。胴を巻き込まない位置にする
+      expect(knee).toBeGreaterThanOrEqual(0.75)
 
       const legs = parts.slice(0, -1)
       expect(legs.length).toBeGreaterThan(4)
       for (const leg of legs) {
-        // 帯は腰から下端まで
-        expect(leg.box.y).toBeCloseTo(hip)
+        expect(leg.box.y).toBeCloseTo(knee)
         expect(leg.box.y + leg.box.h).toBeCloseTo(1)
-        // **軸は腰の線。** ここがずれると胴との境目が開く
-        expect(leg.pivot.y).toBeCloseTo(hip)
-        expect(leg.liftAxis ?? 'y').toBe('y')
+        // **軸は付け根の線。** ここがずれると胴との境目が開く
+        expect(leg.pivot.y).toBeCloseTo(knee)
+        // 足は前後に振る（縦に離れるほど横へずれる）。伸び縮みはさせない
+        expect(leg.shearAxis ?? 'y').toBe('y')
+        expect(leg.lift ?? 0).toBe(0)
       }
-      // 胴の軸も腰の線。足と揃っていないと腰で段差になる
-      expect(body.pivot.y).toBeCloseTo(hip)
+      expect(body.pivot.y).toBeCloseTo(knee)
+    }
+  })
+
+  it('前の足と後ろの足が、逆向きに振れる', () => {
+    for (const id of walkers) {
+      const legs = partsForPiece(id).slice(0, -1)
+      const shears = legs.map((leg) => leg.shear ?? 0)
+      expect(Math.min(...shears)).toBeLessThan(0)
+      expect(Math.max(...shears)).toBeGreaterThan(0)
     }
   })
 
   /*
-   * 隣り合う帯の伸び率の差が、そのまま足元の段差になる。
-   * **一番差が大きいのは伸び率が 0 を横切る所**なので、そこを
-   * 足と足の隙間（どの台紙も x=0.40 あたり）に合わせてある。
+   * **振りの向きが入れ替わる所は、足と足の隙間でなければならない（R-053・R-060）。**
+   *
+   * 前と後ろで逆に振るので、絵のある所で急に入れ替わると、
+   * そこで絵が横にずれて裂ける。実機でステゴサウルスの足の付け根が割れた。
+   *
+   * 隙間は台紙を実測した（線の内側を塗りつぶし、行ごとに足の位置を測ったもの）。
+   * **4台紙すべてで空いているのは 0.41 の一点しかない**ので、
+   * そこを跨ぐようになだらかに変える（段差は下の試験で見ている）。
    */
-  it('隣り合う帯の伸び率の差が小さい（段差にならない）', () => {
+  it('振りが入れ替わるのは、どの台紙でも足と足の隙間', () => {
+    // 実測した「まん中の隙間」（y=0.85 と y=0.92 の両方で空いている範囲）
+    const middleGap: Record<string, readonly [number, number]> = {
+      ankylosaurus: [0.41, 0.43],
+      brontosaurus: [0.4, 0.41],
+      stegosaurus: [0.38, 0.41],
+      triceratops: [0.39, 0.41],
+    }
     for (const id of walkers) {
-      const parts = partsForPiece(id)
-      const legs = parts.slice(0, -1)
-      const body = parts[parts.length - 1]
-      const legHeight = 1 - body.box.h
+      const legs = partsForPiece(id).slice(0, -1)
+      let flipAt: number | null = null
       for (let index = 1; index < legs.length; index++) {
-        const step = Math.abs((legs[index].lift ?? 0) - (legs[index - 1].lift ?? 0)) * legHeight
-        // 上限は `tools/check-parts.py` の 3%
-        expect(step).toBeLessThan(0.03)
+        if ((legs[index - 1].shear ?? 0) > 0 && (legs[index].shear ?? 0) < 0) {
+          flipAt = legs[index].box.x
+        }
       }
+      expect(flipAt, `${id}: 入れ替わる所が無い`).not.toBeNull()
+      const [from, to] = middleGap[id]
+      // 帯1本ぶんは許す（0 を跨ぐのは帯の中なので、境目はその幅だけ動く）
+      const slack = legs[0].box.w
+      expect(flipAt as number, `${id}: ${flipAt}`).toBeGreaterThanOrEqual(from - slack)
+      expect(flipAt as number, `${id}: ${flipAt}`).toBeLessThanOrEqual(to + slack)
     }
   })
 
-  it('前と後ろが逆に伸び縮みする（体重が移って見える）', () => {
+  /*
+   * **隣り合う帯のずれの差が、そのまま足元の段差になる。**
+   *
+   * 急に反転させると差が振り幅そのものになり、足が横に割れる（実機で割れた）。
+   * なだらかに変えれば「振り幅 ÷ (変わりきる幅 × 帯の数)」まで薄まる。
+   */
+  it('隣り合う帯の段差が小さい（足が割れない）', () => {
     for (const id of walkers) {
-      const legs = partsForPiece(id).slice(0, -1)
-      const lifts = legs.map((leg) => leg.lift ?? 0)
-      expect(Math.min(...lifts)).toBeLessThan(0)
-      expect(Math.max(...lifts)).toBeGreaterThan(0)
+      const parts = partsForPiece(id)
+      const legs = parts.slice(0, -1)
+      const legHeight = 1 - parts[parts.length - 1].box.h
+      for (let index = 1; index < legs.length; index++) {
+        const step = Math.abs((legs[index].shear ?? 0) - (legs[index - 1].shear ?? 0)) * legHeight
+        // 上限は `tools/check-parts.py` と同じ 3%（絵の高さに対する割合）
+        expect(step, `${id}: 帯 ${index}`).toBeLessThan(0.03)
+      }
     }
   })
 
