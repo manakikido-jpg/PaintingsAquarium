@@ -8,11 +8,13 @@ import {
   directionInPiece,
   identifySpecies,
   partsForPiece,
+  RAW_SHAPE_THRESHOLD,
   rigForSpecies,
   templatesForTheme,
   type SpeciesId,
 } from '../templates'
 import { TEMPLATE_BITS, TEMPLATE_GRID } from '../templates.generated'
+import { MATCH_THRESHOLD } from '../match'
 
 /** 台紙の升目から、その形の絵を作る（1升 = 4画素）。 */
 function pieceOf(id: SpeciesId, scale = 4): RgbaImage {
@@ -182,6 +184,24 @@ describe('identifySpecies', () => {
       for (let x = 10; x < 70; x++) square.data[(y * 80 + x) * 4 + 3] = 255
     }
     expect(identifySpecies(square)).toBeNull()
+  })
+})
+
+describe('紙を消しただけの形を信じる基準', () => {
+  /*
+   * **この形は、はみ出して塗った色まで含んでいる。**
+   * ふつうの合格点で採ると別の生き物に化ける。実測で、黒いクレヨンで
+   * 8% はみ出したまる魚が 0.752 でタコと判定された（R-061）。
+   * この形が要る場面（輪郭に切れ目がある紙）では 0.967 出ているので、
+   * 間を取って線を引ける。
+   */
+  it('ふつうの合格点より厳しい', () => {
+    expect(RAW_SHAPE_THRESHOLD).toBeGreaterThan(MATCH_THRESHOLD)
+  })
+
+  it('誤判定（0.752）は落とし、切れ目の救済（0.967）は通す', () => {
+    expect(0.752).toBeLessThan(RAW_SHAPE_THRESHOLD)
+    expect(0.967).toBeGreaterThan(RAW_SHAPE_THRESHOLD)
   })
 })
 

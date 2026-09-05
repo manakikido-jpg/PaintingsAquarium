@@ -12,7 +12,12 @@ import { insideOutline } from '../core/outline'
 import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
 import { estimateRig, flipHorizontal, orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
-import { identifySpecies, rigForSpecies, type SpeciesId } from '../core/templates'
+import {
+  identifySpecies,
+  RAW_SHAPE_THRESHOLD,
+  rigForSpecies,
+  type SpeciesId,
+} from '../core/templates'
 import type { ThemeId } from '../core/theme'
 
 /**
@@ -72,33 +77,42 @@ function toCanvas(image: RgbaImage): HTMLCanvasElement {
  * AI は使わない。色も形も変えず、透明度だけを触る。
  */
 /**
- * **照合は 2 つの形で試して、合うほうを採る（R-055・R-058）。**
+ * **照合は 2 つの形で試す。ただし信じる基準を変える（R-055・R-058・R-061）。**
  *
- * - **印刷された線の内側**（`insideOutline`）… 枠を超えて塗った色を落とせる。
- *   台紙どおりの紙ではこちらが強い（実測 0.97）。
- * - **紙を消しただけの形**… 線が途切れていても痩せない。
+ * | 形 | 強いところ | 弱いところ | 合格点 |
+ * |---|---|---|---|
+ * | 印刷された線の内側 | 枠を超えて塗った色を落とせる | 線が切れていると痩せる | 0.70 |
+ * | 紙を消しただけ | 線が切れていても痩せない | **はみ出した色がそのまま形に入る** | **0.85** |
  *
- * 片方だけでは必ず片方の場面で外れる。実測（ステゴサウルスの台紙）:
+ * **紙を消しただけの形は、よく合っているときだけ信じる。**
+ * この形は「こどもが枠の外に塗ったもの」まで含んでいるので、
+ * そこそこ合っている程度では**別の生き物に化ける**。
+ *
+ * 実測（まる魚の台紙）:
  *
  * | | 線の内側 | 紙を消しただけ |
  * |---|---|---|
- * | そのまま | 0.971 | 0.967 |
- * | 輪郭に 1mm の切れ目 | **0.418** | 0.967 |
- * | 輪郭に 2mm の切れ目 | **0.363** | 0.967 |
+ * | そのまま | 0.982 | 0.982 |
+ * | 輪郭に切れ目（ステゴ 1mm・2mm） | 0.418 / 0.363 | **0.967** |
+ * | **黒いクレヨンで 8% はみ出す** | 当たらない | **0.752 → タコと誤判定** |
  *
- * 種類が付かないと、頭の向きも動き方も**絵からの推定**に落ちる。
- * 推定が外れた恐竜には魚のしなりが掛かり、**足が尾びれのように揺れる**。
- * 会場から「いるかの読み取る方向がランダムで変わっている」
- * 「恐竜の足が魚みたいに揺れています」。
+ * 切れ目を救うときは 0.967 出ているので、0.85 で線を引けば
+ * **救うものは救ったまま、誤判定だけ落とせる**。
+ * 落ちた絵は種類なしになる（泳ぎはする）。**間違った答えを出すよりよい。**
+ *
+ * **試して効かなかった案**: 「太い黒はクレヨンなので線として扱わない」。
+ * 絵の中を黒く塗ると内側ごと通り抜け可能になり、輪郭の小さな穴から
+ * 塗りつぶしが入って**形が線だけになった**（照合が1枚も当たらない）。R-061。
  *
  * **保存する絵は元のまま。** はみ出して描いたものを消したりはしない。
  */
 function identify(image: RgbaImage, theme?: ThemeId): ReturnType<typeof identifySpecies> {
   const byOutline = identifySpecies(insideOutline(image), theme)
   const byCut = identifySpecies(image, theme)
-  if (!byOutline) return byCut
-  if (!byCut) return byOutline
-  return byCut.score > byOutline.score ? byCut : byOutline
+  const trusted = byCut && byCut.score >= RAW_SHAPE_THRESHOLD ? byCut : null
+  if (!byOutline) return trusted
+  if (!trusted) return byOutline
+  return trusted.score > byOutline.score ? trusted : byOutline
 }
 
 export async function processPhoto(

@@ -154,6 +154,18 @@ export function templatesForTheme(theme?: ThemeId): readonly Template[] {
   return TEMPLATES.filter((template) => SPECIES[template.id as SpeciesId].theme === theme)
 }
 
+/**
+ * **紙を消しただけの形を信じてよい点数**（`MATCH_THRESHOLD` より厳しい）。
+ *
+ * この形には「こどもが枠の外に塗ったもの」がそのまま入っている。
+ * そこそこ合っている程度で採ると、**別の生き物に化ける**。
+ * 実測で、黒いクレヨンで 8% はみ出したまる魚が **0.752 でタコと判定された**。
+ *
+ * 一方、この形が要る場面（輪郭に切れ目がある紙）では **0.967** 出ている。
+ * 間を取って 0.85。救うものは救ったまま、誤判定だけ落とせる。
+ */
+export const RAW_SHAPE_THRESHOLD = 0.85
+
 export function identifySpecies(image: RgbaImage, theme?: ThemeId): SpeciesMatch | null {
   const best = matchTemplates(image, templatesForTheme(theme), TEMPLATE_GRID)
   if (!best || best.score < MATCH_THRESHOLD) return null
