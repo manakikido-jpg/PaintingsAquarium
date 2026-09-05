@@ -40,7 +40,36 @@ export interface Piece {
    * 台紙に書いた手足の位置を、絵の中の位置に直すのに使う。
    */
   readonly fit?: { readonly turns: number; readonly mirrored: boolean }
+  /**
+   * どの版の見分け方で作った絵か（R-062）。
+   *
+   * 種類・頭の向き・動き方は**取り込んだときに一度だけ**決めて保存している。
+   * 見分け方を直しても、**前に取り込んだ絵は古いまま泳ぎ続ける**。
+   * 実際、向きがばらつく不具合を直したあとも、直す前に取り込んだサメは
+   * 逆を向いたままだった。
+   *
+   * ここが `RIG_VERSION` より古い絵は、**画面に出るものだけ**あとから作り直す。
+   * 入っていない絵は 0 とみなす。
+   */
+  readonly built?: number
 }
+
+/**
+ * 見分け方の版。**変えたら上げる。**
+ *
+ * 上げると、画面に出ている絵が起動後に静かに作り直される。
+ * 全部を作り直さないのは、会期の後半で 600枚 を抱えても
+ * 起動が遅くならないようにするため（実測: 600枚でも起動 5.8秒で 60枚と変わらない）。
+ *
+ * - 1: 台紙との照合を2つの形で試し、向き直しが入れた左右反転を戻す版
+ *      （F-365 / F-366 / R-058・R-061）
+ */
+export const RIG_VERSION = 1
+
+/** 作り直した結果を書き戻すときに渡すもの。 */
+export type UpdatePiecePatch = Partial<
+  Pick<Piece, 'rig' | 'species' | 'head' | 'fit' | 'width' | 'height' | 'built'>
+> & { pngBase64?: string }
 
 export interface Settings {
   /** 見張るフォルダ。未設定なら null */
@@ -107,6 +136,8 @@ export interface SavePieceInput {
   readonly species?: SpeciesId
   readonly head?: Direction
   readonly fit?: { readonly turns: number; readonly mirrored: boolean }
+  /** どの版の見分け方で作ったか（`RIG_VERSION`） */
+  readonly built?: number
 }
 
 /** 絵と設定の保存先。別PCへ移すときに運営者がコピーする場所。 */
@@ -145,6 +176,10 @@ export interface AquariumApi {
   chooseWatchFolder(): Promise<Settings>
   listPieces(): Promise<Piece[]>
   savePiece(input: SavePieceInput): Promise<Piece>
+  /** 保存してある絵を base64 で返す（作り直しに使う） */
+  readPieceImage(id: string): Promise<string | null>
+  /** 作り直した結果で置き換える（R-062）。絵が変わったときだけ `pngBase64` を渡す */
+  updatePiece(id: string, patch: UpdatePiecePatch): Promise<Piece | null>
   deletePiece(id: string): Promise<void>
   rescan(): Promise<void>
   toggleFullscreen(): Promise<boolean>

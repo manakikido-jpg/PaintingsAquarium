@@ -114,10 +114,51 @@ export function savePiece(input: SavePieceInput): Piece {
     species: input.species,
     head: input.head,
     fit: input.fit,
+    built: input.built,
   }
 
   writeJsonAtomic(indexPath(), [...readPieces(), piece])
   return piece
+}
+
+/**
+ * すでに保存した絵を、作り直した結果で置き換える（R-062）。
+ *
+ * 絵そのものが変わったとき（台紙の向きへ起こし直したとき）だけ PNG を書き直す。
+ * **同じ id のまま**にするので、泳いでいる絵が入れ替わったようには見えない。
+ */
+/**
+ * 保存してある絵を base64 で返す（作り直しに使う・R-062）。
+ *
+ * `aqua://` から読むと**キャンバスが汚れて画素を読めなくなる**（別の生い立ち扱い）。
+ * ここを通せばそれを避けられる。
+ */
+export function readPieceImage(id: string): string | null {
+  try {
+    return fs.readFileSync(pieceFile(id)).toString('base64')
+  } catch {
+    return null
+  }
+}
+
+export function updatePiece(
+  id: string,
+  patch: Partial<Omit<Piece, 'id' | 'key' | 'createdAt'>> & { pngBase64?: string },
+): Piece | null {
+  const pieces = readPieces()
+  const index = pieces.findIndex((piece) => piece.id === id)
+  if (index < 0) return null
+
+  const { pngBase64, ...rest } = patch
+  if (pngBase64) {
+    fs.mkdirSync(piecesDir(), { recursive: true })
+    fs.writeFileSync(pieceFile(id), Buffer.from(pngBase64, 'base64'))
+  }
+
+  const next = { ...pieces[index], ...rest }
+  pieces[index] = next
+  writeJsonAtomic(indexPath(), pieces)
+  return next
 }
 
 export function deletePiece(id: string): void {

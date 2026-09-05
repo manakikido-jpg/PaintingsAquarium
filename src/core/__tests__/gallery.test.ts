@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GALLERY_PAGE_SIZE, galleryPage } from '../gallery'
+import { GALLERY_PAGE_SIZE, galleryPage, needsRebuild } from '../gallery'
 
 const many = Array.from({ length: 2000 }, (_, index) => index)
 
@@ -37,5 +37,29 @@ describe('galleryPage', () => {
     const source = [1, 2, 3]
     galleryPage(source, 3)
     expect(source).toEqual([1, 2, 3])
+  })
+})
+
+describe('needsRebuild', () => {
+  /*
+   * **見分け方を直しても、前に取り込んだ絵は古いまま泳ぎ続ける（R-062）。**
+   * 実際、向きがばらつく不具合を直したあとも、直す前のサメは逆を向いたままだった。
+   */
+  it('版が古い絵と、版が入っていない絵を選ぶ', () => {
+    const list = [{ built: 1 }, { built: 0 }, {}, { built: 2 }]
+    expect(needsRebuild(list, 2)).toEqual([{ built: 1 }, { built: 0 }, {}])
+  })
+
+  it('全部が新しければ何も選ばない', () => {
+    expect(needsRebuild([{ built: 3 }, { built: 3 }], 3)).toEqual([])
+  })
+
+  /*
+   * **渡すのは画面に出ている絵だけ。** 全件を渡すと会期後半で起動が遅くなる。
+   * ここは「渡されたものだけを見る」ことを固定しておく。
+   */
+  it('渡された分より多くは選ばない', () => {
+    const shown = [{ built: 0 }, { built: 0 }]
+    expect(needsRebuild(shown, 1)).toHaveLength(2)
   })
 })

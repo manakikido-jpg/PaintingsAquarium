@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Aquarium } from './Aquarium'
-import { processPhoto } from './processImage'
+import { processPhoto, rebuildPiece } from './processImage'
 import type {
   IncomingPhoto,
   Notice,
@@ -9,14 +9,18 @@ import type {
   StorageLocation,
   UpdateStatus,
 } from '../shared/types'
+import { RIG_VERSION } from '../shared/types'
 import { DINOSAUR_STYLES, THEMES, themeOf, type DinosaurStyle, type ThemeId } from '../core/theme'
 import { NOTICE_MODES, showsNotice, type NoticeMode } from '../core/notices'
-import { GALLERY_PAGE_SIZE, galleryPage } from '../core/gallery'
+import { GALLERY_PAGE_SIZE, galleryPage, needsRebuild } from '../core/gallery'
 
 /**
  * 最新版の置き場。**アプリからは見に行かない**（画面に出すだけ）。
  * 更新の仕組みが効かないときの、唯一の逃げ道なので常に出しておく（R-049）。
  */
+/** 作り直しの間隔（ミリ秒）。詰めると泳いでいる絵がカクつく */
+const REBUILD_GAP_MS = 700
+
 const RELEASE_PAGE = 'https://github.com/manakikido-jpg/PaintingsAquarium/releases/tag/latest'
 
 export function App(): React.JSX.Element {
@@ -135,6 +139,7 @@ export function App(): React.JSX.Element {
           species: result.species,
           head: result.head,
           fit: result.fit,
+          built: RIG_VERSION,
         })
         setPieces((current) => [...current, piece])
       })
@@ -160,6 +165,66 @@ export function App(): React.JSX.Element {
   // いま選んでいるテーマの絵だけを出す。恐竜の会期に魚が混ざるのを防ぐ。
   const forTheme = settings ? pieces.filter((piece) => themeOf(piece) === settings.theme) : []
   const visible = settings ? forTheme.slice(-settings.maxVisible) : []
+  /*
+   * **古い版で取り込んだ絵を、あとから静かに作り直す（R-062）。**
+   *
+   * 種類・頭の向き・動き方は取り込んだときに一度だけ決めて保存している。
+   * 見分け方を直しても、前に取り込んだ絵は古いまま泳ぎ続ける。
+   * 実際、向きがばらつく不具合を直したあとも、直す前のサメは逆を向いたままだった。
+   *
+   * **画面に出ている絵だけを直す。** 会期後半には数百枚たまるので、
+   * 全部を作り直すと起動が遅くなる（いまは 600枚 でも 60枚 と変わらない）。
+   * 出ていない絵は、出るときが来たらそのとき直る。
+   *
+   * **1枚ずつ、間を空けて**やる。まとめてやると泳いでいる絵がカクつき、
+   * それは来場者から見える。
+   */
+  useEffect(() => {
+    if (!settings) return
+    const old = needsRebuild(visible, RIG_VERSION)
+    if (old.length === 0) return
+
+    let stopped = false
+    const run = async (): Promise<void> => {
+      for (const piece of old) {
+        if (stopped) return
+        const png = await window.aquarium.readPieceImage(piece.id)
+        const rebuilt = png
+          ? await rebuildPiece(`data:image/png;base64,${png}`, themeOf(piece))
+          : null
+        if (stopped) return
+        /*
+         * **1枚ずつ、書き戻したものだけを差し替える。**
+         * 毎回 `listPieces()` で全件を読み直していたときは、
+         * 会期後半（600枚・0.93MB）で作り直しの間だけ 16.1 → 13.7fps まで落ちた。
+         * 読めない絵は版だけ上げて次へ進む（そこで止まらないため）。
+         */
+        const saved = await window.aquarium.updatePiece(
+          piece.id,
+          rebuilt ? { ...rebuilt, built: RIG_VERSION } : { built: RIG_VERSION },
+        )
+        if (stopped) return
+        if (saved) {
+          setPieces((current) =>
+            current.map((one) => (one.id === saved.id ? saved : one)),
+          )
+        }
+        /*
+         * **間を空ける。** 作り直しは絵の読み込みと照合をやるので、
+         * 詰めてやると泳いでいる絵がカクつく（実測 600枚で 16.1 → 13.9fps）。
+         * 画面に出ている 60枚 を 1分ほどかけて直せば十分（一度きりの作業）。
+         */
+        await new Promise((done) => window.setTimeout(done, REBUILD_GAP_MS))
+      }
+    }
+    void run()
+    return () => {
+      stopped = true
+    }
+    // visible の中身ではなく「作り直すものがあるか」で動かす
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.theme, settings?.maxVisible, pieces.length])
+
   const today = new Date().toISOString().slice(0, 10)
   const todayCount = pieces.filter((piece) => piece.createdAt.startsWith(today)).length
 

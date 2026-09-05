@@ -11,6 +11,7 @@ import type {
   Notice,
   SavePieceInput,
   Settings,
+  UpdatePiecePatch,
   UpdateStatus,
   StorageLocation,
 } from '../src/shared/types'
@@ -193,6 +194,11 @@ app.whenReady().then(() => {
 
   ipcMain.handle('aquarium:listPieces', () => storage.readPieces())
   ipcMain.handle('aquarium:savePiece', (_event, input: SavePieceInput) => storage.savePiece(input))
+  ipcMain.handle('aquarium:readPieceImage', (_event, id: string) => storage.readPieceImage(id))
+  ipcMain.handle(
+    'aquarium:updatePiece',
+    (_event, id: string, patch: UpdatePiecePatch) => storage.updatePiece(id, patch),
+  )
   ipcMain.handle('aquarium:deletePiece', (_event, id: string) => storage.deletePiece(id))
   ipcMain.handle('aquarium:rescan', () => startWatching(storage.readSettings().watchFolder))
 

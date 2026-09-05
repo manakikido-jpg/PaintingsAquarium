@@ -31,3 +31,22 @@ export function galleryPage<T>(items: readonly T[], shown: number): GalleryPage<
     total: items.length,
   }
 }
+
+/**
+ * **作り直しが要る絵を選ぶ（R-062）。**
+ *
+ * 種類・頭の向き・動き方は取り込んだときに一度だけ決めて保存している。
+ * 見分け方を直しても、前に取り込んだ絵は古いまま泳ぎ続ける。
+ *
+ * **渡すのは「いま画面に出ている絵」だけにすること。**
+ * 会期後半には数百枚たまるので、全部を作り直すと起動が遅くなる。
+ * 出ていない絵は、出る番が来たときに直る。
+ *
+ * 版が入っていない絵（この仕組みより前に取り込んだもの）は 0 とみなす。
+ */
+export function needsRebuild<T extends { readonly built?: number }>(
+  visible: readonly T[],
+  version: number,
+): T[] {
+  return visible.filter((piece) => (piece.built ?? 0) < version)
+}

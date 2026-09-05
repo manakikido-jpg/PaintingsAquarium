@@ -5,6 +5,7 @@ import type {
   Notice,
   SavePieceInput,
   Settings,
+  UpdatePiecePatch,
 } from '../src/shared/types'
 
 const api: AquariumApi = {
@@ -14,6 +15,9 @@ const api: AquariumApi = {
   chooseWatchFolder: () => ipcRenderer.invoke('aquarium:chooseWatchFolder'),
   listPieces: () => ipcRenderer.invoke('aquarium:listPieces'),
   savePiece: (input: SavePieceInput) => ipcRenderer.invoke('aquarium:savePiece', input),
+  readPieceImage: (id: string) => ipcRenderer.invoke('aquarium:readPieceImage', id),
+  updatePiece: (id: string, patch: UpdatePiecePatch) =>
+    ipcRenderer.invoke('aquarium:updatePiece', id, patch),
   deletePiece: (id: string) => ipcRenderer.invoke('aquarium:deletePiece', id),
   rescan: () => ipcRenderer.invoke('aquarium:rescan'),
   toggleFullscreen: () => ipcRenderer.invoke('aquarium:toggleFullscreen'),

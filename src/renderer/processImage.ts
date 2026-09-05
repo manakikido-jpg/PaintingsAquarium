@@ -16,6 +16,7 @@ import {
   identifySpecies,
   RAW_SHAPE_THRESHOLD,
   rigForSpecies,
+  type Direction,
   type SpeciesId,
 } from '../core/templates'
 import type { ThemeId } from '../core/theme'
@@ -113,6 +114,153 @@ function identify(image: RgbaImage, theme?: ThemeId): ReturnType<typeof identify
   if (!byOutline) return trusted
   if (!trusted) return byOutline
   return trusted.score > byOutline.score ? trusted : byOutline
+}
+
+/**
+ * **絵を台紙の向きへ起こし、種類と動き方を決める。**
+ *
+ * 取り込みのときと、あとから作り直すとき（R-062）の両方から呼ぶ。
+ * 切り抜きのあと・向き直しのあとの絵を渡すこと。
+ */
+export interface Settled {
+  readonly image: RgbaImage
+  readonly rig: Rig
+  readonly species?: SpeciesId
+  readonly head?: Direction
+  readonly fit?: { readonly turns: number; readonly mirrored: boolean }
+}
+
+export function settle(start: RgbaImage, theme?: ThemeId): Settled {
+  let image = start
+  let found = identify(image, theme)
+
+  /*
+   * 台紙が分かったら、**絵そのものを台紙の向きへ起こす**。
+   *
+   * 向き直し（`orientForSwimming`）は形の性質で決めているので、外すことがある。
+   * 実際、サメが**上下逆さま**で保存されていた（照合は「180度回して左右反転すれば
+   * 合う」と正しく報告していたのに、絵は裏返したままだった）。
+   * 台紙という正解がある以上、報告で済ませず絵を直す。
+   *
+   * 左右反転はしない。反転は描画側が進む向きに合わせてやるので、
+   * ここで子どもの塗った絵を鏡に映す必要はない。
+   */
+  let measured = estimateRig(start)
+  /*
+   * **台紙と同じ向き・同じ左右になるまで直す（R-048・R-058）。**
+   *
+   * 回すのは R-048 のとおり。**左右も戻す**のは、向き直しが上下をひっくり返す
+   *（`flipVertical`）ことがあり、それで絵の左右が入れ替わるため。
+   * 台紙は印刷物なので、こどもの絵が左右反転していることはあり得ない。
+   * 照合が「左右反転すれば合う」と言うのは、**こちらがひっくり返したから**。
+   *
+   * 戻さないと、同じ台紙の絵なのに `headsRight` が絵ごとに変わり、
+   * **同じイルカが右を向いたり左を向いたりする**（会場からの指摘）。
+   * 実測でも、同じサメの台紙 3 枚のうち 1 枚だけ向きが逆になっていた。
+   *
+   * 直したら測り直す。回す前の位置のままだと、箱が胴の別の場所を掴む（R-048）。
+   * 2 周までにするのは、直したあとに別の台紙へ当たったときの空回りを止めるため。
+   */
+  for (let pass = 0; pass < 2 && found && (found.turns !== 0 || found.mirrored); pass++) {
+    if (found.turns !== 0) image = rotateQuarter(image, found.turns)
+    if (found.mirrored) image = flipHorizontal(image)
+    found = identify(image, theme)
+    measured = estimateRig(image)
+  }
+
+  /*
+   * 台紙が分かったら、**種類も尾びれも背びれも台紙の正解を使う**。
+   *
+   * 形からの推定は外れる。実際、イルカが「足のある生き物」と判定され、
+   * 尾も背びれも動いていなかった（会場からの指摘）。
+   * 正解が手元にあるのに推定を信じ続ける理由は無い（R-034 と同じ形の間違い）。
+   */
+  const answer = found ? rigForSpecies(found.id, found.mirrored) : null
+  const rig: Rig = answer
+    ? {
+        ...measured,
+        kind: answer.kind,
+        headsRight: answer.headsRight,
+        headKnown: true,
+        tail: answer.tail,
+        /*
+         * 足・触手がどちら向きかも**台紙の正解**を使う。
+         * 絵からの推定は、実測でタコ4匹のうち2匹を外していた。
+         * 外すと波の向きが逆になり、**止めるべき頭が大きく振れて顔が揺れる**（R-044）。
+         */
+        tipsDown: answer.tipsDown ?? measured.tipsDown,
+        // ひれは絵から実測したものを使う（台紙の手置きの矩形は胴を裂いた）
+        // 台紙どおりなので推定ではない。動きに使ってよい
+        confidence: 1,
+      }
+    : measured
+
+  return {
+    image,
+    rig,
+    species: found?.id,
+    head: found?.head,
+    fit: found ? { turns: found.turns, mirrored: found.mirrored } : undefined,
+  }
+}
+
+/** 作り直した結果。絵そのものが変わったときだけ `pngBase64` が入る。 */
+export interface Rebuilt {
+  readonly rig: Rig
+  readonly species?: SpeciesId
+  readonly head?: Direction
+  readonly fit?: { readonly turns: number; readonly mirrored: boolean }
+  readonly width: number
+  readonly height: number
+  readonly pngBase64?: string
+}
+
+/**
+ * **すでに取り込んだ絵を、いまの見分け方で作り直す（R-062）。**
+ *
+ * 元の写真は残していないので、**保存してある絵**から作り直す。
+ * 切り抜きはやり直せないが、直したのは切り抜きの後ろ（種類・向き・動き方）なので、
+ * ここだけで足りる。
+ *
+ * **向き直し（`orientForSwimming`）はやり直さない。** 保存してある絵は
+ * すでに落ち着いた向きなので、もう一度かけると余計に回すことがある。
+ */
+export async function rebuildPiece(src: string, theme?: ThemeId): Promise<Rebuilt | null> {
+  const image = await loadImage(src).catch(() => null)
+  if (!image) return null
+
+  const canvas = document.createElement('canvas')
+  canvas.width = image.naturalWidth
+  canvas.height = image.naturalHeight
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) return null
+  context.drawImage(image, 0, 0)
+  const before = context.getImageData(0, 0, canvas.width, canvas.height)
+
+  const settled = settle(before, theme)
+  const changed = settled.image !== before
+
+  let pngBase64: string | undefined
+  if (changed) {
+    const blob = await new Promise<Blob | null>((resolve) =>
+      toCanvas(settled.image).toBlob(resolve, 'image/png'),
+    )
+    if (!blob) return null
+    const buffer = new Uint8Array(await blob.arrayBuffer())
+    let binary = ''
+    for (const byte of buffer) binary += String.fromCharCode(byte)
+    pngBase64 = btoa(binary)
+  }
+
+  return {
+    rig: settled.rig,
+    species: settled.species,
+    head: settled.head,
+    fit: settled.fit,
+    width: settled.image.width,
+    height: settled.image.height,
+    pngBase64,
+  }
 }
 
 export async function processPhoto(
@@ -248,69 +396,9 @@ export async function processPhoto(
    * 一致したら、頭の向きは推定ではなく**台紙の正解**を使う。
    * 形から当てる推定は、当たらないことがある（R-030）。
    */
-  let image = oriented.image
-  let found = identify(image, theme)
-
-  /*
-   * 台紙が分かったら、**絵そのものを台紙の向きへ起こす**。
-   *
-   * 向き直し（`orientForSwimming`）は形の性質で決めているので、外すことがある。
-   * 実際、サメが**上下逆さま**で保存されていた（照合は「180度回して左右反転すれば
-   * 合う」と正しく報告していたのに、絵は裏返したままだった）。
-   * 台紙という正解がある以上、報告で済ませず絵を直す。
-   *
-   * 左右反転はしない。反転は描画側が進む向きに合わせてやるので、
-   * ここで子どもの塗った絵を鏡に映す必要はない。
-   */
-  let measured = oriented.rig
-  /*
-   * **台紙と同じ向き・同じ左右になるまで直す（R-048・R-058）。**
-   *
-   * 回すのは R-048 のとおり。**左右も戻す**のは、向き直しが上下をひっくり返す
-   *（`flipVertical`）ことがあり、それで絵の左右が入れ替わるため。
-   * 台紙は印刷物なので、こどもの絵が左右反転していることはあり得ない。
-   * 照合が「左右反転すれば合う」と言うのは、**こちらがひっくり返したから**。
-   *
-   * 戻さないと、同じ台紙の絵なのに `headsRight` が絵ごとに変わり、
-   * **同じイルカが右を向いたり左を向いたりする**（会場からの指摘）。
-   * 実測でも、同じサメの台紙 3 枚のうち 1 枚だけ向きが逆になっていた。
-   *
-   * 直したら測り直す。回す前の位置のままだと、箱が胴の別の場所を掴む（R-048）。
-   * 2 周までにするのは、直したあとに別の台紙へ当たったときの空回りを止めるため。
-   */
-  for (let pass = 0; pass < 2 && found && (found.turns !== 0 || found.mirrored); pass++) {
-    if (found.turns !== 0) image = rotateQuarter(image, found.turns)
-    if (found.mirrored) image = flipHorizontal(image)
-    found = identify(image, theme)
-    measured = estimateRig(image)
-  }
-
-  /*
-   * 台紙が分かったら、**種類も尾びれも背びれも台紙の正解を使う**。
-   *
-   * 形からの推定は外れる。実際、イルカが「足のある生き物」と判定され、
-   * 尾も背びれも動いていなかった（会場からの指摘）。
-   * 正解が手元にあるのに推定を信じ続ける理由は無い（R-034 と同じ形の間違い）。
-   */
-  const answer = found ? rigForSpecies(found.id, found.mirrored) : null
-  const rig: Rig = answer
-    ? {
-        ...measured,
-        kind: answer.kind,
-        headsRight: answer.headsRight,
-        headKnown: true,
-        tail: answer.tail,
-        /*
-         * 足・触手がどちら向きかも**台紙の正解**を使う。
-         * 絵からの推定は、実測でタコ4匹のうち2匹を外していた。
-         * 外すと波の向きが逆になり、**止めるべき頭が大きく振れて顔が揺れる**（R-044）。
-         */
-        tipsDown: answer.tipsDown ?? measured.tipsDown,
-        // ひれは絵から実測したものを使う（台紙の手置きの矩形は胴を裂いた）
-        // 台紙どおりなので推定ではない。動きに使ってよい
-        confidence: 1,
-      }
-    : measured
+  const settled = settle(oriented.image, theme)
+  const image = settled.image
+  const rig = settled.rig
 
   const blob = await new Promise<Blob | null>((resolve) =>
     toCanvas(image).toBlob(resolve, 'image/png'),
@@ -331,8 +419,8 @@ export async function processPhoto(
     turned: oriented.turns !== 0 || oriented.flipped,
     straightened: image !== oriented.image,
     paperValue: chosen,
-    species: found?.id,
-    head: found?.head,
-    fit: found ? { turns: found.turns, mirrored: found.mirrored } : undefined,
+    species: settled.species,
+    head: settled.head,
+    fit: settled.fit,
   }
 }
