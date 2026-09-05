@@ -23,11 +23,11 @@ const SPECIES: readonly (readonly [SpeciesId, 'fish' | 'tentacled'])[] = [
   ['umigame', 'tentacled'],
 ]
 
-/** 6種を4匹ずつ、24匹。会場で実際に測ったときと同じ数 */
-function crowd(): Creature[] {
+/** 6種を copies 匹ずつ。既定の 24匹 は会場で実際に測ったときと同じ数 */
+function crowd(copies = 4): Creature[] {
   const out: Creature[] = []
   let seed = 1
-  for (let copy = 0; copy < 4; copy++) {
+  for (let copy = 0; copy < copies; copy++) {
     for (const [species, kind] of SPECIES) {
       out.push(spawnCreature('float', seed++ * 977, tank, 520, 390, [], 1, kind, species))
     }
@@ -77,6 +77,45 @@ describe('24匹が重なったままにならない', () => {
         }
       }
     }
+  })
+})
+
+/*
+ * **片側にかたまらないこと（R-059）。**
+ *
+ * 会場から「魚の衝突判定で右にまとまることがあります。スタックしたり
+ * かたほうにかたまらないようにしてください」。
+ *
+ * 避け合いは混んだところでは渋滞になる。押す向きが打ち消し合ってその場に留まり、
+ * あとから来た絵もそこで詰まって、**塊が自分で自分を保つ**。
+ *
+ * **画面に出せる上限（60匹）で測る。** 24匹だと、ばらばらに置いても
+ * 数の揺らぎだけで3分の1に半分が入ることがあり、偏りと区別が付かない。
+ */
+describe('片側にかたまらない', () => {
+  it('60匹でも、画面の3分の1に半分以上が集まったままにならない', () => {
+    let creatures = crowd(10)
+    const dt = 1 / 30
+    const shares: number[] = []
+    for (let step = 0; step < 300 / dt; step++) {
+      creatures = stepCreatures(creatures, dt, tank)
+      if (step % 30 !== 0) continue
+      let onScreen = 0
+      let right = 0
+      for (const creature of creatures) {
+        const { x } = placeCreature(creature, [])
+        if (x < 0 || x > tank.width) continue
+        onScreen++
+        if (x > tank.width * (2 / 3)) right++
+      }
+      if (onScreen > 0) shares.push(right / onScreen)
+    }
+    const over = shares.filter((value) => value > 0.5).length / shares.length
+    /*
+     * 実測: 直す前は 16%（毎回ばらばらに置いた場合は 0%）。
+     * すりぬけを入れて 0%、ばらつきも 11pt → 6pt でばらばらに置いた場合と同じになった。
+     */
+    expect(over, `半分より多く右に居た時間 ${(over * 100).toFixed(0)}%`).toBeLessThan(0.05)
   })
 })
 

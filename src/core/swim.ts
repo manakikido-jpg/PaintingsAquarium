@@ -263,6 +263,34 @@ const MIN_AVOID_SPEED = 0.6
 const MAX_AVOID_BOOST = 2.5
 
 /** 絵どうしの当たりの目安。横長の絵が多いので長辺で見る。 */
+/**
+ * **これだけの数に囲まれたら、避けるのをやめてすりぬける（R-059）。**
+ *
+ * 会場から「魚の衝突判定で右にまとまることがあります。スタックしたり
+ * かたほうにかたまらないようにしてください」。
+ *
+ * 避け合いは、**混んでいるところでは渋滞になる**。押す向きが打ち消し合って
+ * その場に留まり、あとから来た絵もそこで詰まる。**塊は自分で自分を保つ。**
+ *
+ * 実測（60匹・300秒。「半分超え」＝画面内の半分より多くが右3分の1に居た時間）:
+ *
+ * | | ばらつき | 半分超え | 重なり | いちばん長く重なった時間 |
+ * |---|---|---|---|---|
+ * | 常に避ける | 11pt | **16%** | 1.11組 | 8.8秒 |
+ * | 3匹より多ければすりぬけ | **6pt** | **0%** | 4.79組 | **6.7秒** |
+ * | まったく避けない | 6pt | 0% | **34.11組** | — |
+ *
+ * ばらつき 6pt は「毎回ばらばらに置いた場合」と同じ＝偏りが消えたということ。
+ *
+ * **重なる組の数は増えるが、重なっている時間は短くなる。**
+ * 見て困るのは「絵が塊のまま止まっていて自分の絵を探せない」ことで、
+ * すれ違いざまに一瞬重なることではない。だからこちらを採る。
+ *
+ * 数を減らす（1〜2匹で諦める）と、ただの「避けない」に近づいて重なりが跳ね上がる
+ *（2匹で 14.30組・1匹で 27.65組）。増やす（4匹）と偏りが戻る（半分超え 5%）。
+ */
+export const AVOID_CROWD = 3
+
 function avoidanceRadius(fish: Fish): number {
   return Math.max(fish.width, fish.height) / 2
 }
@@ -292,6 +320,8 @@ export function separateFish(
 
   const pushX = new Float64Array(fishes.length)
   const pushY = new Float64Array(fishes.length)
+  // まわりに何匹居るか。混みすぎていたら避けるのをやめる（R-059）
+  const around = new Int32Array(fishes.length)
 
   for (let a = 0; a < fishes.length; a++) {
     for (let b = a + 1; b < fishes.length; b++) {
@@ -319,6 +349,9 @@ export function separateFish(
        * 以前は距離で割った値をそのまま足していたので、大きさが画素数に依存し、
        * 「どれだけ避けるか」を速さに換算できなかった。
        */
+      around[a]++
+      around[b]++
+
       const depth = 1 - distance / limit
       pushX[a] -= (dx / distance) * depth
       pushY[a] -= (dy / distance) * depth
@@ -329,6 +362,11 @@ export function separateFish(
 
   return fishes.map((fish, index) => {
     if (pushX[index] === 0 && pushY[index] === 0) return fish
+    /*
+     * **囲まれていたら、押さずにすりぬける（R-059）。**
+     * 混んだところで押し合うと、向きが打ち消し合ってその場に留まり、塊が固まる。
+     */
+    if (around[index] > AVOID_CROWD) return fish
 
     const length = Math.hypot(pushX[index], pushY[index])
     if (length < 1e-6) return fish

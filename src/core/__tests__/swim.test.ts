@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   facesRight,
   renderY,
+  AVOID_CROWD,
   separateFish,
   spawnFish,
   stepFish,
@@ -167,6 +168,29 @@ describe('separateFish', () => {
       expect(Number.isFinite(fish.y)).toBe(true)
     }
     expect(Math.hypot(fishes[0].x - fishes[1].x, fishes[0].y - fishes[1].y)).toBeGreaterThan(1)
+  })
+
+  /*
+   * **囲まれたら避けるのをやめる（R-059）。**
+   *
+   * 混んだところで押し合うと、向きが打ち消し合ってその場に留まり、
+   * 塊が自分で自分を保つ。会場から「かたほうにかたまる」「スタックする」。
+   */
+  it('たくさんに囲まれたら、押さずにすりぬける', () => {
+    const middle = fishAt({ x: 900, y: 540 })
+    const crowd = [middle]
+    // まわりを AVOID_CROWD より多く取り囲む
+    for (let index = 0; index <= AVOID_CROWD; index++) {
+      const angle = (index / (AVOID_CROWD + 1)) * Math.PI * 2
+      crowd.push(fishAt({ x: 900 + Math.cos(angle) * 20, y: 540 + Math.sin(angle) * 20 }))
+    }
+
+    expect(separateFish(crowd, 1 / 60)[0].nudge).toBeUndefined()
+  })
+
+  it('囲まれていなければ、いままでどおり押す', () => {
+    const pair = [fishAt({ x: 900, y: 540 }), fishAt({ x: 915, y: 540 })]
+    expect(separateFish(pair, 1 / 60)[0].nudge).toBeDefined()
   })
 
   it('離れている2匹には何もしない', () => {
