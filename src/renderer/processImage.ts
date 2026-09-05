@@ -4,13 +4,14 @@ import {
   diagnoseCutout,
   diagnoseResult,
   inkStats,
+  SEAL_RATIOS,
   type CutoutOptions,
 } from '../core/cutout'
 import { trimTransparent } from '../core/trim'
 import { insideOutline } from '../core/outline'
 import { keepMainRegions } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
-import { estimateRig, orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
+import { estimateRig, flipHorizontal, orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
 import { identifySpecies, rigForSpecies, type SpeciesId } from '../core/templates'
 import type { ThemeId } from '../core/theme'
 
@@ -70,6 +71,36 @@ function toCanvas(image: RgbaImage): HTMLCanvasElement {
  * 写真 1 枚を「紙を透明にしてトリミングした PNG」にする。
  * AI は使わない。色も形も変えず、透明度だけを触る。
  */
+/**
+ * **照合は 2 つの形で試して、合うほうを採る（R-055・R-058）。**
+ *
+ * - **印刷された線の内側**（`insideOutline`）… 枠を超えて塗った色を落とせる。
+ *   台紙どおりの紙ではこちらが強い（実測 0.97）。
+ * - **紙を消しただけの形**… 線が途切れていても痩せない。
+ *
+ * 片方だけでは必ず片方の場面で外れる。実測（ステゴサウルスの台紙）:
+ *
+ * | | 線の内側 | 紙を消しただけ |
+ * |---|---|---|
+ * | そのまま | 0.971 | 0.967 |
+ * | 輪郭に 1mm の切れ目 | **0.418** | 0.967 |
+ * | 輪郭に 2mm の切れ目 | **0.363** | 0.967 |
+ *
+ * 種類が付かないと、頭の向きも動き方も**絵からの推定**に落ちる。
+ * 推定が外れた恐竜には魚のしなりが掛かり、**足が尾びれのように揺れる**。
+ * 会場から「いるかの読み取る方向がランダムで変わっている」
+ * 「恐竜の足が魚みたいに揺れています」。
+ *
+ * **保存する絵は元のまま。** はみ出して描いたものを消したりはしない。
+ */
+function identify(image: RgbaImage, theme?: ThemeId): ReturnType<typeof identifySpecies> {
+  const byOutline = identifySpecies(insideOutline(image), theme)
+  const byCut = identifySpecies(image, theme)
+  if (!byOutline) return byCut
+  if (!byCut) return byOutline
+  return byCut.score > byOutline.score ? byCut : byOutline
+}
+
 export async function processPhoto(
   dataUrl: string,
   fileName: string,
@@ -125,26 +156,68 @@ export async function processPhoto(
       return cropped ? inkStats(cropped.image) : null
     })
     if (found) chosen = found.value
+
   }
 
-  const cut = cutoutPaper(source_, { ...options, paperValue: chosen })
+  /*
+   * **輪郭の切れ目を塞ぐ幅を、必要になったときだけ広げる（R-057）。**
+   *
+   * 会場から「ふちの中の白色はのこして」。
+   * 塗っていない所は紙と同じ色なので、輪郭が途切れていると外から塗りつぶしが入り、
+   * **絵の中の白が消えて線だけになる**。そうなると中身が足りずに取り込みを断る。
+   * これが「中に塗った絵が表示すらされない」の正体だった。
+   * 実測: 輪郭に 2mm の切れ目を入れた紙は中身 15% で**取り込み拒否**になった。
+   *
+   * **1回目でうまくいった紙は、1画素も変わらない。**
+   * 塞ぐ幅を広げると、タコの足やクラゲの触手のあいだのような本物の隙間まで
+   * 埋まって形が変わる。だから**絵にならなかったときだけ**次の幅へ進む。
+   *
+   * **「どの幅が一番よく合うか」を下見の絵で選ぶのは駄目だった。**
+   * 長辺 400px まで縮めるとクラゲの触手が潰れ、素点が 0.44〜0.66 にしかならない。
+   * その素点で幅を選ばせたところ、**実寸なら当たっていたクラゲ 3枚が
+   * 3枚とも当たらなくなった**。縮めた絵で決めてよいのは明るさのしきい値だけ。
+   */
+  let attempt: {
+    cut: RgbaImage
+    cleaned: RgbaImage
+    touchedBorder: boolean
+    trimmed: NonNullable<ReturnType<typeof trimTransparent>>
+  } | null = null
+  let refusal = ''
 
-  const diagnosis = diagnoseCutout(cut)
-  if (!diagnosis.ok) return { ok: false, message: `${fileName}: ${diagnosis.message}` }
+  for (const sealRatio of SEAL_RATIOS) {
+    const cut = cutoutPaper(source_, { ...options, paperValue: chosen, sealRatio })
 
-  // 影で残った紙の隅やゴミを落としてからトリミングする。順番が逆だと、
-  // 捨てるはずの塊を含んだ外接矩形で切ってしまう（R-003）。
-  const { image: cleaned, touchedBorder } = keepMainRegions(cut)
+    const diagnosis = diagnoseCutout(cut)
+    if (!diagnosis.ok) {
+      refusal = diagnosis.message
+      continue
+    }
 
-  const trimmed = trimTransparent(cleaned)
-  if (!trimmed) {
-    return { ok: false, message: `${fileName}: 絵が残りませんでした。設定のしきい値を見直してください。` }
+    // 影で残った紙の隅やゴミを落としてからトリミングする。順番が逆だと、
+    // 捨てるはずの塊を含んだ外接矩形で切ってしまう（R-003）。
+    const { image: cleaned, touchedBorder } = keepMainRegions(cut)
+
+    const trimmed = trimTransparent(cleaned)
+    if (!trimmed) {
+      refusal = '絵が残りませんでした。設定のしきい値を見直してください。'
+      continue
+    }
+
+    // 外接矩形は大きいのに中身が無い＝絵が消えて紙の裏写りだけが残った状態。
+    // ここで止めないと、紙の模様が黙って泳ぎ出す（R-018）。
+    const content = diagnoseResult(trimmed.image)
+    if (!content.ok) {
+      refusal = content.message
+      continue
+    }
+
+    attempt = { cut, cleaned, touchedBorder, trimmed }
+    break
   }
 
-  // 外接矩形は大きいのに中身が無い＝絵が消えて紙の裏写りだけが残った状態。
-  // ここで止めないと、紙の模様が黙って泳ぎ出す（R-018）。
-  const content = diagnoseResult(trimmed.image)
-  if (!content.ok) return { ok: false, message: `${fileName}: ${content.message}` }
+  if (!attempt) return { ok: false, message: `${fileName}: ${refusal}` }
+  const { touchedBorder, trimmed } = attempt
 
   /*
    * 紙の向きは子どもが決める。実物は縦向き（頭が上）に描かれていた。
@@ -162,17 +235,7 @@ export async function processPhoto(
    * 形から当てる推定は、当たらないことがある（R-030）。
    */
   let image = oriented.image
-  /*
-   * **照合は「印刷された線の内側」の形で行う（R-055）。**
-   *
-   * 塗った色まで形に含めると、枠外へはみ出して塗った紙で種類が付かなくなる
-   *（実測: 5mm はみ出すと、こい色でも外れる）。
-   * 線はクレヨンより暗いので、線に囲まれていない所を外してから照合する。
-   *
-   * **保存する絵は元のまま。** はみ出して描いたものを消したりはしない。
-   */
-  const shapeOf = (from: typeof image): typeof image => insideOutline(from)
-  let found = identifySpecies(shapeOf(image), theme)
+  let found = identify(image, theme)
 
   /*
    * 台紙が分かったら、**絵そのものを台紙の向きへ起こす**。
@@ -186,18 +249,25 @@ export async function processPhoto(
    * ここで子どもの塗った絵を鏡に映す必要はない。
    */
   let measured = oriented.rig
-  if (found && found.turns !== 0) {
-    image = rotateQuarter(image, found.turns)
-    found = identifySpecies(shapeOf(image), theme)
-    /*
-     * **回したあとの絵で測り直す。**
-     *
-     * `oriented.rig` の背びれ・胸びれ・体の芯は、回す前の絵で測った位置。
-     * それを回したあとの絵に当てると、箱が胴の別の場所を掴む。
-     * 実際、サメは 180 度回して保存されるので、腹の下（0.33〜0.54）に置いた
-     * ひれの箱が、回した絵では背中側の胴の真ん中に当たり、
-     * 動かすたびに胴が裂けて見えていた（R-048）。
-     */
+  /*
+   * **台紙と同じ向き・同じ左右になるまで直す（R-048・R-058）。**
+   *
+   * 回すのは R-048 のとおり。**左右も戻す**のは、向き直しが上下をひっくり返す
+   *（`flipVertical`）ことがあり、それで絵の左右が入れ替わるため。
+   * 台紙は印刷物なので、こどもの絵が左右反転していることはあり得ない。
+   * 照合が「左右反転すれば合う」と言うのは、**こちらがひっくり返したから**。
+   *
+   * 戻さないと、同じ台紙の絵なのに `headsRight` が絵ごとに変わり、
+   * **同じイルカが右を向いたり左を向いたりする**（会場からの指摘）。
+   * 実測でも、同じサメの台紙 3 枚のうち 1 枚だけ向きが逆になっていた。
+   *
+   * 直したら測り直す。回す前の位置のままだと、箱が胴の別の場所を掴む（R-048）。
+   * 2 周までにするのは、直したあとに別の台紙へ当たったときの空回りを止めるため。
+   */
+  for (let pass = 0; pass < 2 && found && (found.turns !== 0 || found.mirrored); pass++) {
+    if (found.turns !== 0) image = rotateQuarter(image, found.turns)
+    if (found.mirrored) image = flipHorizontal(image)
+    found = identify(image, theme)
     measured = estimateRig(image)
   }
 

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { cutoutPaper, diagnoseCutout, opaqueRatio, DEFAULT_CUTOUT_OPTIONS, diagnoseResult, chooseCutoutValue, inkStats } from '../cutout'
+import {
+  cutoutPaper,
+  diagnoseCutout,
+  opaqueRatio,
+  DEFAULT_CUTOUT_OPTIONS,
+  diagnoseResult,
+  chooseCutoutValue,
+  inkStats,
+  SEAL_RATIOS,
+} from '../cutout'
 import { createImage } from '../image'
 import {
   AGED_PAPER,
@@ -182,8 +191,58 @@ describe('cutoutPaper', () => {
     expect(alphaAt(result, 300, 40)).toBe(0)
   })
 
+  /*
+   * **大きな切れ目は、幅を広げれば塞がる（R-057）。**
+   *
+   * R-056 の幅は短辺の 0.4%（600px なら 4px）まで。
+   * それより大きく切れていると、そこから塗りつぶしが入って中の白が消える。
+   * 会場から「ふちの中の白色はのこして」。
+   */
+  it('大きな切れ目は、塞ぐ幅を広げれば中の白が残る', () => {
+    const side = 600
+    const image = createImage(side, side)
+    const put = (x: number, y: number, colour: readonly number[]): void => {
+      const offset = (y * side + x) * 4
+      image.data[offset] = colour[0]
+      image.data[offset + 1] = colour[1]
+      image.data[offset + 2] = colour[2]
+      image.data[offset + 3] = 255
+    }
+    for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) put(x, y, PAPER)
+    for (let t = 120; t < 480; t++) {
+      for (let w = 0; w < 3; w++) {
+        put(t, 120 + w, BLACK_LINE)
+        put(t, 477 + w, BLACK_LINE)
+        put(120 + w, t, BLACK_LINE)
+        put(477 + w, t, BLACK_LINE)
+      }
+    }
+    // **20px の切れ目**。R-056 の幅（4px）では塞げない
+    for (let t = 300; t < 320; t++) for (let w = 0; w < 3; w++) put(t, 120 + w, PAPER)
+
+    // いちばん狭い幅では、中まで食われる
+    expect(alphaAt(cutoutPaper(image, DEFAULT_CUTOUT_OPTIONS), 300, 300)).toBe(0)
+
+    // 幅を広げれば残る
+    const wide = cutoutPaper(image, { ...DEFAULT_CUTOUT_OPTIONS, sealRatio: 0.024 })
+    expect(alphaAt(wide, 300, 300)).toBe(255)
+    // 外の紙は、幅を広げても消える
+    expect(alphaAt(wide, 5, 5)).toBe(0)
+  })
+
   it('大きさ 0 の画像でも落ちない', () => {
     expect(() => cutoutPaper(createImage(0, 0))).not.toThrow()
+  })
+})
+
+describe('SEAL_RATIOS', () => {
+  /*
+   * **必ず狭いほうから試す。** 広い幅から始めると、本物の隙間まで埋まる。
+   */
+  it('幅は狭いほうから、広がる順に並んでいる', () => {
+    for (let index = 1; index < SEAL_RATIOS.length; index++) {
+      expect(SEAL_RATIOS[index]).toBeGreaterThan(SEAL_RATIOS[index - 1])
+    }
   })
 })
 

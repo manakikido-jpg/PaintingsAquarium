@@ -1,4 +1,5 @@
 import { cloneImage, value, type RgbaImage } from './image'
+import { floodFromBorder } from './flood'
 
 /**
  * 照合に使う形を、**印刷された輪郭の内側**から作る。
@@ -46,44 +47,33 @@ export function insideOutline(
   const total = width * height
   if (total === 0) return result
 
-  const isLine = (index: number): boolean => {
+  const notLine = new Uint8Array(total)
+  for (let index = 0; index < total; index++) {
     const offset = index * 4
     // 透明な所（消した紙）は線ではない。通り抜けられる
-    if (data[offset + 3] < 24) return false
-    return value(data[offset], data[offset + 1], data[offset + 2]) <= darkness
+    if (data[offset + 3] < 24) {
+      notLine[index] = 1
+      continue
+    }
+    if (value(data[offset], data[offset + 1], data[offset + 2]) > darkness) notLine[index] = 1
   }
 
-  const outside = new Uint8Array(total)
-  const stack = new Int32Array(total)
-  let stackSize = 0
-
-  const push = (index: number): void => {
-    if (outside[index] === 1 || isLine(index)) return
-    outside[index] = 1
-    stack[stackSize++] = index
-  }
-
-  for (let x = 0; x < width; x++) {
-    push(x)
-    push((height - 1) * width + x)
-  }
-  for (let y = 0; y < height; y++) {
-    push(y * width)
-    push(y * width + width - 1)
-  }
-
-  while (stackSize > 0) {
-    const index = stack[--stackSize]
-    const x = index % width
-    const y = (index - x) / width
-    if (x > 0) push(index - 1)
-    if (x < width - 1) push(index + 1)
-    if (y > 0) push(index - width)
-    if (y < height - 1) push(index + width)
-  }
+  /*
+   * **ここでは切れ目を塞がない（R-058）。**
+   *
+   * 塞ぐには線を太らせることになり、ステゴサウルスの板や足のあいだのような
+   * **本物の隙間まで埋まって形が変わる**。実測で、塞ぐ幅を上げると
+   * 台紙との合い方が 0.97 → 0.62 まで落ちた（切れ目の無い紙で）。
+   *
+   * 切れ目があるときは、この形は使いものにならない（線だけに痩せる）。
+   * そのときは**紙を消しただけの形**のほうが正しいので、
+   * 呼ぶ側で両方を試して合うほうを採る（`processImage`）。
+   */
+  const outside = floodFromBorder(notLine, width, height)
 
   for (let index = 0; index < total; index++) {
     result.data[index * 4 + 3] = outside[index] === 1 ? 0 : 255
   }
   return result
 }
+

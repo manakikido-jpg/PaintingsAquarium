@@ -333,6 +333,31 @@ export function flipVertical(image: RgbaImage): RgbaImage {
 }
 
 /**
+ * 左右をひっくり返す。
+ *
+ * **これは向きを直すための道具で、絵を鏡に映すためのものではない（R-058）。**
+ * 台紙は印刷物なので、こどもが描いた絵が左右反転していることはあり得ない。
+ * それでも照合が「左右反転すれば合う」と言うときは、
+ * こちらが `flipVertical` で上下をひっくり返したせいで**手が入れ替わっている**。
+ * そのときだけ、ここで戻す。
+ */
+export function flipHorizontal(image: RgbaImage): RgbaImage {
+  const { width, height } = image
+  const data = new Uint8ClampedArray(image.data.length)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const from = (y * width + x) * 4
+      const to = (y * width + (width - 1 - x)) * 4
+      data[to] = image.data[from]
+      data[to + 1] = image.data[from + 1]
+      data[to + 2] = image.data[from + 2]
+      data[to + 3] = image.data[from + 3]
+    }
+  }
+  return { width, height, data: data as RgbaImage['data'] }
+}
+
+/**
  * 絵の上半分と下半分、どちらが濃いか。
  *
  * 魚は背中が濃く腹が明るい（実物もそうだった）。

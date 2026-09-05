@@ -7,6 +7,7 @@ import {
   estimateRig,
   findTail,
   flareConfidence,
+  flipHorizontal,
   flipVertical,
   midline,
   orientForSwimming,
@@ -171,6 +172,33 @@ describe('flipVertical', () => {
     const flipped = flipVertical(image)
     expect(flipped.data[3]).toBe(0)
     expect(flipped.data[(2 * 2 + 0) * 4 + 3]).toBe(255)
+  })
+})
+
+describe('flipHorizontal', () => {
+  it('2回で元に戻る', () => {
+    const image = fishFacingRight()
+    expect([...flipHorizontal(flipHorizontal(image)).data]).toEqual([...image.data])
+  })
+
+  it('左の列が右へ移る', () => {
+    const image = createImage(3, 2)
+    fill(image, 0, 0, 1, 2)
+    const flipped = flipHorizontal(image)
+    expect(flipped.data[3]).toBe(0)
+    expect(flipped.data[2 * 4 + 3]).toBe(255)
+  })
+
+  /*
+   * **上下をひっくり返すのは、左右をひっくり返して 180 度回すのと同じ。**
+   * 向き直し（`orientForSwimming`）が上下を返すと、絵の左右が入れ替わる。
+   * それが「同じイルカが右を向いたり左を向いたりする」の正体だった（R-058）。
+   */
+  it('上下反転は、左右反転と 180 度回転を合わせたものと同じ', () => {
+    const image = fishFacingRight()
+    expect([...flipVertical(image).data]).toEqual([
+      ...rotateQuarter(flipHorizontal(image), 2).data,
+    ])
   })
 })
 
