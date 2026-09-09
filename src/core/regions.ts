@@ -116,9 +116,80 @@ export function keepMainRegions(
 
   if (areas.length === 0) return { image: result, droppedRegions: 0, keptRegions: 0, touchedBorder: false }
 
+  /*
+   * **縁に触れる塊でも、中身が詰まっていれば捨てない（R-067）。**
+   *
+   * 「縁に触れる塊は捨てる」規則（R-003）は、紙の隅の影のような
+   * **小さなゴミ**を落とすためのもの。ところが実物の写真では、
+   * カメラの構え方次第で**絵そのもの**が縁にわずかでも触れることがある
+   * （紙をぎりぎりまで大きく写す・紙の端まで色を塗る、など）。
+   *
+   * 絵は台紙の印刷線でひと続きに繋がっているので、縁に1画素でも触れると
+   * **絵ぜんぶ**がまとめて「縁のゴミ」として落ちる。残るのは題（印刷文字）
+   * のような、縁から離れた小さな塊だけになり、**題が絵として保存されていた**
+   * （会場から「色の塗り方によって中が透明になる」）。
+   *
+   * ただし「一番大きい塊を無条件に残す」だけでは別の実物写真で壊れた。
+   * 台紙を黒い台などに置いて撮ると、紙からはみ出た背景が「紙ではない」
+   * （＝クレヨンと同じ扱い）と誤判定され、額縁のような形の塊になる。
+   * この額縁は面積が絵より大きくなりがちで、縁にも触れる。無条件に残すと
+   * 額縁ごと絵として保存され、種類判定の的（絵の輪郭）が崩れて外れやすくなった
+   * （実測: 会場データで種類判定が 11/19 → 6/19 に悪化）。
+   *
+   * 額縁と本物の絵は「外接矩形に対してどれだけ埋まっているか」で見分けられる。
+   * 額縁は中が空洞（紙の分だけ穴が空く）なので詰まり方が薄いが、
+   * 絵は多少はみ出して塗っても塊自体は密。実測（会場データ）:
+   *
+   * | | 詰まり方（面積 / 外接矩形） |
+   * |---|---|
+   * | 額縁（背景の誤判定、5枚） | 13.1%〜21.9% |
+   * | 本物の絵（縁に触れた本体） | 45.3%〜70.9% |
+   *
+   * **詰まり方だけでも足りなかった。** スキャナで紙を2枚重ねて取り込んだ
+   * 場合（別の既知の不具合。運用の直し方は別途検討）、2枚目の絵も
+   * 密な塊として縁に触れ、詰まり方の検査を通ってしまう。
+   * ところがこの場合、**1枚目の絵はすでに縁に触れない塊として
+   * 単独で十分な大きさ**を持っている。縁の塊に頼る必要は無い。
+   *
+   * そこで「内側の塊が既に十分大きいか」も見る。実測（会場データ）:
+   *
+   * | | 内側の一番大きい塊 ÷ 縁の候補の面積 |
+   * |---|---|
+   * | 題だけが内側に残る（本来の不具合） | 0.4% |
+   * | 2枚重ねで1枚目が内側に残る | 48%〜98% |
+   *
+   * 内側の塊がすでに縁の候補の 20% 以上あれば「単独で十分」とみなし、
+   * 縁の塊には手を出さない。無いか小さすぎるときだけ、縁の塊を候補に加える。
+   */
+  const SOLID_FILL_RATIO = 0.3
+  const SELF_SUFFICIENT_RATIO = 0.2
+  let mainBorderLabel = -1
+  let mainBorderArea = 0
+  for (let label = 0; label < areas.length; label++) {
+    if (!touchesBorder[label]) continue
+    const box = boxes[label]
+    const bboxArea = (box.right - box.left + 1) * (box.bottom - box.top + 1)
+    const fillRatio = bboxArea > 0 ? areas[label] / bboxArea : 0
+    if (fillRatio < SOLID_FILL_RATIO) continue
+    if (areas[label] > mainBorderArea) {
+      mainBorderArea = areas[label]
+      mainBorderLabel = label
+    }
+  }
+
   const inner = areas.map((_, label) => label).filter((label) => !touchesBorder[label])
-  const touchedBorder = inner.length === 0
-  const candidates = touchedBorder ? areas.map((_, label) => label) : inner
+  let largestInnerArea = 0
+  for (const label of inner) {
+    if (areas[label] > largestInnerArea) largestInnerArea = areas[label]
+  }
+  if (mainBorderLabel !== -1 && largestInnerArea >= mainBorderArea * SELF_SUFFICIENT_RATIO) {
+    mainBorderLabel = -1
+  }
+
+  const candidateSet = new Set(inner)
+  if (mainBorderLabel !== -1) candidateSet.add(mainBorderLabel)
+  // 縁に触れない塊が1つも無ければ、これまでどおり全部を候補に戻す
+  const candidates = inner.length > 0 ? [...candidateSet] : areas.map((_, label) => label)
 
   let largestArea = 0
   let main = candidates[0]
@@ -128,6 +199,14 @@ export function keepMainRegions(
       main = label
     }
   }
+
+  /*
+   * お知らせの合図は「本体が縁に触れているか」に変える。
+   * 以前は「縁に触れない塊が1つも無いか」を見ていたが、
+   * それだと本体を残せた今回のような場合に警告が出ない。
+   * 本体が縁に触れているなら、次はもう少し余白を空けてほしい、という助言は変わらず要る。
+   */
+  const touchedBorder = touchesBorder[main]
 
   /*
    * **本体から離れた塊を捨てる（R-065）。**

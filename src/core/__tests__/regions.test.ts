@@ -146,3 +146,59 @@ describe('本体から離れた塊を捨てる（R-065）', () => {
     expect(keepMainRegions(image).droppedRegions).toBe(0)
   })
 })
+
+describe('縁に触れる塊を額縁や2枚重ねと区別する（R-067）', () => {
+  const put = (image: ReturnType<typeof createImage>, x: number, y: number): void => {
+    image.data[(y * image.width + x) * 4 + 3] = 255
+  }
+
+  it('縁を囲む額縁状の塊（詰まり方が薄い）は無視し、内側の絵を残す', () => {
+    // 20x20 の外周1画素ぶんだけを塗った「額縁」（詰まり方 19%）＋中央に密な絵（8x8）
+    const image = createImage(20, 20)
+    for (let x = 0; x < 20; x++) {
+      put(image, x, 0)
+      put(image, x, 19)
+    }
+    for (let y = 0; y < 20; y++) {
+      put(image, 0, y)
+      put(image, 19, y)
+    }
+    for (let y = 6; y < 14; y++) for (let x = 6; x < 14; x++) put(image, x, y)
+
+    const { image: kept, touchedBorder } = keepMainRegions(image)
+
+    // 額縁は縁にしか触れておらず、実際に消える
+    expect(touchedBorder).toBe(false)
+    expect(alphaAt(kept, 0, 0)).toBe(0)
+    // 中央の絵は残る
+    expect(alphaAt(kept, 8, 8)).toBe(255)
+  })
+
+  it('内側の絵がすでに十分大きければ、縁に触れる密な塊（2枚重ねのもう1枚）は取り込まない', () => {
+    // 内側: 8x8（非border）。縁: 10x10 の密な塊が右端に接する（間に1画素の隙間を空けて別の塊にする）
+    // 内側 64 ÷ 縁 100 = 64% あり、単独で十分（自己完結）とみなす
+    const image = createImage(22, 20)
+    for (let y = 2; y < 10; y++) for (let x = 2; x < 10; x++) put(image, x, y)
+    for (let y = 5; y < 15; y++) for (let x = 12; x < 22; x++) put(image, x, y)
+
+    const { image: kept, touchedBorder } = keepMainRegions(image)
+
+    expect(touchedBorder).toBe(false)
+    // 内側の絵は残る
+    expect(alphaAt(kept, 5, 5)).toBe(255)
+    // 縁に触れる、もう1枚ぶんの塊は残らない
+    expect(alphaAt(kept, 17, 10)).toBe(0)
+  })
+
+  it('内側に小さな断片しか無ければ、縁に触れる密な本体を残す（本来の不具合）', () => {
+    // 内側: 2x2（題の断片くらい小さい）。縁: 10x10 の密な本体
+    const image = createImage(20, 20)
+    for (let y = 2; y < 4; y++) for (let x = 2; x < 4; x++) put(image, x, y)
+    for (let y = 5; y < 15; y++) for (let x = 10; x < 20; x++) put(image, x, y)
+
+    const { image: kept, touchedBorder } = keepMainRegions(image)
+
+    expect(touchedBorder).toBe(true)
+    expect(alphaAt(kept, 15, 10)).toBe(255)
+  })
+})
