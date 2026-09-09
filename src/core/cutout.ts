@@ -30,6 +30,14 @@ export interface CutoutOptions {
    * `SEAL_RATIOS` を順に上げて呼び直す（R-057）。
    */
   sealRatio?: number
+  /**
+   * 明るさの下限を区画ごとに変える地図（影ムラ対応・R-068）。
+   * 指定すると `paperValue` の代わりにこちらを使う。
+   *
+   * **通常の判定が失敗したときの再挑戦でだけ渡す。** 普段は無い前提で、
+   * 渡さなければ今までどおり写真全体で1つのしきい値を使う。
+   */
+  localPaperMap?: LocalPaperMap
 }
 
 export const DEFAULT_CUTOUT_OPTIONS: CutoutOptions = {
@@ -120,6 +128,81 @@ export function paperColour(image: RgbaImage): readonly [number, number, number]
 }
 
 /**
+ * **紙の明るさを区画ごとに測った地図（影ムラ対応・R-068）。**
+ *
+ * 通常の判定（写真全体で1つの明るさしきい値、R-020）は、
+ * 同じ紙の中で明るさが場所によって大きく違う（テープや撮影時の影）と
+ * 破綻する。影の部分を紙とみなせるほど下限を下げると薄い色の絵まで消え、
+ * 下げなければ影がかかった紙が絵として残って拒否になる
+ * （実測: 紙の余白だけを測っても明るさが 0.32〜0.65 まで揺れていた）。
+ *
+ * そこで**区画ごと**に「紙とみなす明るさ」を測り直す。
+ * 通常の判定が失敗したとき（`diagnoseCutout` の `nothing-removed`）だけ使う。
+ */
+export interface LocalPaperMap {
+  readonly cols: number
+  readonly rows: number
+  /** 区画ごとの明るさの下限。長さは `cols * rows`、並びは行優先 */
+  readonly values: readonly number[]
+}
+
+/** 区画の中で「彩度が低い（クレヨンの色ではなく、紙か影）」とみなす上限 */
+const LOCAL_LOW_SATURATION = 0.2
+/** これより標本が少ない区画は測れないとみなし、既定値のまま触らない */
+const LOCAL_MIN_SAMPLES = 40
+/**
+ * 区画の中で「紙の暗いほう」を採る位置（下から何%目か）。
+ *
+ * 中央値（50%）だと、影の濃淡がある区画では暗いほうに寄り切れず、
+ * まだ紙が残ってしまうことがある。低すぎると絵の余白側に寄りすぎて
+ * 薄い色を消す方向に効きすぎる。実物1例からの仮の値（要調整）。
+ */
+const LOCAL_PERCENTILE = 0.3
+
+export function localPaperValueMap(
+  image: RgbaImage,
+  cols: number,
+  rows: number,
+  fallbackValue: number,
+): LocalPaperMap {
+  const { width, height, data } = image
+  const values: number[] = new Array(cols * rows).fill(fallbackValue)
+  if (width === 0 || height === 0 || cols <= 0 || rows <= 0) return { cols, rows, values }
+
+  const buckets: number[][] = Array.from({ length: cols * rows }, () => [])
+  for (let y = 0; y < height; y++) {
+    const by = Math.min(rows - 1, Math.floor((y / height) * rows))
+    for (let x = 0; x < width; x++) {
+      const offset = (y * width + x) * 4
+      const r = data[offset]
+      const g = data[offset + 1]
+      const b = data[offset + 2]
+      if (saturation(r, g, b) > LOCAL_LOW_SATURATION) continue
+      const bx = Math.min(cols - 1, Math.floor((x / width) * cols))
+      buckets[by * cols + bx].push(value(r, g, b))
+    }
+  }
+
+  for (let index = 0; index < buckets.length; index++) {
+    const bucket = buckets[index]
+    if (bucket.length < LOCAL_MIN_SAMPLES) continue // 測れない区画は既定値のまま
+    bucket.sort((a, b) => a - b)
+    const at = Math.floor(bucket.length * LOCAL_PERCENTILE)
+    // **下げる方向にしか使わない。** 区画の実測が既定値より明るくても、
+    // 既定より甘くする理由が無い（消しすぎ側のリスクを増やさない）
+    values[index] = Math.min(fallbackValue, bucket[at])
+  }
+
+  return { cols, rows, values }
+}
+
+function localValueAt(map: LocalPaperMap, x: number, width: number, y: number, height: number): number {
+  const bx = Math.min(map.cols - 1, Math.floor((x / width) * map.cols))
+  const by = Math.min(map.rows - 1, Math.floor((y / height) * map.rows))
+  return map.values[by * map.cols + bx]
+}
+
+/**
  * 紙の色からの離れ具合（0〜1）。
  *
  * **明るさを揃えてから比べる。** 紙は影で暗くなるが色は変わらない。
@@ -179,7 +262,7 @@ export function cutoutPaper(
   const result = cloneImage(source)
   if (width === 0 || height === 0) return result
 
-  const { paperValue, paperSaturation, feather } = options
+  const { paperValue, paperSaturation, feather, localPaperMap } = options
 
   // 探索は緩めのしきい値で行う。厳しいほうだけで探索すると、絵の輪郭の
   // 手前で背景が途切れ、絵のまわりに白い縁が残る。
@@ -194,12 +277,22 @@ export function cutoutPaper(
    */
   const paper = paperColour(source)
 
+  /**
+   * 明るさの下限（区画があれば区画ごと、無ければ写真全体で1つ）。
+   * 影ムラ対応（R-068）。`localPaperMap` が無ければ今までどおり定数。
+   */
+  const strictFloorAt = (x: number, y: number): number =>
+    localPaperMap ? localValueAt(localPaperMap, x, width, y, height) : paperValue
+
   const looksLikePaper = (index: number): boolean => {
     const offset = index * 4
     const r = data[offset]
     const g = data[offset + 1]
     const b = data[offset + 2]
-    if (value(r, g, b) < looseValue) return false
+    const floor = localPaperMap
+      ? strictFloorAt(index % width, Math.floor(index / width)) - feather
+      : looseValue
+    if (value(r, g, b) < floor) return false
     if (saturation(r, g, b) > looseSaturation) return false
     // **紙と色が違うものは、うすくても絵として残す。**
     // ここが無いと、軽く塗ったオレンジや肌色が紙と一緒に消える
@@ -238,7 +331,11 @@ export function cutoutPaper(
 
     // 厳しいしきい値をどれだけ外しているかで、境界の濃さを決める。
     // 完全に紙なら 0（透明）、緩い判定ぎりぎりなら 1（不透明）。
-    const byValue = feather > 0 ? (paperValue - value(r, g, b)) / feather : 0
+    // 区画の地図があれば、その区画の下限を「厳しいしきい値」として使う（R-068）
+    const strictFloor = localPaperMap
+      ? strictFloorAt(index % width, Math.floor(index / width))
+      : paperValue
+    const byValue = feather > 0 ? (strictFloor - value(r, g, b)) / feather : 0
     const bySaturation = feather > 0 ? (saturation(r, g, b) - paperSaturation) / feather : 0
     const opacity = Math.min(1, Math.max(0, Math.max(byValue, bySaturation)))
 

@@ -4,6 +4,7 @@ import {
   diagnoseCutout,
   diagnoseResult,
   inkStats,
+  localPaperValueMap,
   SEAL_RATIOS,
   type CutoutOptions,
 } from '../core/cutout'
@@ -280,6 +281,87 @@ export async function rebuildPiece(src: string, theme?: ThemeId): Promise<Rebuil
   }
 }
 
+interface CutoutAttempt {
+  readonly cut: RgbaImage
+  readonly cleaned: RgbaImage
+  readonly touchedBorder: boolean
+  readonly trimmed: NonNullable<ReturnType<typeof trimTransparent>>
+}
+
+interface SealAttemptResult {
+  readonly attempt: CutoutAttempt | null
+  readonly refusalCode: 'nothing-left' | 'nothing-removed' | 'other' | null
+  readonly refusalMessage: string
+}
+
+/**
+ * `SEAL_RATIOS` を順に試し、絵が 1 つの塊になる幅を選ぶ（R-057・R-066）。
+ *
+ * `extra` で `cutoutPaper` への追加設定を差し替えられる。
+ * 影ムラ対応の再挑戦（R-068）で、区画ごとのしきい値地図を渡すために使う。
+ */
+function trySealRatios(
+  source: RgbaImage,
+  options: CutoutOptions,
+  extra: Partial<CutoutOptions> = {},
+): SealAttemptResult {
+  let attempt: CutoutAttempt | null = null
+  let refusalCode: SealAttemptResult['refusalCode'] = null
+  let refusalMessage = ''
+
+  for (const sealRatio of SEAL_RATIOS) {
+    const cut = cutoutPaper(source, { ...options, sealRatio, ...extra })
+
+    const diagnosis = diagnoseCutout(cut)
+    if (!diagnosis.ok) {
+      refusalCode = diagnosis.code
+      refusalMessage = diagnosis.message
+      continue
+    }
+
+    // 影で残った紙の隅やゴミを落としてからトリミングする。順番が逆だと、
+    // 捨てるはずの塊を含んだ外接矩形で切ってしまう（R-003）。
+    const { image: cleaned, touchedBorder, keptRegions } = keepMainRegions(cut)
+
+    const trimmed = trimTransparent(cleaned)
+    if (!trimmed) {
+      refusalCode = 'other'
+      refusalMessage = '絵が残りませんでした。設定のしきい値を見直してください。'
+      continue
+    }
+
+    // 外接矩形は大きいのに中身が無い＝絵が消えて紙の裏写りだけが残った状態。
+    // ここで止めないと、紙の模様が黙って泳ぎ出す（R-018）。
+    const content = diagnoseResult(trimmed.image)
+    if (!content.ok) {
+      refusalCode = 'other'
+      refusalMessage = content.message
+      continue
+    }
+
+    /*
+     * **絵が 1 つに繋がる幅を選ぶ（R-066）。**
+     *
+     * 「絵として通る」だけでは足りない。輪郭の切れ目から塗りつぶしが入ると、
+     * 中身が食われて**絵が線ごとに割れる**が、割れたままでも中身の割合は
+     * 下限（16%）を超えることがあり、そのまま通ってしまう。
+     * 実際、台紙の題を落とすようにしたら外接矩形が小さくなり、
+     * **中身が抜けた魚が通るようになった**（青い水槽が絵の中に透けて見えた）。
+     *
+     * 台紙どおりに取り込めた絵は**必ず 1 つの塊**になる（実測 33/33）。
+     * それを満たす一番狭い幅を採る。満たす幅が無ければ、通った中で一番狭いもの。
+     */
+    const whole: CutoutAttempt = { cut, cleaned, touchedBorder, trimmed }
+    if (!attempt) attempt = whole
+    if (keptRegions === 1) {
+      attempt = whole
+      break
+    }
+  }
+
+  return { attempt, refusalCode, refusalMessage }
+}
+
 export async function processPhoto(
   dataUrl: string,
   fileName: string,
@@ -356,62 +438,33 @@ export async function processPhoto(
    * その素点で幅を選ばせたところ、**実寸なら当たっていたクラゲ 3枚が
    * 3枚とも当たらなくなった**。縮めた絵で決めてよいのは明るさのしきい値だけ。
    */
-  let attempt: {
-    cut: RgbaImage
-    cleaned: RgbaImage
-    touchedBorder: boolean
-    trimmed: NonNullable<ReturnType<typeof trimTransparent>>
-  } | null = null
-  let refusal = ''
+  const baseOptions: CutoutOptions = { ...options, paperValue: chosen }
+  let { attempt, refusalCode, refusalMessage } = trySealRatios(source_, baseOptions)
 
-  for (const sealRatio of SEAL_RATIOS) {
-    const cut = cutoutPaper(source_, { ...options, paperValue: chosen, sealRatio })
-
-    const diagnosis = diagnoseCutout(cut)
-    if (!diagnosis.ok) {
-      refusal = diagnosis.message
-      continue
-    }
-
-    // 影で残った紙の隅やゴミを落としてからトリミングする。順番が逆だと、
-    // 捨てるはずの塊を含んだ外接矩形で切ってしまう（R-003）。
-    const { image: cleaned, touchedBorder, keptRegions } = keepMainRegions(cut)
-
-    const trimmed = trimTransparent(cleaned)
-    if (!trimmed) {
-      refusal = '絵が残りませんでした。設定のしきい値を見直してください。'
-      continue
-    }
-
-    // 外接矩形は大きいのに中身が無い＝絵が消えて紙の裏写りだけが残った状態。
-    // ここで止めないと、紙の模様が黙って泳ぎ出す（R-018）。
-    const content = diagnoseResult(trimmed.image)
-    if (!content.ok) {
-      refusal = content.message
-      continue
-    }
-
-    /*
-     * **絵が 1 つに繋がる幅を選ぶ（R-066）。**
-     *
-     * 「絵として通る」だけでは足りない。輪郭の切れ目から塗りつぶしが入ると、
-     * 中身が食われて**絵が線ごとに割れる**が、割れたままでも中身の割合は
-     * 下限（16%）を超えることがあり、そのまま通ってしまう。
-     * 実際、台紙の題を落とすようにしたら外接矩形が小さくなり、
-     * **中身が抜けた魚が通るようになった**（青い水槽が絵の中に透けて見えた）。
-     *
-     * 台紙どおりに取り込めた絵は**必ず 1 つの塊**になる（実測 33/33）。
-     * それを満たす一番狭い幅を採る。満たす幅が無ければ、通った中で一番狭いもの。
-     */
-    const whole = { cut, cleaned, touchedBorder, trimmed }
-    if (!attempt) attempt = whole
-    if (keptRegions === 1) {
-      attempt = whole
-      break
+  /*
+   * **影ムラで拒否されたときだけ、区画ごとのしきい値で再挑戦する（R-068）。**
+   *
+   * 写真全体で1つのしきい値（`chosen`）を選ぶ仕組み（R-020）は、写真ごとに
+   * 紙の明るさが違う問題は解決するが、**同じ1枚の中で紙の明るさが場所に
+   * よって大きく違う**（テープや撮影時の影）場合には効かない。
+   * 実測: 紙の余白だけを測っても明るさが 0.32〜0.65 まで揺れていた
+   * （`docs/設計-影ムラ対応.md`）。
+   *
+   * **普段は一切触らない。** 通常の判定が全部の幅で失敗し、かつ最後の
+   * 理由が「紙の白がほとんど消えなかった」ときだけ動く。ここを通らない
+   * 写真は今までと1画素も変わらない。
+   */
+  if (!attempt && refusalCode === 'nothing-removed') {
+    const localPaperMap = localPaperValueMap(source_, 4, 3, chosen)
+    const retried = trySealRatios(source_, baseOptions, { localPaperMap })
+    if (retried.attempt) {
+      attempt = retried.attempt
+      refusalCode = retried.refusalCode
+      refusalMessage = retried.refusalMessage
     }
   }
 
-  if (!attempt) return { ok: false, message: `${fileName}: ${refusal}` }
+  if (!attempt) return { ok: false, message: `${fileName}: ${refusalMessage}` }
   const { touchedBorder, trimmed } = attempt
 
   /*

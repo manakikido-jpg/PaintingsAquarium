@@ -8,6 +8,7 @@ import {
   chooseCutoutValue,
   inkStats,
   SEAL_RATIOS,
+  localPaperValueMap,
 } from '../cutout'
 import { createImage } from '../image'
 import {
@@ -370,5 +371,95 @@ describe('inkStats', () => {
     }
     expect(inkStats(image).fill).toBeCloseTo(0.5)
     expect(inkStats(image).darkShare).toBeCloseTo(0.5)
+  })
+})
+
+describe('localPaperValueMap（影ムラ対応・R-068）', () => {
+  /** 灰色（無彩色）で塗った画像を作る。左右で明るさを変える */
+  function shadowedImage(leftLevel: number, rightLevel: number): ReturnType<typeof createImage> {
+    const image = createImage(20, 10)
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 20; x++) {
+        const level = x < 10 ? leftLevel : rightLevel
+        const offset = (y * 20 + x) * 4
+        image.data[offset] = level
+        image.data[offset + 1] = level
+        image.data[offset + 2] = level
+        image.data[offset + 3] = 255
+      }
+    }
+    return image
+  }
+
+  it('影で暗い区画だけ、下限を実測値まで下げる', () => {
+    const image = shadowedImage(230, 115) // 左 0.90 ／ 右 0.45
+    const map = localPaperValueMap(image, 2, 1, 0.62)
+
+    // 明るい区画は、実測が既定値より明るくても既定値のまま（上げない）
+    expect(map.values[0]).toBeCloseTo(0.62, 1)
+    // 暗い区画は、実測（≈0.45）まで下げる
+    expect(map.values[1]).toBeCloseTo(0.45, 1)
+  })
+
+  it('彩度の高い画素しか無い区画は、標本が足りず既定値のまま', () => {
+    const image = createImage(20, 10)
+    // 右半分をはっきりした赤（彩度が高い）で塗る。灰色の標本が無い
+    for (let y = 0; y < 10; y++) {
+      for (let x = 10; x < 20; x++) {
+        const offset = (y * 20 + x) * 4
+        image.data[offset] = 220
+        image.data[offset + 1] = 40
+        image.data[offset + 2] = 40
+        image.data[offset + 3] = 255
+      }
+    }
+    const map = localPaperValueMap(image, 2, 1, 0.62)
+    expect(map.values[1]).toBe(0.62)
+  })
+})
+
+describe('cutoutPaper で影ムラを救う（R-068）', () => {
+  function shadowedPaperWithInk(): ReturnType<typeof createImage> {
+    const image = createImage(20, 10)
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 20; x++) {
+        const level = x < 10 ? 240 : 115 // 左は普通の紙／右は影で暗い紙
+        const offset = (y * 20 + x) * 4
+        image.data[offset] = level
+        image.data[offset + 1] = level
+        image.data[offset + 2] = level
+        image.data[offset + 3] = 255
+      }
+    }
+    // 左側（普通の紙の上）に、彩度の高い絵を置く
+    for (let y = 3; y < 6; y++) {
+      for (let x = 3; x < 6; x++) {
+        const offset = (y * 20 + x) * 4
+        image.data[offset] = 40
+        image.data[offset + 1] = 80
+        image.data[offset + 2] = 220
+      }
+    }
+    return image
+  }
+
+  it('区画の地図が無いと、影の紙が消えずに残る（本来の不具合）', () => {
+    const image = shadowedPaperWithInk()
+    const cut = cutoutPaper(image, DEFAULT_CUTOUT_OPTIONS)
+    // 影がかかった右側の紙は、消えずに不透明のまま残る
+    expect(alphaAt(cut, 15, 5)).toBeGreaterThan(0)
+  })
+
+  it('区画の地図を渡すと、影の紙も消える。絵はそのまま残る', () => {
+    const image = shadowedPaperWithInk()
+    const localPaperMap = localPaperValueMap(image, 2, 1, DEFAULT_CUTOUT_OPTIONS.paperValue)
+    const cut = cutoutPaper(image, { ...DEFAULT_CUTOUT_OPTIONS, localPaperMap })
+
+    // 影がかかった右側の紙は、今度は消える
+    expect(alphaAt(cut, 15, 5)).toBe(0)
+    // 普通の紙（左側）も変わらず消える
+    expect(alphaAt(cut, 1, 1)).toBe(0)
+    // 絵（彩度の高い画素）はそのまま残る
+    expect(alphaAt(cut, 4, 4)).toBeGreaterThan(0)
   })
 })
