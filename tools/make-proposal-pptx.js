@@ -1,9 +1,13 @@
-// お絵かき水族館 企画書（会場へ渡す用）
+// お絵かき水族館・お絵かきダイナソー 企画書（会場へ渡す用）
 const pptx = require('pptxgenjs')
 const path = require('path')
 
 const ROOT = '/home/user/PaintingsAquarium'
-const SHOT = path.join(ROOT, 'docs/images/画面.jpg')
+// 実際に会場で塗られた絵を使った画面（R-067/068修正後の実物データ）
+const SHOT = path.join(ROOT, 'docs/images/画面-水族館-実物.jpg')
+const SHOT_DINO = path.join(ROOT, 'docs/images/画面-恐竜-実物.jpg')
+const SHOT_TRANSFORM = path.join(ROOT, 'docs/images/変換前後.jpg')
+const SHOT_GALLERY = path.join(ROOT, 'docs/images/いろいろな絵.jpg')
 const OUT = path.join(ROOT, 'docs/お絵かき水族館-企画書.pptx')
 
 // 水槽の画面そのものから採った色。海の濃紺を主役に、明るい水色を差し色にする
@@ -15,6 +19,9 @@ const MUTE = '5C6E7A'
 const LINE = 'D8E3EA'
 const TINT = 'EFF6FA'
 const WARM = 'E08A2E'
+// 恐竜側の差し色（平原の土と葉の色）
+const LAND = 'C9782B'
+const LEAF = '2E9E5B'
 
 const FONT = 'Meiryo'
 const W = 13.333
@@ -23,8 +30,8 @@ const M = 0.72
 
 const p = new pptx()
 p.layout = 'LAYOUT_WIDE'
-p.author = 'お絵かき水族館'
-p.title = 'お絵かき水族館 企画書'
+p.author = 'お絵かき水族館・お絵かきダイナソー'
+p.title = 'お絵かき水族館・お絵かきダイナソー 企画書'
 
 const shadow = () => ({ type: 'outer', color: '0B3B52', opacity: 0.12, blur: 10, offset: 2, angle: 90 })
 
@@ -63,29 +70,87 @@ function card(s, o) {
   s.addImage({ path: SHOT, x: 6.4, y: 0, w: W - 6.4, h: H, sizing: { type: 'cover', w: W - 6.4, h: H } })
 
   s.addText('出張ワークショップのご提案', {
-    x: M, y: 1.75, w: 6.2, h: 0.36, fontFace: FONT, fontSize: 14, bold: true,
+    x: M, y: 1.5, w: 6.2, h: 0.36, fontFace: FONT, fontSize: 14, bold: true,
     color: AQUA, charSpacing: 2, margin: 0,
   })
-  s.addText('お絵かき水族館', {
-    x: M, y: 2.25, w: 6.6, h: 1.15, fontFace: FONT, fontSize: 54, bold: true,
-    color: 'FFFFFF', margin: 0,
+  s.addText('お絵かき水族館\nお絵かきダイナソー', {
+    x: M, y: 1.95, w: 6.6, h: 1.55, fontFace: FONT, fontSize: 42, bold: true,
+    color: 'FFFFFF', lineSpacing: 50, margin: 0,
   })
-  s.addText('子どもが塗った魚が、その場で\n大画面の海を泳ぎ出します。', {
-    x: M, y: 3.5, w: 5.3, h: 0.9, fontFace: FONT, fontSize: 19, color: 'E4F1F8',
+  s.addText('子どもが塗った絵が、その場で\n大画面の中を泳ぎ・歩き出します。', {
+    x: M, y: 3.6, w: 5.3, h: 0.9, fontFace: FONT, fontSize: 19, color: 'E4F1F8',
     lineSpacing: 30, margin: 0,
   })
-  s.addText('塗り終わった紙をスキャナに通すだけ。約3秒後には、\nその絵が水槽を泳いでいます。', {
-    x: M, y: 4.6, w: 5.3, h: 0.8, fontFace: FONT, fontSize: 14, color: 'A9C9DA',
+  s.addText('塗り終わった紙をスキャナに通すだけ。約3秒後には、\nその絵が画面の中で動いています。', {
+    x: M, y: 4.68, w: 5.3, h: 0.8, fontFace: FONT, fontSize: 14, color: 'A9C9DA',
     lineSpacing: 24, margin: 0,
   })
-  s.addText('右は実際の画面です。泳いでいるのは、すべて塗り絵から作った絵です。', {
+  s.addText('すでに2会場・のべ630人のお子さまに参加いただいています。', {
+    x: M, y: 5.55, w: 5.3, h: 0.4, fontFace: FONT, fontSize: 13, bold: true, color: AQUA, margin: 0,
+  })
+  s.addText('右は実際の画面です。泳いでいるのは、すべて会場で塗られた実物の絵です。', {
     x: M, y: H - 0.85, w: 5.3, h: 0.5, fontFace: FONT, fontSize: 10.5,
     color: '8FB4C8', lineSpacing: 17, margin: 0,
   })
-  s.addNotes('塗り絵を大画面の水槽で泳がせる出張ワークショップの提案。')
+  s.addNotes('塗り絵を大画面で泳がせ・歩かせる出張ワークショップの提案。すでに2会場で実施済み。')
 }
 
-/* ------------------------------------------------- 2 1枚でいうと */
+/* ------------------------------------------------------------------ 2 実施実績 */
+{
+  const s = slide(false)
+  heading(s, '実施実績', 'すでに2会場で、のべ630人のお子さまに参加いただいています')
+
+  const venues = [
+    ['イオン久御山店', '2日間', '420人'],
+    ['イオン大日店', '2日間', '210人'],
+  ]
+  const vy = 1.9
+  card(s, { x: M, y: vy, w: 5.5, h: 1.9, fill: TINT, stroke: 'CFE2EE' })
+  venues.forEach(([name, days, people], i) => {
+    const y = vy + 0.22 + i * 0.72
+    s.addText(name, {
+      x: M + 0.35, y, w: 2.2, h: 0.5, fontFace: FONT, fontSize: 15, bold: true, color: INK,
+      valign: 'middle', margin: 0,
+    })
+    s.addText(days, {
+      x: M + 2.6, y, w: 1.3, h: 0.5, fontFace: FONT, fontSize: 13, color: MUTE,
+      valign: 'middle', margin: 0,
+    })
+    s.addText(people, {
+      x: M + 3.9, y, w: 1.5, h: 0.5, fontFace: FONT, fontSize: 20, bold: true, color: SEA,
+      align: 'right', valign: 'middle', margin: 0,
+    })
+  })
+  s.addShape(p.ShapeType.line, { x: M + 0.35, y: vy + 1.44, w: 4.8, h: 0, line: { color: 'B6D9EB', width: 1 } })
+  s.addText('合計 4日間', {
+    x: M + 0.35, y: vy + 1.5, w: 2.85, h: 0.34, fontFace: FONT, fontSize: 13, bold: true, color: INK, valign: 'middle', margin: 0,
+  })
+  s.addText('630人', {
+    x: M + 3.9, y: vy + 1.5, w: 1.5, h: 0.34, fontFace: FONT, fontSize: 15, bold: true, color: WARM,
+    align: 'right', valign: 'middle', margin: 0,
+  })
+
+  const facts = [
+    '来場層はファミリーが中心。未就学児〜小学生とその保護者に受け入れられています',
+    '体験の終わりにアンケートへ案内する導線もスムーズでした',
+    '運用中に見つかった不具合は、実際に集まった紙・写真データを使って検証し、その都度直しています',
+  ]
+  facts.forEach((t, i) => {
+    const y = 4.05 + i * 0.72
+    s.addShape(p.ShapeType.ellipse, { x: M + 0.04, y: y + 0.1, w: 0.16, h: 0.16, fill: { color: SEA } })
+    s.addText(t, {
+      x: M + 0.36, y, w: 5.15, h: 0.66, fontFace: FONT, fontSize: 12, color: INK, lineSpacing: 17, valign: 'middle', margin: 0,
+    })
+  })
+
+  s.addImage({ path: SHOT_GALLERY, x: 6.3, y: 1.9, w: 6.3, h: 3.87, shadow: shadow() })
+  s.addText('実際に会場で塗られた絵の一部（水族館5種・恐竜5種、すべて実物）', {
+    x: 6.3, y: 5.82, w: 6.3, h: 0.4, fontFace: FONT, fontSize: 10.5, color: MUTE, margin: 0,
+  })
+  s.addNotes('実績を最初に見せる。数字とギャラリーで「もう動いている」ことを伝える。')
+}
+
+/* ------------------------------------------------- 3 1枚でいうと */
 {
   const s = slide(false)
   heading(s, '1枚でいうと')
@@ -93,7 +158,7 @@ function card(s, o) {
   s.addText([
     { text: '塗り終わった紙をスキャナに通すだけで、', options: { breakLine: true } },
     { text: '約3秒後', options: { bold: true, color: SEA } },
-    { text: 'にその絵が水槽の中を泳ぎ始めます。', options: { breakLine: true } },
+    { text: 'にその絵が画面の中で動き始めます。', options: { breakLine: true } },
     { text: '自分の絵を探して、指をさして、親を呼ぶ。' },
   ], {
     x: M, y: 1.55, w: 6.9, h: 1.5, fontFace: FONT, fontSize: 19, color: INK,
@@ -105,12 +170,13 @@ function card(s, o) {
   s.addText([
     { text: '塗り絵なので', options: {} },
     { text: '絵が苦手な子でも参加できます', options: { bold: true } },
-    { text: '。塗った紙は持ち帰れます。', options: {} },
+    { text: '。塗った紙は持ち帰れます。', options: { breakLine: true } },
+    { text: '「水族館」「恐竜」の2つの世界から選べます。', options: {} },
   ], {
-    x: M, y: 3.8, w: 6.9, h: 0.4, fontFace: FONT, fontSize: 15, color: MUTE, margin: 0,
+    x: M, y: 3.78, w: 6.9, h: 0.68, fontFace: FONT, fontSize: 14, color: MUTE, lineSpacing: 22, margin: 0,
   })
 
-  card(s, { x: M, y: 4.4, w: 6.9, h: 2.05, fill: TINT, stroke: 'CFE2EE' })
+  card(s, { x: M, y: 4.55, w: 6.9, h: 1.9, fill: TINT, stroke: 'CFE2EE' })
   s.addText([
     { text: '会場にお借りするのは「場所」だけです。', options: { bold: true, breakLine: true } },
     { text: '机・椅子・モニター・機材・画材まで、すべてこちらで持ち込みます。' },
@@ -131,9 +197,9 @@ function card(s, o) {
     x: 8.05, y: 4.18, w: 4.55, h: 0.28, fontFace: FONT, fontSize: 10, color: MUTE, margin: 0,
   })
   const nums = [
-    ['約3秒', '塗り終わってから泳ぎ出すまで'],
-    ['50匹', '同時に泳ぐ数の上限'],
-    ['6種類', '選べる台紙'],
+    ['約3秒', '塗り終わってから動き出すまで'],
+    ['50匹', '同時に動く数の上限'],
+    ['11種類', '選べる台紙（2テーマ）'],
   ]
   nums.forEach(([big, small], i) => {
     const y = 4.68 + i * 0.62
@@ -148,16 +214,17 @@ function card(s, o) {
   const s = slide(false)
   heading(s, '来場者の体験', '会場で実際に起きること')
 
-  s.addImage({ path: SHOT, x: M, y: 1.72, w: 6.6, h: 3.71, shadow: shadow() })
-  s.addText('大きなモニターの中に青い海が広がり、子どもたちが塗った絵が泳いでいます。1匹ずつ、みんな違う色です。', {
-    x: M, y: 5.6, w: 6.6, h: 0.7, fontFace: FONT, fontSize: 13, color: MUTE, lineSpacing: 22, margin: 0,
+  s.addImage({ path: SHOT_TRANSFORM, x: M, y: 1.72, w: 6.6, h: 2.31, shadow: shadow() })
+  s.addText('撮影した紙（左）が、約3秒後にそのまま画面の中で動きます（右）。実際に会場で塗られた1枚です。', {
+    x: M, y: 4.15, w: 6.6, h: 0.7, fontFace: FONT, fontSize: 13, color: MUTE, lineSpacing: 22, margin: 0,
   })
+  s.addImage({ path: SHOT, x: M, y: 4.95, w: 6.6, h: 1.4, shadow: shadow() })
 
   const bx = 7.9
   s.addText([
     { text: '子どもは机で台紙を塗り、塗り終わったらスタッフに渡します。スタッフが紙をスキャナに通すと、', options: {} },
     { text: '約3秒後', options: { bold: true, color: SEA } },
-    { text: '、いま塗ったばかりの絵が画面の奥からふわっと現れて、泳ぎ始めます。', options: {} },
+    { text: '、いま塗ったばかりの絵が画面の奥からふわっと現れて、動き始めます。', options: {} },
   ], {
     x: bx, y: 1.72, w: 4.72, h: 1.7, fontFace: FONT, fontSize: 15, color: INK, lineSpacing: 27, margin: 0,
   })
@@ -182,7 +249,7 @@ function card(s, o) {
   heading(s, '流れ', '1人あたり 5〜10分')
 
   const steps = [
-    ['1', '6種類の台紙から1枚選ぶ', '30秒', '「選ぶ」という行為で、自分のものになる'],
+    ['1', 'テーマ・台紙を選ぶ（水族館6種／恐竜5種）', '30秒', '「選ぶ」という行為で、自分のものになる'],
     ['2', '好きな色で塗る', '3〜7分', '塗るだけなので失敗しない。絵が苦手でも参加できる'],
     ['3', 'スタッフに渡す → スキャン', '20秒', '待たせない。機械の操作は見せない'],
     ['4', '画面に自分の絵が現れる', '1〜3分', '「自分がやったことが、大きな画面を変えた」'],
@@ -219,10 +286,10 @@ function card(s, o) {
   heading(s, 'なぜこの形にしているか')
 
   const items = [
-    ['塗り絵にした理由', '白紙に「魚を描いて」と言うと、描ける子と描けない子が分かれます。台紙なら全員が同じスタートラインに立てて、しかも必ず魚に見えるまま泳ぎます。'],
-    ['3秒にこだわる理由', '「あとで映ります」では、自分がやったこととの因果が切れます。その場で泳ぎ出すから、驚きと達成感になります。'],
-    ['絵を直さない', 'はみ出した色も塗り残しも、そのまま泳ぎます。きれいに直すと「自分の絵」ではなくなります。'],
-    ['同時に泳ぐのは50匹まで', '増え続けると自分の絵を見失います。古い絵は消えるのではなく、画面の外へ泳いで去ります。絵どうしも避け合います。'],
+    ['塗り絵にした理由', '白紙に「描いて」と言うと、描ける子と描けない子が分かれます。台紙なら全員が同じスタートラインに立てて、しかも必ずその生き物に見えたまま動きます。'],
+    ['3秒にこだわる理由', '「あとで映ります」では、自分がやったこととの因果が切れます。その場で動き出すから、驚きと達成感になります。'],
+    ['絵を直さない', 'はみ出した色も塗り残しも、そのまま動きます。きれいに直すと「自分の絵」ではなくなります。'],
+    ['同時に動くのは50匹まで', '増え続けると自分の絵を見失います。古い絵は消えるのではなく、画面の外へ去ります。絵どうしも避け合います。'],
   ]
   items.forEach(([t, d], i) => {
     const x = M + (i % 2) * 6.06
@@ -244,7 +311,7 @@ function card(s, o) {
 /* ------------------------------------------------- 6 6種類 */
 {
   const s = slide(false)
-  heading(s, '6種類、泳ぎ方が違います', '同じ海に6種類がいて、動きで見分けられます。自分が塗ったのがどれか、すぐ分かります。')
+  heading(s, 'お絵かき水族館：6種類、泳ぎ方が違います', '同じ海に6種類がいて、動きで見分けられます。自分が塗ったのがどれか、すぐ分かります。')
 
   const kinds = [
     ['魚', 'FF6B4A', '尾びれを振りながら進み、画面の端で向きを変えて戻ってきます'],
@@ -274,7 +341,37 @@ function card(s, o) {
   s.addNotes('動きで見分けられることが、自分の絵を見つけやすさに効いている。')
 }
 
-/* ------------------------------------------------- 7 年齢と混雑 */
+/* ------------------------------------------------------------------ 7 恐竜5種 */
+{
+  const s = slide(false)
+  heading(s, 'お絵かきダイナソー：歩く4種と、飛ぶ1種', '恐竜も同じ仕組みで動きます。台紙を選べば、水族館と同じ日に両方実施できます。')
+
+  const kinds = [
+    ['アンキロサウルス', LEAF, '4本の足を交互に動かしながら平原を歩きます'],
+    ['ブロントサウルス', SEA, '同上（長い首と尾をゆったり揺らしながら）'],
+    ['ステゴサウルス', LAND, '同上（背中の板を上下に揺らしながら）'],
+    ['トリケラトプス', 'D9534F', '同上（3本づのを前に構えて）'],
+    ['プテラノドン', '9B7BD1', '唯一空を飛びます。翼を開いてたたみながら羽ばたきます'],
+  ]
+  kinds.forEach(([name, dot, desc], i) => {
+    const x = M + (i % 3) * 4.04
+    const y = 1.95 + Math.floor(i / 3) * 2.06
+    card(s, { x, y, w: 3.74, h: 1.8 })
+    s.addShape(p.ShapeType.ellipse, { x: x + 0.34, y: y + 0.36, w: 0.26, h: 0.26, fill: { color: dot } })
+    s.addText(name, {
+      x: x + 0.72, y: y + 0.28, w: 2.9, h: 0.42, fontFace: FONT, fontSize: 15, bold: true,
+      color: INK, valign: 'middle', margin: 0,
+    })
+    s.addText(desc, {
+      x: x + 0.34, y: y + 0.82, w: 3.06, h: 0.86, fontFace: FONT, fontSize: 12.5, color: MUTE,
+      lineSpacing: 20, margin: 0,
+    })
+  })
+  s.addImage({ path: SHOT_DINO, x: M + 8.08, y: 4.01, w: 3.74, h: 2.01, shadow: shadow() })
+  s.addNotes('恐竜テーマ。水族館と2つの世界を選べることを伝える。')
+}
+
+/* ------------------------------------------------- 8 年齢と混雑 */
 {
   const s = slide(false)
   heading(s, '年齢による楽しみ方と、混雑したとき')
@@ -301,7 +398,7 @@ function card(s, o) {
     x: M, y: 3.95, w: 6.0, h: 0.44, fontFace: FONT, fontSize: 20, bold: true, color: INK, margin: 0,
   })
   const jams = [
-    ['塗る席は6席', '1時間あたり 30〜50人が目安です（塗り時間5分想定）'],
+    ['塗る席は6席', '1時間あたり 30〜50人が目安です（塗り時間5分想定）。実績はイオン久御山店で2日間420人（1日あたり210人）'],
     ['列はできません', '待ち行列はスキャンの20秒だけ。塗っている人が滞留するだけで、機械の前には並びません'],
     ['持ち帰りもできます', '台紙を持ち帰り、あとから塗って戻ってきてもらうこともできます'],
   ]
@@ -332,6 +429,7 @@ function card(s, o) {
     ['子どもが機械を触りませんか', '機材は机の奥に置き、来場者は触りません。操作するのはスタッフだけです'],
     ['コード類は危なくないですか', '固定します。床を通る線は養生テープで留めます'],
     ['途中で止まりませんか', '万一PCが止まっても、再起動すればそれまでの絵は全部残ります。塗った紙も手元に残るので、通し直せます'],
+    ['大人数でも大丈夫ですか', '実績があります。イオン久御山店では2日間で420人にご参加いただきました'],
     ['片付けは', '持ち込んだものを全部引き上げ、ゴミも持ち帰ります。跡は残りません'],
   ]
   const pages = [qa.slice(0, 6), qa.slice(6)]
@@ -367,31 +465,44 @@ function card(s, o) {
     x: M, y: 1.15, w: W - M * 2, h: 0.7, fontFace: FONT, fontSize: 32, bold: true, color: 'FFFFFF', margin: 0,
   })
   const aims = [
-    ['待たせない', '塗り終えてから泳ぎ出すまで約3秒。「描いて終わり」にしません'],
-    ['見つけられる', '同時に泳ぐのは最新の50匹まで。増えすぎて自分の絵を見失わないようにしています'],
+    ['待たせない', '塗り終えてから動き出すまで約3秒。「描いて終わり」にしません'],
+    ['見つけられる', '同時に動くのは最新の50匹まで。増えすぎて自分の絵を見失わないようにしています'],
     ['持ち帰れる', '紙は本人のものです。画面の中と手元の両方に残ります'],
     ['繰り返せる', '1人が2枚描いても仕組みは変わりません'],
   ]
   aims.forEach(([t, d], i) => {
     const x = M + (i % 2) * 6.06
-    const y = 2.35 + Math.floor(i / 2) * 1.9
+    const y = 2.15 + Math.floor(i / 2) * 1.62
     s.addShape(p.ShapeType.roundRect, {
-      x, y, w: 5.76, h: 1.62, rectRadius: 0.1,
+      x, y, w: 5.76, h: 1.42, rectRadius: 0.1,
       fill: { color: '0E3C56' }, line: { color: '1B5878', width: 1 },
     })
     s.addText(t, {
-      x: x + 0.36, y: y + 0.24, w: 5.0, h: 0.44, fontFace: FONT, fontSize: 18, bold: true,
+      x: x + 0.36, y: y + 0.2, w: 5.0, h: 0.4, fontFace: FONT, fontSize: 18, bold: true,
       color: AQUA, valign: 'middle', margin: 0,
     })
     s.addText(d, {
-      x: x + 0.36, y: y + 0.74, w: 5.04, h: 0.7, fontFace: FONT, fontSize: 13, color: 'C3DCE9',
+      x: x + 0.36, y: y + 0.64, w: 5.04, h: 0.66, fontFace: FONT, fontSize: 13, color: 'C3DCE9',
       lineSpacing: 21, margin: 0,
     })
   })
-  s.addText('お絵かき水族館', {
-    x: M, y: H - 0.95, w: 6.0, h: 0.4, fontFace: FONT, fontSize: 13, color: '7FA9BF', margin: 0,
+  const lastY = 2.15 + 2 * 1.62
+  s.addShape(p.ShapeType.roundRect, {
+    x: M, y: lastY, w: 11.82, h: 1.0, rectRadius: 0.1,
+    fill: { color: '0E3C56' }, line: { color: '1B5878', width: 1 },
   })
-  s.addNotes('締め。4点だけ覚えて帰ってもらう。')
+  s.addText('次の導線につながる', {
+    x: M + 0.36, y: lastY + 0.14, w: 4.0, h: 0.72, fontFace: FONT, fontSize: 18, bold: true,
+    color: AQUA, valign: 'middle', margin: 0,
+  })
+  s.addText('体験の余韻がある状態でアンケート等へ案内できます（実績あり）', {
+    x: M + 4.3, y: lastY, w: 7.2, h: 1.0, fontFace: FONT, fontSize: 13, color: 'C3DCE9',
+    valign: 'middle', lineSpacing: 21, margin: 0,
+  })
+  s.addText('お絵かき水族館・お絵かきダイナソー', {
+    x: M, y: H - 0.65, w: 6.0, h: 0.4, fontFace: FONT, fontSize: 13, color: '7FA9BF', margin: 0,
+  })
+  s.addNotes('締め。5点だけ覚えて帰ってもらう。')
 }
 
 p.writeFile({ fileName: OUT }).then(() => console.log('wrote', OUT))
