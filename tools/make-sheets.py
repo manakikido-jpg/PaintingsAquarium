@@ -66,6 +66,13 @@ MARGIN = mm(14)
 # 題の下に空ける幅。**ここを詰めない。**
 # 詰めると、はみ出して塗った色が題につながり、文字ごと絵として拾われる
 TITLE_GAP = mm(9)
+# 絵の大きさ（空いている面積に対する割合）。
+#
+# **一度目のイベントで「絵が大きすぎて塗るのに時間がかかる」という指摘**（本人）。
+# 面積いっぱいに広げず、0.7倍に縮めて余白を増やす。
+# 縮めるほど紙の中で題（文字）の取り分が相対的に増えるので、
+# 0.7倍でも題が絵として拾われないことを `make-sample-scans.py --sheets` で確かめてから使うこと。
+ART_SCALE = 0.7
 
 FONT = '/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf'
 # 線と同じ濃さ。薄くすると印刷でかすれる
@@ -123,7 +130,7 @@ def sheet(art_path: Path, title: str, lead: str) -> Image.Image:
     top_of_art = y + TITLE_GAP
     space_w = inner
     space_h = page.height - MARGIN - top_of_art
-    scale = min(space_w / art.width, space_h / art.height)
+    scale = min(space_w / art.width, space_h / art.height) * ART_SCALE
     drawn = art.resize((max(1, round(art.width * scale)), max(1, round(art.height * scale))), Image.LANCZOS)
     page.paste(
         drawn,
