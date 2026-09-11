@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keepMainRegions } from '../regions'
+import { keepMainRegions, largestRegion } from '../regions'
 import { cutoutPaper } from '../cutout'
 import { createImage } from '../image'
 import { BLACK_LINE, PAPER, alphaAt, imageFromPattern } from './helpers'
@@ -200,5 +200,59 @@ describe('縁に触れる塊を額縁や2枚重ねと区別する（R-067）', (
 
     expect(touchedBorder).toBe(true)
     expect(alphaAt(kept, 15, 10)).toBe(255)
+  })
+})
+
+describe('largestRegion — 落書きの中から絵ひとつ分を選ぶ（R-069）', () => {
+  const put = (image: ReturnType<typeof createImage>, x: number, y: number): void => {
+    image.data[(y * image.width + x) * 4 + 3] = 255
+  }
+  const fill = (
+    image: ReturnType<typeof createImage>,
+    x0: number, y0: number, x1: number, y1: number,
+  ): void => {
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) put(image, x, y)
+  }
+
+  it('印刷線で仕切られた区画は、ひとつながりの絵として扱う', () => {
+    // 台紙の絵の内側は線で仕切られている（プテラノドンなら胴と左右の翼）。
+    // 素直に「一番大きい塊」を採ると、実測で**右の翼だけ**が残った
+    const image = createImage(30, 20)
+    fill(image, 2, 2, 10, 18)    // 胴（8x16 = 128）
+    fill(image, 11, 2, 17, 18)   // 線1本ぶん空けた隣の区画（6x16 = 96）
+    fill(image, 24, 14, 28, 18)  // 離れた落書きの輪の内側（4x4 = 16）
+
+    const kept = largestRegion(image)
+
+    expect(alphaAt(kept, 5, 10)).toBe(255)
+    expect(alphaAt(kept, 14, 10)).toBe(255)
+    expect(alphaAt(kept, 26, 16)).toBe(0)
+  })
+
+  it('太らせた分は絵に足さない（仕切りの隙間は透明のまま）', () => {
+    const image = createImage(30, 20)
+    fill(image, 2, 2, 10, 18)
+    fill(image, 11, 2, 17, 18)
+
+    const kept = largestRegion(image)
+
+    // x=10 は元から透明。繋げるために太らせただけで、絵にはしない
+    expect(alphaAt(kept, 10, 10)).toBe(0)
+  })
+
+  it('離れた大きな落書きは、絵より広くても選ばない側になる', () => {
+    const image = createImage(40, 24)
+    fill(image, 2, 2, 14, 22)    // 絵（12x20 = 240）
+    fill(image, 24, 2, 34, 22)   // 離れた落書きの塊（10x20 = 200）
+
+    const kept = largestRegion(image)
+
+    expect(alphaAt(kept, 7, 12)).toBe(255)
+    expect(alphaAt(kept, 29, 12)).toBe(0)
+  })
+
+  it('何も写っていない絵を渡しても壊れない', () => {
+    expect(() => largestRegion(createImage(8, 8))).not.toThrow()
+    expect(() => largestRegion(createImage(0, 0))).not.toThrow()
   })
 })

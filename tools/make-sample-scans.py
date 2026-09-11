@@ -3,6 +3,7 @@
 
     python3 tools/make-sample-scans.py 出力先フォルダ [枚数]
     python3 tools/make-sample-scans.py 出力先フォルダ [枚数] --sheets <印刷用台紙のフォルダ>
+    python3 tools/make-sample-scans.py 出力先フォルダ [枚数] --sheets <台紙> --scribble
 
 **何のために要るのか**
 
@@ -20,6 +21,9 @@
   - 線の内側を、その生き物らしい色で塗る
   - クレヨンのムラ（低い周波数のゆらぎ）と、白い塗り残しを入れる
   - 2枚目以降は**線からはみ出して塗る**。子どもの塗り方に近く、切り抜きの試験になる
+
+`--scribble` を付けると、**絵の中を塗らずに余白いっぱいへ落書きした紙**も1枚ずつ足す。
+会場で実際に出た塗り方で、これが無いと**通っても何も保証していない**（R-069）。
 
 `--sheets` を付けると、`tools/make-sheets.py` が作った**題入りの台紙**を塗る。
 **題の文字が取り込みで落ちるかを確かめるのは、これでしかできない。**
@@ -155,6 +159,68 @@ def paint_sheet(path: Path, rng, spill: int) -> Image.Image:
     return Image.fromarray(noisy.astype('uint8')).filter(ImageFilter.GaussianBlur(0.4))
 
 
+# 落書きに使う色。クレヨンの箱にありそうな濃さで、**線とみなす暗さ（0.45）より明るいもの**。
+# ここを黒に近くすると `insideOutline` が落書きを線として扱い、別の不具合の話になる
+DOODLE_COLOURS = [(228, 74, 45), (58, 82, 180), (64, 150, 210), (40, 140, 95), (120, 70, 160)]
+
+
+def loop(pen, rng, cx: int, cy: int, size: int, colour, width: int) -> None:
+    """ぐるぐる書きか、ぎざぎざ。子どもが余白に描くのはだいたいこの2つ。"""
+    if rng.random() < 0.5:
+        points = [(cx + size * i / 40 * np.cos(i / 6), cy + size * i / 40 * np.sin(i / 6)) for i in range(40)]
+    else:
+        points = [(cx + rng.integers(-size, size), cy + rng.integers(-size, size)) for _ in range(12)]
+    pen.line([(float(x), float(y)) for x, y in points], fill=colour, width=width, joint='curve')
+
+
+def scribble_sheet(path: Path, rng) -> Image.Image:
+    """**絵の中は塗らず、まわりの余白いっぱいに落書きした紙**（R-069）。
+
+    会場の実物（2026-09-11・プテラノドン）を写したもの。絵を 0.7倍に縮めて
+    余白が増えたあと、早く塗り終わった子がその余白を埋めていた。
+    落書きの何本かが線をまたぐと、**紙じゅうの落書きが絵とひとつながり**になり、
+    外接矩形が紙いっぱいに広がって台紙との重なりが 0.98 → 0.09〜0.44 まで落ちる。
+
+    **クレヨンは紙を透かす。** 印刷線の上をなぞっても線は消えないので、
+    別の層に描いて「暗いほうを採る」で重ねる。ここを不透明で塗ると
+    輪郭に穴が開き、**実物より厳しい**紙になってしまう（実際そうなって
+    直し方の効きを読み違えた）。
+    """
+    art = Image.open(path).convert('L')
+    grey = np.asarray(art)
+    inside = inside_mask(grey < INK)
+    # 絵のすぐ外まで。ここには落書きを置かない（子どもは絵の上ではなく余白に描く）
+    near = ndimage.binary_dilation(inside, iterations=30)
+
+    layer = Image.new('RGB', art.size, (255, 255, 255))
+    pen = ImageDraw.Draw(layer)
+    width, height = art.size
+
+    placed = 0
+    for _ in range(40 * 60):
+        if placed >= 40:
+            break
+        x, y = int(rng.integers(0, width)), int(rng.integers(0, height))
+        if near[y, x]:
+            continue
+        loop(pen, rng, x, y, int(rng.integers(int(height * .05), int(height * .20))),
+             DOODLE_COLOURS[rng.integers(len(DOODLE_COLOURS))], int(rng.integers(10, 26)))
+        placed += 1
+
+    # **何本かは線をまたぐ。** これが無いと落書きは絵とつながらず、不具合が出ない
+    edge = inside ^ ndimage.binary_erosion(inside, iterations=8)
+    ys, xs = np.where(edge)
+    if len(ys):
+        for _ in range(4):
+            index = int(rng.integers(len(ys)))
+            loop(pen, rng, int(xs[index]), int(ys[index]), int(height * .10),
+                 DOODLE_COLOURS[rng.integers(len(DOODLE_COLOURS))], int(rng.integers(10, 26)))
+
+    page = Image.fromarray(np.minimum(np.asarray(art.convert('RGB')), np.asarray(layer)))
+    noisy = np.clip(np.asarray(page, dtype=float) + rng.normal(0, 1.6, (height, width, 3)), 0, 255)
+    return Image.fromarray(noisy.astype('uint8')).filter(ImageFilter.GaussianBlur(0.4))
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     out = Path(args[0] if args else 'sample-scans')
@@ -162,6 +228,9 @@ def main() -> int:
 
     if '--sheets' in sys.argv:
         sheets = Path(sys.argv[sys.argv.index('--sheets') + 1])
+        # **落書きも作る（R-069）。** 付けないと、会場で実際に出た塗り方を
+        # 一度も試さないまま「全種通った」と言うことになる
+        doodle = '--scribble' in sys.argv
         made = 0
         for theme in ('aquarium', 'dinosaur'):
             target = out / theme
@@ -171,6 +240,13 @@ def main() -> int:
                     rng = np.random.default_rng(abs(hash(path.stem)) % 9973 + index * 101)
                     page = paint_sheet(path, rng, spill=0 if index == 0 else 2 + index)
                     name = f'{path.stem}-{index + 1}.jpg'
+                    page.save(target / name, quality=92, subsampling=0)
+                    made += 1
+                    print(f'  {theme}/{name}')
+                if doodle:
+                    rng = np.random.default_rng(abs(hash(path.stem)) % 9973 + 7717)
+                    page = scribble_sheet(path, rng)
+                    name = f'{path.stem}-落書き.jpg'
                     page.save(target / name, quality=92, subsampling=0)
                     made += 1
                     print(f'  {theme}/{name}')

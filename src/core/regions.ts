@@ -40,6 +40,129 @@ export interface KeepMainRegionsResult {
 }
 
 /**
+ * **絵ひとつ分だけを残す（R-069）。照合に渡す形を作るためのもの。**
+ *
+ * `keepMainRegions` とは役目が違う。あちらは「保存する絵」からゴミを落とす。
+ * こちらは `insideOutline` の結果から「台紙の絵はどれか」を選ぶ。
+ *
+ * **なぜ要るのか**
+ *
+ * 会場の紙（2026-09-11・プテラノドン）は、絵の中をほとんど塗らずに
+ * **紙の余白いっぱいにクレヨンで落書き**してあった。落書きの何本かが
+ * 翼の線をまたいでいたので、切り抜いたあとの塊は
+ * 「絵＋紙じゅうの落書き」がひとつながりになり、
+ * 外接矩形が紙いっぱいに広がって絵が全体の一部に縮んだ。
+ * 台紙との重なりは実測で **0.98 → 0.09〜0.44**。種類が付かず、
+ * プテラノドンが飛ばずに地面を歩いた（頭の向きも当てずっぽうになる）。
+ *
+ * **「一番大きい塊」だけでは足りない。**
+ *
+ * 台紙の絵の内側は、**印刷された線で仕切られている**。プテラノドンなら
+ * 胴・左右の翼・翼膜の区画に分かれていて、`insideOutline` はそれぞれを
+ * 別の塊として返す。素直に一番大きい塊を採ると、実測で**右の翼だけ**が
+ * 残った（重なり 0.403）。
+ *
+ * そこで**印刷線ぶんだけ太らせてから**数える。線1本を挟んで隣り合う区画は
+ * ひとつながりとみなせる。落書きの輪は絵から離れているので、
+ * この幅では繋がらない。
+ */
+export function largestRegion(source: RgbaImage, alphaThreshold = 8): RgbaImage {
+  const { width, height, data } = source
+  const result = cloneImage(source)
+  const total = width * height
+  if (total === 0) return result
+
+  const opaque = new Uint8Array(total)
+  for (let index = 0; index < total; index++) {
+    if (data[index * 4 + 3] > alphaThreshold) opaque[index] = 1
+  }
+
+  /*
+   * 仕切りの印刷線を跨ぐ幅。
+   *
+   * 取り込みは長辺 1200px に縮めてある（`processImage` の `MAX_SIDE`）。
+   * そこでの台紙の線の太さは実測 **2.0〜4.0px**（恐竜5種・等倍と 0.7 倍）。
+   * 両側から太らせるので、半径 3 で 6px ぶんの隙間まで繋がる。
+   * 絵が小さく写っているときのために、短辺からも決める。
+   */
+  const bridge = Math.max(2, Math.min(6, Math.round(Math.min(width, height) * 0.004)))
+  const grown = dilate(opaque, width, height, bridge)
+
+  const labels = new Int32Array(total).fill(-1)
+  const stack = new Int32Array(total)
+  /** 太らせた塊ごとに、**元の**不透明な画素が何枚あるか。太らせた分は数えない */
+  const areas: number[] = []
+
+  for (let start = 0; start < total; start++) {
+    if (labels[start] !== -1 || grown[start] === 0) continue
+    const label = areas.length
+    areas.push(0)
+    let stackSize = 0
+    labels[start] = label
+    stack[stackSize++] = start
+    while (stackSize > 0) {
+      const index = stack[--stackSize]
+      const x = index % width
+      const y = (index - x) / width
+      if (opaque[index] === 1) areas[label]++
+      const push = (neighbour: number): void => {
+        if (labels[neighbour] !== -1 || grown[neighbour] === 0) return
+        labels[neighbour] = label
+        stack[stackSize++] = neighbour
+      }
+      if (x > 0) push(index - 1)
+      if (x < width - 1) push(index + 1)
+      if (y > 0) push(index - width)
+      if (y < height - 1) push(index + width)
+    }
+  }
+
+  if (areas.length === 0) return result
+
+  let main = 0
+  for (let label = 1; label < areas.length; label++) {
+    if (areas[label] > areas[main]) main = label
+  }
+
+  for (let index = 0; index < total; index++) {
+    if (opaque[index] === 0 || labels[index] !== main) result.data[index * 4 + 3] = 0
+  }
+  return result
+}
+
+/**
+ * 印を `radius` 画素ぶん太らせる。縦と横に分けて走るので、半径を上げても重くならない。
+ *
+ * 形は正方形（チェビシェフ距離）。円にする意味は無い。
+ * ここで欲しいのは「線1本ぶん跨げるか」だけで、跨げる距離が向きで
+ * 1.4 倍ずれても結果は変わらない。
+ */
+function dilate(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  const pass = (input: Uint8Array, along: 'x' | 'y'): Uint8Array => {
+    const output = new Uint8Array(input.length)
+    const outer = along === 'x' ? height : width
+    const inner = along === 'x' ? width : height
+    for (let a = 0; a < outer; a++) {
+      // 直前に見た印からの距離。一度なぞるだけで前後どちらの印も拾える
+      let since = inner
+      for (let b = 0; b < inner; b++) {
+        const index = along === 'x' ? a * width + b : b * width + a
+        since = input[index] === 1 ? 0 : since + 1
+        if (since <= radius) output[index] = 1
+      }
+      since = inner
+      for (let b = inner - 1; b >= 0; b--) {
+        const index = along === 'x' ? a * width + b : b * width + a
+        since = input[index] === 1 ? 0 : since + 1
+        if (since <= radius) output[index] = 1
+      }
+    }
+    return output
+  }
+  return pass(pass(mask, 'x'), 'y')
+}
+
+/**
  * 絵の本体だけを残し、離れた小さな塊を捨てる。
  *
  * 照明が均一でない写真だと、紙の隅が影で暗くなり「紙ではない」と判定されて

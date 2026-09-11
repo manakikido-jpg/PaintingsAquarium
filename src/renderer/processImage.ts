@@ -10,7 +10,7 @@ import {
 } from '../core/cutout'
 import { trimTransparent } from '../core/trim'
 import { insideOutline } from '../core/outline'
-import { keepMainRegions } from '../core/regions'
+import { keepMainRegions, largestRegion } from '../core/regions'
 import { downscale, type RgbaImage } from '../core/image'
 import { estimateRig, flipHorizontal, orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
 import {
@@ -109,7 +109,15 @@ function toCanvas(image: RgbaImage): HTMLCanvasElement {
  * **保存する絵は元のまま。** はみ出して描いたものを消したりはしない。
  */
 function identify(image: RgbaImage, theme?: ThemeId): ReturnType<typeof identifySpecies> {
-  const byOutline = identifySpecies(insideOutline(image), theme)
+  /*
+   * **線の内側は、一番大きい塊だけを見る（R-069）。**
+   *
+   * 絵の中を塗らずに**紙の余白へ落書き**した紙だと、濃い色のぐるぐる書きが
+   * 1つ1つ「閉じた線」になり、その内側まで形に入る。外接矩形が紙いっぱいに
+   * 広がって、絵は全体の一部に縮む（実測 0.98 → 0.09〜0.31）。
+   * 印刷線で囲まれた面は落書きの輪よりずっと広いので、一番大きい塊を採ればよい。
+   */
+  const byOutline = identifySpecies(largestRegion(insideOutline(image)), theme)
   const byCut = identifySpecies(image, theme)
   const trusted = byCut && byCut.score >= RAW_SHAPE_THRESHOLD ? byCut : null
   if (!byOutline) return trusted
