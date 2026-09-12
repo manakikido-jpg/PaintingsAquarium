@@ -146,6 +146,16 @@ export interface SavePieceInput {
   readonly built?: number
 }
 
+/** 会期ぶんの絵を移した先。画面に出して、運営者がその場で確かめられるようにする。 */
+export interface ArchivedEvent {
+  /** 移した先のフォルダ（そのまま画面に出す） */
+  readonly folder: string
+  /** 移した絵の枚数 */
+  readonly pieces: number
+  /** 一緒に移した、元のスキャン写真の枚数 */
+  readonly scans: number
+}
+
 /** 絵と設定の保存先。別PCへ移すときに運営者がコピーする場所。 */
 export interface StorageLocation {
   readonly dataRoot: string
@@ -187,6 +197,11 @@ export interface AquariumApi {
   /** 作り直した結果で置き換える（R-062）。絵が変わったときだけ `imageBase64` を渡す */
   updatePiece(id: string, patch: UpdatePiecePatch): Promise<Piece | null>
   deletePiece(id: string): Promise<void>
+  /**
+   * 会期ぶんの絵をまとめて別のフォルダへ移し、空から始める（F-513）。
+   * **消さずに移す。** 設定（取り込みフォルダ・テーマ）はそのまま残る。
+   */
+  archiveEvent(name: string): Promise<ArchivedEvent>
   rescan(): Promise<void>
   toggleFullscreen(): Promise<boolean>
   /** いまの版（`0.1.38` のような番号）。配布したファイル名には入れていない */

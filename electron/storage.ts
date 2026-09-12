@@ -5,6 +5,8 @@ import type { Piece, SavePieceInput, Settings } from '../src/shared/types'
 import { DEFAULT_CUTOUT_OPTIONS } from '../src/core/cutout'
 import { DEFAULT_DINOSAUR_STYLE, DEFAULT_THEME, isDinosaurStyle, isThemeId } from '../src/core/theme'
 import { DEFAULT_NOTICE_MODE, isNoticeMode } from '../src/core/notices'
+import { eventFolderName } from '../src/core/events'
+import { SUPPORTED_EXTENSIONS } from '../src/core/ingest'
 
 const DEFAULT_SETTINGS: Settings = {
   watchFolder: null,
@@ -197,4 +199,103 @@ export function deletePiece(id: string): void {
   } catch {
     // 画像だけ先に消えていても、台帳から消せていれば実害はない。
   }
+}
+
+/**
+ * 会期ぶんの絵をまとめて別のフォルダへ移し、空から始める（F-513）。
+ *
+ * **消さずに移す。** 会期中の絵は二度と撮り直せない。
+ * `data/events/<日付 名前>/` に `pieces/` と `pieces.json` をそのまま入れるので、
+ * 戻したくなったら中身を上の階層へ戻せばよい。
+ *
+ * **設定（`settings.json`）は動かさない。** 取り込みフォルダもテーマも
+ * 次の会期でそのまま使う。ここを一緒に移すと、次の会期の朝に
+ * **取り込みフォルダを選び直すところから**になる。
+ */
+export function archiveEvent(
+  name: string,
+  /**
+   * 取り込みフォルダ。**中の写真も一緒に移す。**
+   *
+   * 移さないと 2 つ困る。
+   * 1. 台帳（`pieces.json`）を移した時点で「取り込み済み」の記録も消えるので、
+   *    次の起動で**前の会期の写真がまた取り込まれる**（実機で再現済み）。
+   * 2. 元のスキャン写真は、あとから不具合を調べるときの唯一の材料になる。
+   *    実際、プテラノドンが飛ばない原因（R-069）は実物の紙が来て初めて分かった。
+   */
+  watchFolder: string | null,
+  now: Date = new Date(),
+): { folder: string; pieces: number; scans: number } {
+  const pieces = readPieces()
+  const eventsRoot = path.join(dataRoot(), 'events')
+  fs.mkdirSync(eventsRoot, { recursive: true })
+
+  const folder = eventFolderName(name, now, (candidate) =>
+    fs.existsSync(path.join(eventsRoot, candidate)),
+  )
+  const target = path.join(eventsRoot, folder)
+  fs.mkdirSync(target, { recursive: true })
+
+  // 先に絵を移す。台帳だけ先に移すと、途中で落ちたときに
+  // 「台帳は空なのに絵は残っている」状態になり、絵の行き先が分からなくなる
+  if (fs.existsSync(piecesDir())) {
+    fs.renameSync(piecesDir(), path.join(target, 'pieces'))
+  }
+  if (fs.existsSync(indexPath())) {
+    fs.renameSync(indexPath(), path.join(target, 'pieces.json'))
+  }
+  // 次の会期ぶんの入れ物を作っておく。無くても保存時に作られるが、
+  // 運営者がエクスプローラで開いたときに「空になった」と分かるほうがよい
+  fs.mkdirSync(piecesDir(), { recursive: true })
+
+  return { folder: target, pieces: pieces.length, scans: moveScans(watchFolder, target) }
+}
+
+/**
+ * 取り込みフォルダの写真を、会期のフォルダへ移す。
+ *
+ * **1 枚ずつ試して、失敗しても続ける。** スキャナが書いている途中の
+ * ファイルは移せないことがあるが、そこで止めると**残りの写真が
+ * 取り込みフォルダに残ったまま**になり、次の会期に混ざる。
+ * 移せなかったぶんは数に入れないので、画面の枚数を見れば気づける。
+ */
+function moveScans(watchFolder: string | null, target: string): number {
+  if (!watchFolder || !fs.existsSync(watchFolder)) return 0
+
+  let names: string[]
+  try {
+    names = fs.readdirSync(watchFolder)
+  } catch {
+    return 0
+  }
+
+  const scans = names.filter((name) =>
+    (SUPPORTED_EXTENSIONS as readonly string[]).includes(path.extname(name).toLowerCase()),
+  )
+  if (scans.length === 0) return 0
+
+  const into = path.join(target, 'scans')
+  fs.mkdirSync(into, { recursive: true })
+
+  let moved = 0
+  for (const name of scans) {
+    try {
+      fs.renameSync(path.join(watchFolder, name), path.join(into, name))
+      moved++
+    } catch {
+      /*
+       * 別のドライブ（USB のスキャナ用フォルダなど）だと rename が通らない。
+       * その場合はコピーしてから消す。コピーが成功した後だけ消すので、
+       * 途中で落ちても写真は必ずどちらかに残る。
+       */
+      try {
+        fs.copyFileSync(path.join(watchFolder, name), path.join(into, name))
+        fs.unlinkSync(path.join(watchFolder, name))
+        moved++
+      } catch {
+        // 開かれている最中の写真。次の会期に混ざるが、消すよりはよい
+      }
+    }
+  }
+  return moved
 }

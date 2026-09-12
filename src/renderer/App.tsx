@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Aquarium } from './Aquarium'
 import { processPhoto, rebuildPiece } from './processImage'
 import type {
+  ArchivedEvent,
   IncomingPhoto,
   Notice,
   Piece,
@@ -26,6 +27,9 @@ const RELEASE_PAGE = 'https://github.com/manakikido-jpg/PaintingsAquarium/releas
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [storage, setStorage] = useState<StorageLocation | null>(null)
+  /** 会期の切り替え。名前を入れて押すまで何も起きない（F-513） */
+  const [eventName, setEventName] = useState('')
+  const [archived, setArchived] = useState<ArchivedEvent | null>(null)
   /**
    * 更新の確認。**押したときだけ通信する**（要件定義 §4 を守るため、
    * 起動時には見に行かない）。
@@ -419,6 +423,62 @@ export function App(): React.JSX.Element {
                   取り込みフォルダの写真さえ残っていれば、入れ直すだけでもやり直せます。
                 </p>
               </>
+            )}
+
+            {/*
+              **会期ごとに絵を分ける（F-513）。**
+
+              絵は 1 か所にたまり続けるので、会期を重ねると
+              「どのイベントの絵か」が混ざる。終わったらここで区切る。
+
+              **消さずに移す。** 会期中の絵は二度と撮り直せない。
+              設定（取り込みフォルダ・テーマ）は動かさないので、
+              次の会期の朝に選び直すことにはならない。
+            */}
+            <div className="row">
+              <span>イベントを終える</span>
+              <input
+                type="text"
+                value={eventName}
+                placeholder="イオン久御山店 など"
+                onChange={(event) => setEventName(event.target.value)}
+              />
+              <button
+                type="button"
+                disabled={pieces.length === 0}
+                onClick={async () => {
+                  const label = eventName.trim() || 'このイベント'
+                  if (
+                    !window.confirm(
+                      `${label}の絵 ${pieces.length} 枚を別のフォルダへ移して、空から始めます。\n` +
+                        '取り込みフォルダのスキャン写真も一緒に移します（次の会期に混ざらないように）。\n\n' +
+                        '絵も写真も消えません。取り込みフォルダとテーマの設定もそのまま残ります。',
+                    )
+                  ) {
+                    return
+                  }
+                  const result = await window.aquarium.archiveEvent(eventName)
+                  setArchived(result)
+                  setEventName('')
+                  setPieces([])
+                }}
+              >
+                絵を片付けて次へ
+              </button>
+            </div>
+            {archived && (
+              <p className="note">
+                絵 {archived.pieces} 枚と、元のスキャン写真 {archived.scans} 枚を{' '}
+                <code>{archived.folder}</code> へ移しました。
+                <br />
+                画面は空になりましたが、<strong>どちらも消えていません</strong>。
+                このフォルダを開けば、そのままの形で残っています。
+              </p>
+            )}
+            {pieces.length === 0 && !archived && (
+              <p className="note">
+                絵が 1 枚も無いので、片付けるものがありません。
+              </p>
             )}
 
             {/*
