@@ -1,0 +1,517 @@
+<title>お絵かき水族館・ダイナソー 現場マニュアル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  /*
+   * 紙に刷るためのファイル。**画面用ではない**ので、明るい配色に決め打ちする
+   *（`docs/イベント運営マニュアル.md` が原本。手順を変えたらそちらを先に直す）。
+   *
+   * 台紙の発注は入れていない。現場でやるのは発注以外だけなので、
+   * 現場に渡す紙に入れると、やらない手順を読ませることになる。
+   */
+  :root {
+    --paper: #ffffff;
+    --ink: #16232b;
+    --ink-soft: #4a5b63;
+    --ink-faint: #78888f;
+    --rule: #d9d5cc;
+    --accent: #0e6f7a;
+    --accent-soft: #e8f2f3;
+    --warn: #a8401a;
+    --warn-soft: #f9ece6;
+    --good: #376d33;
+    --good-soft: #ebf2e9;
+    --sans: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --mono: "JetBrains Mono", monospace;
+  }
+
+  @page {
+    size: A4;
+    margin: 16mm 15mm 14mm;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 10.5pt;
+    line-height: 1.75;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ---------- 表紙まわり ---------- */
+  .eyebrow {
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: .16em;
+    color: var(--accent);
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-size: 25pt;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+    margin: 0 0 12px;
+  }
+  .lede { font-size: 11pt; color: var(--ink-soft); margin: 0; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    font-size: 8.5pt;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+  }
+
+  h2 {
+    font-size: 15pt;
+    font-weight: 700;
+    line-height: 1.4;
+    margin: 0 0 4px;
+  }
+  h3 {
+    font-size: 11.5pt;
+    font-weight: 700;
+    margin: 18px 0 4px;
+  }
+  p { margin: 0 0 9px; }
+  strong { font-weight: 700; }
+
+  /* ---------- 時間の軸 ---------- */
+  .phase {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 0 20px;
+    padding-block: 20px;
+    border-top: 1px solid var(--rule);
+    /* 段落の途中で切れるのは構わないが、見出しだけが取り残されるのは避ける */
+    break-inside: auto;
+  }
+  .phase > div:last-child > h2 { break-after: avoid; }
+  .when {
+    font-family: var(--mono);
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: .03em;
+    color: var(--accent);
+    padding-top: 3px;
+    line-height: 1.55;
+  }
+  .when span {
+    display: block;
+    font-weight: 400;
+    color: var(--ink-faint);
+    letter-spacing: 0;
+  }
+
+  /* ---------- 表 ---------- */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 9.5pt;
+    margin: 10px 0 12px;
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 7px 12px 7px 0;
+    border-bottom: 1px solid var(--rule);
+    line-height: 1.6;
+  }
+  /* 行の途中で改ページすると、設定値と「外すとどうなる」が離れて読めなくなる */
+  tr { break-inside: avoid; }
+  th {
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--ink-faint);
+    border-bottom-color: var(--ink-faint);
+    padding-bottom: 5px;
+  }
+  td:last-child, th:last-child { padding-right: 0; }
+  table.spec td:first-child { width: 30%; font-weight: 500; }
+  /* 症状は短い語なので、折り返して1文字だけ next 行に残るのを防ぐ */
+  table.trouble td:first-child { width: 34%; }
+  table.roles td:last-child { font-family: var(--mono); white-space: nowrap; }
+  .zero { color: var(--accent); font-weight: 700; }
+
+  code, .mono { font-family: var(--mono); font-size: .9em; }
+  code {
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+
+  /* ---------- 注意の箱 ---------- */
+  .why, .pass {
+    padding: 11px 14px;
+    margin: 12px 0;
+    font-size: 9.5pt;
+    break-inside: avoid;
+  }
+  .why { border-left: 3px solid var(--warn); background: var(--warn-soft); }
+  .pass { border-left: 3px solid var(--good); background: var(--good-soft); }
+  .why p:last-child, .pass p:last-child { margin-bottom: 0; }
+  .why .head {
+    font-weight: 700;
+    color: var(--warn);
+    font-size: 8.5pt;
+    letter-spacing: .05em;
+    margin-bottom: 3px;
+  }
+
+  ul, ol { margin: 0 0 11px; padding-left: 1.3em; }
+  li { margin-bottom: 4px; }
+
+  /* ---------- スタッフ用の貼り紙（必ず単独ページ） ---------- */
+  .card {
+    break-before: page;
+    break-after: page;
+    border: 2.5pt solid var(--ink);
+    padding: 34px 32px 30px;
+    margin: 0;
+    /* 貼って離れたところから読むものなので、紙いっぱいまで使う。
+       切り取るときも、枠が大きいほうがまっすぐ切れる */
+    min-height: 252mm;
+  }
+  .card .tear {
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: .12em;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+    margin: 0 0 12px;
+  }
+  .card h2 { font-size: 26pt; margin-bottom: 22px; }
+  .steps {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 30px;
+    counter-reset: step;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 44px;
+    margin-bottom: 16px;
+    font-size: 17pt;
+    line-height: 1.45;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 13pt;
+    font-weight: 700;
+    text-align: center;
+    line-height: 30px;
+  }
+  .say {
+    font-size: 19pt;
+    font-weight: 700;
+    color: var(--accent);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 18px 0;
+    margin: 0 0 28px;
+  }
+  /*
+   * **ここを grid にしない。** 以前、企画書で grid の升目が改ページに
+   * またがったとき、文字が1文字ずつの縦の列にばらけた（Chrome の印刷）。
+   * 2列に見せたいだけなので、段組みで足りる。
+   */
+  .dos { column-count: 2; column-gap: 30px; }
+  .dos > div { break-inside: avoid; }
+  .dos h4 {
+    font-size: 11pt;
+    letter-spacing: .08em;
+    margin: 0 0 7px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .dos ul { list-style: none; padding: 0; margin: 0; }
+  .dos li { padding-left: 22px; position: relative; font-size: 13pt; margin-bottom: 10px; }
+  .dos li::before { position: absolute; left: 0; font-weight: 700; }
+  .ok li::before { content: "\25CB"; color: var(--good); }
+  .ng li::before { content: "\00D7"; color: var(--warn); }
+  .ok h4 { color: var(--good); }
+  .ng h4 { color: var(--warn); }
+
+  footer {
+    margin-top: 26px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    font-size: 9pt;
+    color: var(--ink-faint);
+    break-inside: avoid;
+  }
+  footer p { margin: 0; }
+</style>
+
+<p class="eyebrow">お絵かき水族館 ／ お絵かきダイナソー</p>
+<h1>現場マニュアル</h1>
+<p class="lede">
+  前日の仕込みから、当日、片付けまで。台紙の発注は入れていません。<br>
+  このイベントの核心は「<strong>会場スタッフのアプリ操作を0回にする</strong>」ことです。
+  手順を1つ増やす話が出たら、まずそこへ戻ってください。
+</p>
+<div class="meta">
+  <span>2026-09-12</span>
+  <span>スキャナ: CZUR Shine Ultra Pro</span>
+  <span>台紙: A4 よこ / 11種</span>
+</div>
+
+<table class="roles">
+  <thead>
+    <tr><th>だれが</th><th>なにを</th><th>1日あたり</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>立ち上げる人</td><td>設営・設定・片付け</td><td>朝と終わりに1回</td></tr>
+    <tr><td>会場スタッフ</td><td>紙を配る／描けた紙をスキャンする</td><td>30〜100回</td></tr>
+    <tr><td>会場スタッフ</td><td>アプリの操作</td><td class="zero">0回</td></tr>
+  </tbody>
+</table>
+
+<!-- ───────── 前日 ───────── -->
+<section class="phase">
+  <div class="when">前日<span>立ち上げる人</span></div>
+  <div>
+    <h2>アプリとスキャナを整える</h2>
+    <p><strong>当日の朝にやらないでください。</strong>失敗したときに直す時間がありません。</p>
+
+    <h3>アプリを最新にする</h3>
+    <p>
+      設定画面（<code>S</code> キー）→「更新を確認」→「いま入れ替えて再起動する」。
+      <strong>絵と設定は消えません。</strong>
+    </p>
+
+    <h3>スキャナの設定</h3>
+    <p>アプリの操作は0回ですが、スキャナ側は最初に1回だけ設定が要ります。</p>
+    <table class="spec">
+      <thead>
+        <tr><th>設定</th><th>こうする</th><th>外すとどうなる</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>保存形式</td><td><strong>JPG</strong></td>
+          <td><strong>PDFは読めません。</strong>書類用スキャナは既定がPDFのことが多い</td>
+        </tr>
+        <tr>
+          <td>保存先</td><td>アプリの取り込みフォルダ</td>
+          <td>スタッフの操作が「毎回コピーする」に増える</td>
+        </tr>
+        <tr>
+          <td>解像度</td><td><span class="mono">150〜300dpi</span></td>
+          <td>600dpiは要らない（150も300も取り込み約2.9秒）</td>
+        </tr>
+        <tr>
+          <td>ファイル名</td><td><strong>通し番号。リセットしない</strong></td>
+          <td>毎回 <span class="mono">img001</span> に戻ると二重取り込みとみなして捨てる。<strong>絵が静かに消える</strong></td>
+        </tr>
+        <tr>
+          <td>トップLED</td><td><strong>点ける</strong></td>
+          <td>影が濃いと、紙の一部が「紙ではない」と判定されて取り込みを断る</td>
+        </tr>
+        <tr>
+          <td>フットペダル</td><td><strong>使う</strong></td>
+          <td>手で操作すると手や腕が写り込んで影になる</td>
+        </tr>
+        <tr>
+          <td>自動切り出し</td><td>紙のまわりに余白を残す</td>
+          <td>端ぎりぎりで切ると、絵が写真の縁に触れて<strong>丸ごと消える</strong>ことがある</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="color:#4a5b63;font-size:9.5pt">
+      設定の名前はソフトの版で違うかもしれません。大事なのは
+      <strong>JPGで・決まったフォルダへ・通し番号で</strong>保存されることの3つだけです。
+    </p>
+
+    <h3>紙を置く場所を白くする</h3>
+    <p>
+      <strong>敷くマットが黒い場合は使わないでください。</strong>
+      白い紙（模造紙・A3のコピー用紙など）を敷きます。
+    </p>
+    <div class="why">
+      <p class="head">実測</p>
+      <p>
+        上から撮る方式では、台紙の外側の台まで写ります。台が黒いと、そこが
+        「紙ではない＝クレヨンと同じ」と判定されて額縁のような塊になります。
+        前回これで、台紙の見分けが <strong>11/19 → 6/19</strong> まで落ちました。
+      </p>
+    </div>
+
+    <h3>通しで1枚試す</h3>
+    <div class="pass">
+      <p><strong>合格</strong> — 色を塗った紙を1枚スキャンすると、アプリを触らずに数秒で泳ぎ出す。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 当日の朝 ───────── -->
+<section class="phase">
+  <div class="when">当日の朝<span>30分</span></div>
+  <div>
+    <h2>立ち上げる</h2>
+    <ol>
+      <li>PC・スキャナ・モニターをつなぐ</li>
+      <li>アプリを起動する</li>
+      <li><code>S</code> キーで設定を開き、<strong>テーマ</strong>（水族館／ダイナソー）を今日のものにする</li>
+      <li>取り込みフォルダが前日のままか確認する</li>
+      <li><code>F</code> キーで全画面にする</li>
+      <li>試しに1枚スキャンして、泳ぎ出すのを見る</li>
+      <li>試した絵を一覧から消す</li>
+    </ol>
+    <p><strong>ここまでで立ち上げは終わりです。</strong>あとはスタッフに任せられます。</p>
+  </div>
+</section>
+
+<!-- ───────── スタッフ用（単独ページ） ───────── -->
+<div class="card">
+  <p class="tear">このページを切り取って、スキャナの横に貼る</p>
+  <h2>スキャンの手順</h2>
+  <ol class="steps">
+    <li>台紙を渡す</li>
+    <li>描けた紙を受け取る</li>
+    <li>スキャナの下に、まっすぐ置く</li>
+    <li>フットペダルを踏む</li>
+    <li>紙を返す</li>
+  </ol>
+
+  <p class="say">渡すときに一言 ——「絵の中を塗ってね」</p>
+
+  <div class="dos">
+    <div class="ok">
+      <h4>こうする</h4>
+      <ul>
+        <li>まっすぐ置く</li>
+        <li>紙のまわりに余白を空ける</li>
+        <li>1枚ずつ置く</li>
+        <li>出ないときは、もう一度スキャンする</li>
+      </ul>
+    </div>
+    <div class="ng">
+      <h4>これはしない</h4>
+      <ul>
+        <li>アプリを触る（触りません）</li>
+        <li>手や腕を紙の上に残す</li>
+        <li>2枚重ねて置く</li>
+        <li>うまくいかなかった紙を捨てる</li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="margin-top:20px;margin-bottom:0;font-size:10pt;color:#4a5b63">
+    2回やっても画面に出ない紙は、<strong>取っておいて立ち上げた人に渡してください。</strong>
+    あとで直すための、唯一の手がかりになります。
+  </p>
+</div>
+
+<!-- ───────── 終わったら ───────── -->
+<section class="phase" style="border-top:none;padding-top:0">
+  <div class="when">終わったら<span>その日のうちに</span></div>
+  <div>
+    <h2>イベントを終える</h2>
+    <p>
+      <code>S</code> キーで設定を開き、「イベントを終える」に会場の名前を入れて
+      「絵を片付けて次へ」を押します。
+    </p>
+    <p>
+      その会期の絵と、<strong>元のスキャン写真</strong>がまとめて日付つきフォルダへ移ります。
+      <strong>消えません。移すだけです。</strong>
+      取り込みフォルダとテーマの設定は残るので、次の会期の朝に選び直すことにはなりません。
+    </p>
+
+    <table class="spec">
+      <tbody>
+        <tr><td><span class="mono">pieces/</span></td><td>泳いでいた絵（切り抜き済み）</td></tr>
+        <tr><td><span class="mono">pieces.json</span></td><td>その台帳</td></tr>
+        <tr><td><span class="mono">scans/</span></td><td><strong>スキャナが撮った元の写真 ← 一番大事</strong></td></tr>
+      </tbody>
+    </table>
+
+    <div class="why">
+      <p class="head">なぜ scans が一番大事か</p>
+      <p>
+        不具合を調べられるのはこれだけです。プテラノドンが飛ばなかった原因は、
+        <strong>実物の紙が手元に来て初めて</strong>分かりました。
+        合成データでは一度も再現できませんでした。
+      </p>
+    </div>
+
+    <p>
+      <strong>持ち帰るもの</strong>：上のフォルダ（丸ごとバックアップ）／
+      うまくいかなかった紙の現物／参加人数と気づいたこと。
+    </p>
+  </div>
+</section>
+
+<!-- ───────── 困ったとき ───────── -->
+<section class="phase">
+  <div class="when">困ったとき<span>症状から引く</span></div>
+  <div>
+    <h2>だいたいここに入っています</h2>
+    <table class="spec trouble">
+      <thead><tr><th>症状</th><th>見るところ</th></tr></thead>
+      <tbody>
+        <tr><td>1枚も泳がない</td><td>スキャナの保存形式が <strong>PDF</strong> になっていませんか。<strong>JPG</strong> にする</td></tr>
+        <tr><td>1枚も泳がない</td><td>保存先が取り込みフォルダですか（<code>S</code> キーで確認できます）</td></tr>
+        <tr><td>ある紙だけ泳がない</td><td>もう一度スキャンする。それでも駄目なら<strong>紙を取っておく</strong></td></tr>
+        <tr><td>絵が真っ黒／変な四角が泳ぐ</td><td>敷いているマットが黒くありませんか。<strong>白い紙を敷く</strong></td></tr>
+        <tr><td>絵の中が透けている</td><td>影です。<strong>トップLEDを点ける</strong>／手を紙の上に残さない</td></tr>
+        <tr><td>絵が縦に潰れて見える</td><td>紙を寄せすぎです。<strong>まわりに余白を空ける</strong></td></tr>
+        <tr><td>途中から取り込まれない</td><td>ファイル名が <span class="mono">img001</span> に戻る設定になっていませんか</td></tr>
+        <tr><td>前回の絵が混ざっている</td><td>「イベントを終える」をやらずに始めています。いまからでもできます</td></tr>
+        <tr><td>画面がカクつく</td><td><code>S</code> →「飾りの多さ」を下げる／「しなりの強さ」を 0 にする</td></tr>
+      </tbody>
+    </table>
+    <p>
+      どれにも当てはまらないときは、<strong>うまくいかなかった紙を取っておいてください。</strong>
+      紙さえあれば、あとから原因を特定して直せます。
+    </p>
+  </div>
+</section>
+
+<!-- ───────── 記録 ───────── -->
+<section class="phase">
+  <div class="when">毎回<span>記録する</span></div>
+  <div>
+    <h2>次の会期の判断を良くするために</h2>
+    <ul>
+      <li>会場・日程</li>
+      <li>参加人数</li>
+      <li>台紙の消費（種類ごと）</li>
+      <li>泳いだ絵の枚数</li>
+      <li><strong>うまくいかなかった紙の枚数と、その紙</strong></li>
+      <li>スタッフから出た声／来場者から出た声</li>
+    </ul>
+    <p>
+      「うまくいかなかった紙」は<strong>必ず現物で</strong>持ち帰ってください。枚数だけでは直せません。
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    原本は <span class="mono">docs/イベント運営マニュアル.md</span>。手順を変えたときは、
+    そちらを直してから <span class="mono">tools/make-manual-pdf.py</span> で作り直してください。
+    台紙の発注は原本のほうに入っています。
+  </p>
+</footer>
