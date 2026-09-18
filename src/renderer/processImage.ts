@@ -16,8 +16,8 @@ import { downscale, type RgbaImage } from '../core/image'
 import { estimateRig, flipHorizontal, orientForSwimming, rotateQuarter, type Rig } from '../core/rig'
 import {
   identifySpecies,
-  RAW_SHAPE_THRESHOLD,
   rigForSpecies,
+  trustsRawShape,
   type Direction,
   type SpeciesId,
 } from '../core/templates'
@@ -120,7 +120,13 @@ function identify(image: RgbaImage, theme?: ThemeId): ReturnType<typeof identify
    */
   const byOutline = identifySpecies(largestRegion(insideOutline(image)), theme)
   const byCut = identifySpecies(image, theme)
-  const trusted = byCut && byCut.score >= RAW_SHAPE_THRESHOLD ? byCut : null
+  /*
+   * **点数が足りなくても、2位を大きく引き離していれば信じる（R-071）。**
+   * 0.85 は「はみ出して塗ったか」の代用品で、1位と2位の差のほうが
+   * 「別の生き物と間違えていないか」を直に測れる。クラゲはこれで落ちていて、
+   * 実データ200枚で種類が付いたのは 3 枚だけだった（直して 16 枚）。
+   */
+  const trusted = byCut && trustsRawShape(byCut) ? byCut : null
   if (!byOutline) return trusted
   if (!trusted) return byOutline
   return trusted.score > byOutline.score ? trusted : byOutline

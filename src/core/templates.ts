@@ -168,6 +168,52 @@ export function templatesForTheme(theme?: ThemeId): readonly Template[] {
  */
 export const RAW_SHAPE_THRESHOLD = 0.85
 
+/**
+ * **点数が足りなくても、2位を大きく引き離していれば信じてよい（R-071）。**
+ *
+ * `RAW_SHAPE_THRESHOLD`（0.85）は「枠からはみ出して塗ったか」の**代用品**。
+ * はみ出すと別の生き物の形に近づくので、点数だけで弾いていた。
+ * ところが「**別の生き物と間違えていないか**」は、1位と2位の差で直接測れる。
+ * 塗り方が荒いと点数は全体に下がるが、見間違えていなければ差は開いたままになる。
+ *
+ * **クラゲがこれで落ちていた。** 触手が細いので「線の内側」の形が取れず、
+ * 「紙を消しただけ」の形では 0.71〜0.81 しか出ないため 0.85 に届かない。
+ * しかし2位は**いつも fish の 0.45〜0.53** で、差は 0.23〜0.35 あった。
+ *
+ * **境目は実データ400枚（会場 2026-09-05〜06）で決めた。**
+ * 0.70〜0.85 で捨てられていた 80 枚を1位と2位の差で並べ、実物を目で確かめた:
+ *
+ * | 差 | 実物 | 判定 |
+ * |---|---|---|
+ * | 0.021 | ステゴサウルス | **間違い**（triceratops と言っていた） |
+ * | 0.095 | トリケラトプス | 正しい |
+ * | 0.096 | アンキロサウルス | **間違い**（triceratops と言っていた） |
+ * | 0.114 | トリケラトプス | 正しい |
+ * | **0.20 以上（37枚）** | — | **1枚ずつ写ったものは全部正しい** |
+ *
+ * **0.09 付近では正解と間違いが隣り合っていて分けられない。**
+ * 間違いの最大は 0.114 だったので、その倍近い余裕を取って 0.20 にした。
+ *
+ * 判断が割れたのは**二枚重ねのスキャン**だけで、これは別の既知の問題
+ *（会場の運用としても「無視してよい」とのこと）。
+ *
+ * これを入れた結果（実アプリで400枚を通し直して1枚ずつ突き合わせ）:
+ * 種類が付いた絵が **31枚増え（クラゲは 3→16枚）、減った絵・変わった絵は 0 枚**。
+ * 増えた31枚は全部この目で見て正しいことを確かめた。合成44枚も 44/44 のまま。
+ */
+export const RAW_SHAPE_MARGIN = 0.2
+
+/**
+ * **「紙を消しただけの形」の答えを信じてよいか。**
+ *
+ * 通す道は2本ある。点数が高い（`RAW_SHAPE_THRESHOLD`）か、
+ * 2位を大きく引き離している（`RAW_SHAPE_MARGIN`）か。
+ * どちらも「別の生き物と見間違えていない」ことの裏付けになる。
+ */
+export function trustsRawShape(match: SpeciesMatch): boolean {
+  return match.score >= RAW_SHAPE_THRESHOLD || match.score - match.runnerUp >= RAW_SHAPE_MARGIN
+}
+
 export function identifySpecies(image: RgbaImage, theme?: ThemeId): SpeciesMatch | null {
   const best = matchTemplates(image, templatesForTheme(theme), TEMPLATE_GRID)
   if (!best || best.score < MATCH_THRESHOLD) return null
