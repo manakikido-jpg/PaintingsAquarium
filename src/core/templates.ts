@@ -130,6 +130,8 @@ export interface SpeciesMatch {
   readonly id: SpeciesId
   /** 重なり具合（0〜1） */
   readonly score: number
+  /** 2位の台紙との重なり。1位との差が「迷っていないか」を表す（R-071） */
+  readonly runnerUp: number
   /** 絵の中で頭が向いている向き */
   readonly head: Direction
   /**
@@ -176,6 +178,8 @@ export function identifySpecies(image: RgbaImage, theme?: ThemeId): SpeciesMatch
   return {
     id,
     score: best.score,
+    /** 2位の台紙との重なり。1位との差で「迷っていないか」を見る（R-071） */
+    runnerUp: best.runnerUp,
     head,
     headsRight: sideways ? head.x > 0 : null,
     turns: best.turns,

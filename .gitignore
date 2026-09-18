@@ -13,3 +13,6 @@ build/preview/
 
 # 印刷用台紙の PNG（PDF は docs/ にある。どちらも tools/make-sheets.py で作り直せる）
 sheets/
+
+# 調べもの用の使い捨て（実データを1枚ずつ追うときに作る。製品には入れない）
+probe-*.ts

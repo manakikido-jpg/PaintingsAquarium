@@ -106,6 +106,20 @@ describe('matchTemplates', () => {
     expect(matchTemplates(cross(), templates)?.id).toBe('十字')
   })
 
+  it('2位の点数も返す（迷っていないかを見るため・R-071）', () => {
+    const best = matchTemplates(ell(), templates)!
+    expect(best.id).toBe('L字')
+    // 2位は必ず「1位以外の台紙」の中で一番よかったもの
+    expect(best.runnerUp).toBeLessThan(best.score)
+    expect(best.runnerUp).toBe(
+      matchTemplates(ell(), [templates[1]])!.score,
+    )
+  })
+
+  it('台紙が1つしか無ければ、2位は 0', () => {
+    expect(matchTemplates(ell(), [templates[0]])?.runnerUp).toBe(0)
+  })
+
   it('絵が横倒しでも、まわして合わせて同じ台紙にたどり着く', () => {
     // 紙の向きは描いた人が決める（R-019）。台紙方式なら、合った向きが
     // そのまま「正しい向き」になるので、向きを別に推定しなくてよい。

@@ -158,6 +158,14 @@ export interface MatchResult {
   readonly turns: number
   readonly mirrored: boolean
   /**
+   * **2位の台紙との重なり**（`id` 以外で一番よかったもの）。
+   *
+   * 点数そのものより、**1位との差**が「迷っていないか」を表す。
+   * 塗り方が荒い絵は点数が全体に下がるが、それでも別の生き物と
+   * 見間違えていなければ差は開いたままになる（R-071）。
+   */
+  readonly runnerUp: number
+  /**
    * 何度傾けたときに一番よく重なったか（診断用）。
    *
    * **絵を描くときには使わない。** ここで見ているのは紙の置き方のずれで、
@@ -206,6 +214,8 @@ export function matchTemplates(
   if (templates.length === 0) return null
 
   let best: MatchResult | null = null
+  /** 台紙ごとの一番よかった重なり。2位を出すために全部覚えておく */
+  const bestOf = new Map<string, number>()
   // 傾きを一番外に置く。升目に落とす計算は傾きごとに1回で済み、
   // 台紙の数だけ作り直さずにすむ
   for (const tilt of MATCH_TILTS) {
@@ -216,12 +226,21 @@ export function matchTemplates(
         const candidate = mirrored ? mirrorSilhouette(turned) : turned
         for (const template of templates) {
           const score = overlap(candidate, template.shape)
-          if (!best || score > best.score) best = { id: template.id, score, turns, mirrored, tilt }
+          if (score > (bestOf.get(template.id) ?? -1)) bestOf.set(template.id, score)
+          if (!best || score > best.score) {
+            best = { id: template.id, score, turns, mirrored, tilt, runnerUp: 0 }
+          }
         }
       }
     }
   }
-  return best
+  if (!best) return null
+
+  let runnerUp = 0
+  for (const [id, score] of bestOf) {
+    if (id !== best.id && score > runnerUp) runnerUp = score
+  }
+  return { ...best, runnerUp }
 }
 
 /**
