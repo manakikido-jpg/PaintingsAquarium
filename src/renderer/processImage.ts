@@ -5,6 +5,7 @@ import {
   diagnoseResult,
   inkStats,
   localPaperValueMap,
+  fillsWholePhoto,
   SEAL_RATIOS,
   type CutoutOptions,
 } from '../core/cutout'
@@ -358,13 +359,34 @@ function trySealRatios(
      *
      * 台紙どおりに取り込めた絵は**必ず 1 つの塊**になる（実測 33/33）。
      * それを満たす一番狭い幅を採る。満たす幅が無ければ、通った中で一番狭いもの。
+     *
+     * **ただし「写真まるごと」を 1 つの塊として受け取らない（R-070）。**
+     *
+     * 黒い布の上に紙を置いて撮ると、紙の外がぜんぶ「紙ではない」と判定される。
+     * 塞ぐ幅を広げると、その黒い縁と絵が繋がって**写真全体が 1 つの塊**になり、
+     * この規則がそれを「絵が1つに繋がった」とみなして選んでしまう。
+     * 実測（会場データ 2026-09-06・水族館）:
+     *
+     * | 塞ぐ幅 | 残った塊 | 切り抜き |
+     * |---|---|---|
+     * | 0.004〜0.02 | 2 | **403x692（正しい）** |
+     * | 0.032〜0.05 | **1** | 1200x927（写真まるごと） |
+     *
+     * **200枚中21枚**がこうなり、水槽の中を紙の写真が題の文字ごと泳いでいた。
+     *
+     * 幅を広げるのは**割れた絵を繋ぎ直す**ためであって、
+     * 絵を**膨らませる**ためではない。だから「写真のほぼ全面」になったものは、
+     * それより狭い幅で通った結果があるなら採らない。
      */
     const whole: CutoutAttempt = { cut, cleaned, touchedBorder, trimmed }
-    if (!attempt) attempt = whole
-    if (keptRegions === 1) {
+    const fillsPhoto = fillsWholePhoto(source, trimmed.image)
+    if (!attempt && !fillsPhoto) attempt = whole
+    if (keptRegions === 1 && !fillsPhoto) {
       attempt = whole
       break
     }
+    // どの幅でも写真まるごとにしかならないなら、それでも返す（何も返さないよりよい）
+    if (!attempt) attempt = whole
   }
 
   return { attempt, refusalCode, refusalMessage }

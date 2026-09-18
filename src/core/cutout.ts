@@ -40,6 +40,36 @@ export interface CutoutOptions {
   localPaperMap?: LocalPaperMap
 }
 
+/**
+ * 切り抜きの結果が「紙まるごと」になっていないか（R-070）。
+ *
+ * **黒い布の上に紙を置いて撮ると、紙の外がぜんぶ「紙ではない」と判定される。**
+ * 塞ぐ幅を広げたときに、その黒い縁と絵が繋がって**写真全体が1つの塊**になり、
+ * 「絵は必ず1つの塊になる」という規則（R-066）が、それを
+ * 「絵が1つに繋がった」とみなして選んでしまう。
+ * 実測（会場データ 2026-09-06・水族館 200枚のうち **21枚**）:
+ *
+ * | 塞ぐ幅 | 残った塊 | 切り抜き |
+ * |---|---|---|
+ * | 0.004〜0.02 | 2 | **403x692（正しい）** |
+ * | 0.032〜0.05 | **1** | 1200x927（写真まるごと） |
+ *
+ * 会場では、水槽の中を**紙の写真が題の文字ごと**泳いでいた。
+ *
+ * **紙は必ず余白を持って写る**ので、絵だけがここまで大きくなることはない。
+ * 実測（実データ400枚）: 正しく切り抜けた絵は一番大きくても写真の 79%（横）どまり、
+ * 紙まるごとになったものは 100%。境目は 85% に置いた。
+ *
+ * **黒い布は外せない**（会場の都合）ので、運用ではなくここで直す。
+ */
+export function fillsWholePhoto(
+  photo: { readonly width: number; readonly height: number },
+  cut: { readonly width: number; readonly height: number },
+  ratio = 0.85,
+): boolean {
+  return cut.width >= photo.width * ratio && cut.height >= photo.height * ratio
+}
+
 export const DEFAULT_CUTOUT_OPTIONS: CutoutOptions = {
   // 既定は自動。会場のスタッフにつまみを触らせないため
   auto: true,

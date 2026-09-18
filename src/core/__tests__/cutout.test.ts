@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  fillsWholePhoto,
   cutoutPaper,
   diagnoseCutout,
   opaqueRatio,
@@ -461,5 +462,31 @@ describe('cutoutPaper で影ムラを救う（R-068）', () => {
     expect(alphaAt(cut, 1, 1)).toBe(0)
     // 絵（彩度の高い画素）はそのまま残る
     expect(alphaAt(cut, 4, 4)).toBeGreaterThan(0)
+  })
+})
+
+describe('fillsWholePhoto — 「紙まるごと」を絵として受け取らない（R-070）', () => {
+  const photo = { width: 1200, height: 927 }
+
+  it('写真いっぱいの切り抜きは紙まるごととみなす', () => {
+    // 会場データで実際に出た値（黒い布の縁と絵が繋がった）
+    expect(fillsWholePhoto(photo, { width: 1200, height: 927 })).toBe(true)
+  })
+
+  it('ふつうに切り抜けた絵は紙まるごとではない', () => {
+    // 同じ写真を狭い幅で切り抜いたときの値
+    expect(fillsWholePhoto(photo, { width: 403, height: 692 })).toBe(false)
+    expect(fillsWholePhoto(photo, { width: 273, height: 545 })).toBe(false)
+  })
+
+  it('片方だけ大きい絵は紙まるごとではない（横長のアンキロサウルスなど）', () => {
+    // 実データで一番横に広い絵でも 79%。縦が足りなければ紙ではない
+    expect(fillsWholePhoto(photo, { width: 1180, height: 520 })).toBe(false)
+    expect(fillsWholePhoto(photo, { width: 400, height: 920 })).toBe(false)
+  })
+
+  it('境目は動かせる', () => {
+    expect(fillsWholePhoto(photo, { width: 960, height: 750 }, 0.8)).toBe(true)
+    expect(fillsWholePhoto(photo, { width: 960, height: 750 }, 0.9)).toBe(false)
   })
 })
