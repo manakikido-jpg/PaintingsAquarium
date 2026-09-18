@@ -82,8 +82,13 @@ export function largestRegion(source: RgbaImage, alphaThreshold = 8): RgbaImage 
    *
    * 取り込みは長辺 1200px に縮めてある（`processImage` の `MAX_SIDE`）。
    * そこでの台紙の線の太さは実測 **2.0〜4.0px**（恐竜5種・等倍と 0.7 倍）。
-   * 両側から太らせるので、半径 3 で 6px ぶんの隙間まで繋がる。
-   * 絵が小さく写っているときのために、短辺からも決める。
+   * 両側から太らせるので、**繋がる隙間は半径の2倍**（半径2なら4pxまで繋がり、
+   * 5pxでは繋がらないことを実測で確認）。
+   *
+   * 半径は短辺から決めるので、A4 よこを長辺1200pxで取り込むと **3〜4**、
+   * 正方形に近い切り抜きでは 5、短辺が 625px を割ると下限の 2 になる。
+   * **下限 2（隙間4px）は線の太さ4.0pxに対して余裕がほとんど無い。**
+   * 絵が画面のごく一部にしか写っていない撮り方をすると、ここが効かなくなる。
    */
   const bridge = Math.max(2, Math.min(6, Math.round(Math.min(width, height) * 0.004)))
   const grown = dilate(opaque, width, height, bridge)

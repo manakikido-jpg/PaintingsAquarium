@@ -197,6 +197,8 @@ export interface AquariumApi {
   /** 作り直した結果で置き換える（R-062）。絵が変わったときだけ `imageBase64` を渡す */
   updatePiece(id: string, patch: UpdatePiecePatch): Promise<Piece | null>
   deletePiece(id: string): Promise<void>
+  /** 取り込みフォルダにいま写真が何枚あるか。片付ける前に画面へ出す */
+  countScans(): Promise<number>
   /**
    * 会期ぶんの絵をまとめて別のフォルダへ移し、空から始める（F-513）。
    * **消さずに移す。** 設定（取り込みフォルダ・テーマ）はそのまま残る。

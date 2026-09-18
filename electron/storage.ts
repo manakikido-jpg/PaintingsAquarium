@@ -252,6 +252,40 @@ export function archiveEvent(
 }
 
 /**
+ * 写真そのものか。
+ *
+ * **拡張子だけで決めない。** `backup.png` という名前の**フォルダ**があると、
+ * `path.extname` は `.png` を返すので、中身ごと会期のフォルダへ動いてしまう
+ *（実測で再現）。名前だけでは足りないので、実体も見る。
+ */
+function isScan(folder: string, name: string): boolean {
+  if (!(SUPPORTED_EXTENSIONS as readonly string[]).includes(path.extname(name).toLowerCase())) {
+    return false
+  }
+  try {
+    return fs.statSync(path.join(folder, name)).isFile()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 取り込みフォルダに写真が何枚あるか。
+ *
+ * **押す前に画面へ出すために要る。** 取り込みフォルダを「ピクチャ」のような
+ * 広いフォルダにしてあると、片付けで**無関係な写真まで**会期のフォルダへ動く。
+ * 枚数が出ていれば、押す前に気づける（3000枚と出たら手が止まる）。
+ */
+export function countScans(watchFolder: string | null): number {
+  if (!watchFolder || !fs.existsSync(watchFolder)) return 0
+  try {
+    return fs.readdirSync(watchFolder).filter((name) => isScan(watchFolder, name)).length
+  } catch {
+    return 0
+  }
+}
+
+/**
  * 取り込みフォルダの写真を、会期のフォルダへ移す。
  *
  * **1 枚ずつ試して、失敗しても続ける。** スキャナが書いている途中の
@@ -269,9 +303,7 @@ function moveScans(watchFolder: string | null, target: string): number {
     return 0
   }
 
-  const scans = names.filter((name) =>
-    (SUPPORTED_EXTENSIONS as readonly string[]).includes(path.extname(name).toLowerCase()),
-  )
+  const scans = names.filter((name) => isScan(watchFolder, name))
   if (scans.length === 0) return 0
 
   const into = path.join(target, 'scans')

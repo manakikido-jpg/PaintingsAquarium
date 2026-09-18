@@ -30,6 +30,11 @@ export function App(): React.JSX.Element {
   /** 会期の切り替え。名前を入れて押すまで何も起きない（F-513） */
   const [eventName, setEventName] = useState('')
   const [archived, setArchived] = useState<ArchivedEvent | null>(null)
+  /** 片付けの最中。**この間は押せなくする。** 連打すると2回目が「0枚」を返す */
+  const [archiving, setArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
+  /** 取り込みフォルダにある写真の枚数。押す前に見せるために数える */
+  const [scanCount, setScanCount] = useState(0)
   /**
    * 更新の確認。**押したときだけ通信する**（要件定義 §4 を守るため、
    * 起動時には見に行かない）。
@@ -85,6 +90,8 @@ export function App(): React.JSX.Element {
     read()
     const timer = window.setInterval(read, 1000)
     void window.aquarium.pendingUpdate().then(setPending)
+    // 取り込みフォルダの写真は会期中に増える。**開くたびに数え直す**
+    void window.aquarium.countScans().then(setScanCount)
     return () => window.clearInterval(timer)
   }, [panelOpen])
 
@@ -154,6 +161,18 @@ export function App(): React.JSX.Element {
   // 常設すると大画面に管理用の要素が映り込み、来場者の視界に入る。
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      /*
+       * **文字を打っているときは、ショートカットを効かせない。**
+       *
+       * 会場名の入力欄（F-513）が、このアプリで初めての自由入力欄になった。
+       * それまでは目盛りと入切しか無かったので、window で拾って問題なかった。
+       * いまは `AEON Sakai` と打つと `S` で設定画面が閉じ、`Fujiidera` と打つと
+       * `F` で**来場者が見ている大画面の全画面が解除される**。
+       */
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return
+      }
       if (event.key === 's' || event.key === 'S') {
         // 開くたびに先頭へ戻す。前回たくさん送った状態のまま開くと、
         // 開いた瞬間にその枚数を描くことになり、固まる理由が残る。
@@ -445,28 +464,57 @@ export function App(): React.JSX.Element {
               />
               <button
                 type="button"
-                disabled={pieces.length === 0}
+                /*
+                 * **絵が0枚でも、写真が残っていれば押せる。**
+                 * スキャナの設定が違って1枚も取り込めなかった日は、
+                 * 写真だけが取り込みフォルダに溜まる。押せないと翌日それが流れ込む。
+                 */
+                disabled={archiving || (pieces.length === 0 && scanCount === 0)}
                 onClick={async () => {
                   const label = eventName.trim() || 'このイベント'
+                  const folder = settings.watchFolder ?? '(未設定)'
                   if (
                     !window.confirm(
-                      `${label}の絵 ${pieces.length} 枚を別のフォルダへ移して、空から始めます。\n` +
-                        '取り込みフォルダのスキャン写真も一緒に移します（次の会期に混ざらないように）。\n\n' +
-                        '絵も写真も消えません。取り込みフォルダとテーマの設定もそのまま残ります。',
+                      `${label}として、絵 ${pieces.length} 枚を別のフォルダへ移して空から始めます。\n\n` +
+                        `あわせて、次のフォルダにある写真 ${scanCount} 枚も一緒に移します。\n` +
+                        `  ${folder}\n` +
+                        '（次の会期に混ざらないようにするためです）\n\n' +
+                        '絵も写真も消えません。移すだけです。\n' +
+                        '取り込みフォルダとテーマの設定もそのまま残ります。',
                     )
                   ) {
                     return
                   }
-                  const result = await window.aquarium.archiveEvent(eventName)
-                  setArchived(result)
-                  setEventName('')
-                  setPieces([])
+                  /*
+                   * **失敗しても黙らない（CLAUDE.md「できませんで終わらせない」）。**
+                   * 以前はここに catch が無く、例外が出ると画面が無反応になった。
+                   * 無反応だと会場では「効かない」と思ってもう一度押すので、
+                   * 2回目が 0 枚を返して「絵が全部消えた」ように見える。
+                   */
+                  setArchiving(true)
+                  setArchiveError(null)
+                  try {
+                    const result = await window.aquarium.archiveEvent(eventName)
+                    setArchived(result)
+                    setEventName('')
+                    setPieces([])
+                    setScanCount(await window.aquarium.countScans())
+                  } catch (error) {
+                    setArchiveError(
+                      `片付けられませんでした（${error instanceof Error ? error.message : String(error)}）。` +
+                        'エクスプローラで絵のフォルダを開いていたら閉じて、もう一度押してください。' +
+                        '絵も写真も移動していないので、そのまま続けても大丈夫です。',
+                    )
+                  } finally {
+                    setArchiving(false)
+                  }
                 }}
               >
-                絵を片付けて次へ
+                {archiving ? '片付けています…' : '絵を片付けて次へ'}
               </button>
             </div>
-            {archived && (
+            {archiveError && <p className="note warn">{archiveError}</p>}
+            {archived && !archiveError && (
               <p className="note">
                 絵 {archived.pieces} 枚と、元のスキャン写真 {archived.scans} 枚を{' '}
                 <code>{archived.folder}</code> へ移しました。
@@ -475,9 +523,9 @@ export function App(): React.JSX.Element {
                 このフォルダを開けば、そのままの形で残っています。
               </p>
             )}
-            {pieces.length === 0 && !archived && (
+            {pieces.length === 0 && scanCount === 0 && !archived && (
               <p className="note">
-                絵が 1 枚も無いので、片付けるものがありません。
+                絵も、取り込みフォルダの写真も無いので、片付けるものがありません。
               </p>
             )}
 

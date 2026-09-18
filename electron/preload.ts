@@ -19,6 +19,7 @@ const api: AquariumApi = {
   updatePiece: (id: string, patch: UpdatePiecePatch) =>
     ipcRenderer.invoke('aquarium:updatePiece', id, patch),
   deletePiece: (id: string) => ipcRenderer.invoke('aquarium:deletePiece', id),
+  countScans: () => ipcRenderer.invoke('aquarium:countScans'),
   archiveEvent: (name: string) => ipcRenderer.invoke('aquarium:archiveEvent', name),
   rescan: () => ipcRenderer.invoke('aquarium:rescan'),
   toggleFullscreen: () => ipcRenderer.invoke('aquarium:toggleFullscreen'),

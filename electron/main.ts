@@ -203,6 +203,7 @@ app.whenReady().then(() => {
     (_event, id: string, patch: UpdatePiecePatch) => storage.updatePiece(id, patch),
   )
   ipcMain.handle('aquarium:deletePiece', (_event, id: string) => storage.deletePiece(id))
+  ipcMain.handle('aquarium:countScans', () => storage.countScans(storage.readSettings().watchFolder))
   ipcMain.handle('aquarium:archiveEvent', (_event, name: string) => {
     const result = storage.archiveEvent(name, storage.readSettings().watchFolder)
     // 取り込みフォルダが空になったので、見張りを張り直す
