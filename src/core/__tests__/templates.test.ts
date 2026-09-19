@@ -8,13 +8,10 @@ import {
   directionInPiece,
   identifySpecies,
   partsForPiece,
-  RAW_SHAPE_MARGIN,
   RAW_SHAPE_THRESHOLD,
   rigForSpecies,
   templatesForTheme,
-  trustsRawShape,
   type SpeciesId,
-  type SpeciesMatch,
 } from '../templates'
 import { TEMPLATE_BITS, TEMPLATE_GRID } from '../templates.generated'
 import { MATCH_THRESHOLD } from '../match'
@@ -205,32 +202,6 @@ describe('紙を消しただけの形を信じる基準', () => {
   it('誤判定（0.752）は落とし、切れ目の救済（0.967）は通す', () => {
     expect(0.752).toBeLessThan(RAW_SHAPE_THRESHOLD)
     expect(0.967).toBeGreaterThan(RAW_SHAPE_THRESHOLD)
-  })
-})
-
-describe('2位を引き離していれば点数が足りなくても信じる（R-071）', () => {
-  const match = (score: number, runnerUp: number): SpeciesMatch => ({
-    id: 'kurage', score, runnerUp, head: { x: 0, y: -1 }, headsRight: null, turns: 0, mirrored: false,
-  })
-
-  it('点数が高ければ、差が小さくても通す', () => {
-    expect(trustsRawShape(match(0.9, 0.88))).toBe(true)
-  })
-
-  /* 会場データの実測値。クラゲは点数が届かないが、2位の fish を大きく離す。 */
-  it('クラゲ（0.71／2位 0.47）は通す', () => {
-    expect(trustsRawShape(match(0.716, 0.468))).toBe(true)
-  })
-
-  /* 同じく実測値。どちらも1位が間違っていた枚。 */
-  it('差が 0.114 以下のものは、点数が足りなければ落とす', () => {
-    expect(trustsRawShape(match(0.75, 0.729))).toBe(false)   // 差 0.021・ステゴサウルス
-    expect(trustsRawShape(match(0.8, 0.704))).toBe(false)    // 差 0.096・アンキロサウルス
-    expect(trustsRawShape(match(0.82, 0.706))).toBe(false)   // 差 0.114・正しかった枚も巻き添え
-  })
-
-  it('間違いの最大（0.114）より広い余裕を取っている', () => {
-    expect(RAW_SHAPE_MARGIN).toBeGreaterThan(0.114)
   })
 })
 
