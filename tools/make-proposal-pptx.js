@@ -11,57 +11,29 @@ const SHOT_GALLERY = path.join(ROOT, 'docs/images/いろいろな絵.jpg')
 const OUT = path.join(ROOT, 'docs/お絵かき水族館-企画書.pptx')
 
 // 水槽の画面そのものから採った色。海の濃紺を主役に、明るい水色を差し色にする
-const DEEP = '062A3D'
-const SEA = '0B6FA4'
-const AQUA = '4FC3E8'
-const INK = '15242F'
-const MUTE = '5C6E7A'
-const LINE = 'D8E3EA'
-const TINT = 'EFF6FA'
-const WARM = 'E08A2E'
+const PALETTE = {
+  DEEP: '062A3D',
+  SEA: '0B6FA4',
+  AQUA: '4FC3E8',
+  INK: '15242F',
+  MUTE: '5C6E7A',
+  LINE: 'D8E3EA',
+  TINT: 'EFF6FA',
+  WARM: 'E08A2E',
+  SHADOW: '0B3B52',
+}
+const { DEEP, SEA, AQUA, INK, MUTE, LINE, TINT, WARM } = PALETTE
 // 恐竜側の差し色（平原の土と葉の色）
 const LAND = 'C9782B'
 const LEAF = '2E9E5B'
-
-const FONT = 'Meiryo'
-const W = 13.333
-const H = 7.5
-const M = 0.72
 
 const p = new pptx()
 p.layout = 'LAYOUT_WIDE'
 p.author = 'お絵かき水族館・お絵かきダイナソー'
 p.title = 'お絵かき水族館・お絵かきダイナソー 企画書'
 
-const shadow = () => ({ type: 'outer', color: '0B3B52', opacity: 0.12, blur: 10, offset: 2, angle: 90 })
-
-function slide(dark) {
-  const s = p.addSlide()
-  s.background = { color: dark ? DEEP : 'FFFFFF' }
-  return s
-}
-
-// 見出しは全スライド同じ位置。飾り線は使わず、余白と字の大きさだけで差をつける
-function heading(s, text, note) {
-  s.addText(text, {
-    x: M, y: 0.5, w: W - M * 2, h: 0.62, fontFace: FONT, fontSize: 32, bold: true,
-    color: INK, align: 'left', valign: 'middle', margin: 0,
-  })
-  if (note) {
-    s.addText(note, {
-      x: M, y: 1.16, w: W - M * 2, h: 0.36, fontFace: FONT, fontSize: 14,
-      color: MUTE, valign: 'middle', margin: 0,
-    })
-  }
-}
-
-function card(s, o) {
-  s.addShape(p.ShapeType.roundRect, {
-    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: 0.1,
-    fill: { color: o.fill || TINT }, line: { color: o.stroke || LINE, width: 1 },
-    shadow: o.flat ? undefined : shadow(),
-  })
-}
+// 見出し・カード・影は通年版とハロウィン版で共通（`tools/proposal-deck.js`）
+const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck')(p, PALETTE)
 
 /* ------------------------------------------------------------------ 1 表紙 */
 {
