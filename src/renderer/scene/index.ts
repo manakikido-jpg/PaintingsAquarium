@@ -4,6 +4,7 @@ import type { Scene } from './types'
 import { createAquariumScene } from './aquariumScene'
 import { createDinosaurScene } from './dinosaurScene'
 import { createDinosaurSceneVivid } from './dinosaurSceneVivid'
+import { createHalloweenScene } from './halloweenScene'
 
 /**
  * テーマから世界を作る。
@@ -17,6 +18,8 @@ export function createScene(
   dinosaurStyle: DinosaurStyle = DEFAULT_DINOSAUR_STYLE,
 ): Scene {
   switch (theme) {
+    case 'halloween':
+      return createHalloweenScene(tank, decorDensity)
     case 'dinosaur':
       return dinosaurStyle === 'vivid'
         ? createDinosaurSceneVivid(tank, decorDensity)

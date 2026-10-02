@@ -5,7 +5,7 @@
  * 変わるのは「どんな世界で、どう動かすか」だけ。設計は `docs/設計-テーマ.md`。
  */
 
-export type ThemeId = 'aquarium' | 'dinosaur' | 'space' | 'meadow' | 'night'
+export type ThemeId = 'aquarium' | 'dinosaur' | 'halloween' | 'space' | 'meadow' | 'night'
 
 /**
  * 絵の動き方。
@@ -27,6 +27,13 @@ export interface ThemeMeta {
 export const THEMES: readonly ThemeMeta[] = [
   { id: 'aquarium', name: '水族館', motion: 'float', ready: true },
   { id: 'dinosaur', name: '恐竜', motion: 'walk', ready: true },
+  /*
+   * **まだ台紙が無いので `ready: false`。** 設定画面には出さない。
+   * 世界（背景）だけ先に作ってある。台紙5種が確定したら true にする。
+   * ここを先に true にすると、会場で選べてしまい、
+   * 種類の付かない絵ばかりが漂う画面になる。
+   */
+  { id: 'halloween', name: 'ハロウィン', motion: 'float', ready: false },
   { id: 'space', name: '宇宙', motion: 'float', ready: false },
   { id: 'meadow', name: '森・草原', motion: 'flutter', ready: false },
   { id: 'night', name: '夜空', motion: 'rise', ready: false },
