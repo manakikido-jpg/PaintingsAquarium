@@ -9,7 +9,8 @@ const pptx = require('pptxgenjs')
 const path = require('path')
 
 const ROOT = '/home/user/PaintingsAquarium'
-const SHOT = path.join(ROOT, 'docs/images/画面-ハロウィン-開発中.jpg')
+const SHOT = path.join(ROOT, 'docs/images/画面-ハロウィン.jpg')
+const SHOT_COLORED = path.join(ROOT, 'docs/images/ハロウィン-塗った例.jpg')
 const SHOT_SHEETS = path.join(ROOT, 'docs/images/ハロウィン台紙5種.jpg')
 const SHOT_TRANSFORM = path.join(ROOT, 'docs/images/変換前後.jpg')
 const SHOT_GALLERY = path.join(ROOT, 'docs/images/いろいろな絵.jpg')
@@ -220,7 +221,8 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
   const s = slide(false)
   heading(s, '塗れるのは5種類です', '5種とも夜空を「浮く」動きで揃えています')
 
-  s.addImage({ path: SHOT_SHEETS, x: M, y: 1.68, w: W - M * 2, h: 2.36, shadow: shadow() })
+  s.addImage({ path: SHOT_SHEETS, x: M, y: 1.66, w: W - M * 2, h: 1.18, shadow: shadow() })
+  s.addImage({ path: SHOT_COLORED, x: M, y: 2.94, w: W - M * 2, h: 1.18, shadow: shadow() })
 
   const kinds = [
     ['かぼちゃ', 'E8653F', '夜空をゆっくり上下に漂います'],
@@ -231,7 +233,7 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
   ]
   kinds.forEach(([name, dot, desc], i) => {
     const x = M + i * 2.42
-    const y = 4.3
+    const y = 4.36
     card(s, { x, y, w: 2.22, h: 1.62, flat: true })
     s.addShape(p.ShapeType.ellipse, { x: x + 0.22, y: y + 0.26, w: 0.2, h: 0.2, fill: { color: dot } })
     s.addText(name, {
