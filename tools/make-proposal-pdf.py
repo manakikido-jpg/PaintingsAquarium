@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """企画書の HTML から、会場に渡す PDF を作る。
 
-    python3 tools/make-proposal-pdf.py
+    python3 tools/make-proposal-pdf.py              # 通年版（水族館・恐竜）
+    python3 tools/make-proposal-pdf.py --halloween  # ハロウィン版
 
 なぜこのスクリプトが要るか（手で印刷すると2回とも同じ失敗をした）:
 
@@ -23,8 +24,11 @@ import sys
 import urllib.parse
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCE = ROOT / 'docs' / '企画書.html'
-OUTPUT = ROOT / 'docs' / 'お絵かき水族館-企画書.pdf'
+# `--halloween` でハロウィン版を作る。工程（文字化け対策・フォント埋め込み）は共通
+SOURCES = {
+    False: (ROOT / 'docs' / '企画書.html', ROOT / 'docs' / 'お絵かき水族館-企画書.pdf'),
+    True: (ROOT / 'docs' / '企画書-ハロウィン.html', ROOT / 'docs' / 'お絵かきハロウィン-企画書.pdf'),
+}
 CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 FAMILIES = 'family=Noto+Sans+JP:wght@400;500;700&family=Zen+Maru+Gothic:wght@500;700'
 # 記号やラテン文字は本文に出てこなくても CSS の counter などで使う
@@ -59,7 +63,8 @@ def inline_fonts(html: str) -> str:
 
 
 def main() -> None:
-    html = SOURCE.read_text(encoding='utf-8')
+    source, output = SOURCES['--halloween' in sys.argv]
+    html = source.read_text(encoding='utf-8')
     printable = ROOT / 'docs' / '.企画書-印刷用.html'
     printable.write_text(inline_fonts(html), encoding='utf-8')
     done = subprocess.run([
@@ -67,12 +72,12 @@ def main() -> None:
         '--no-pdf-header-footer',
         # 埋め込み画像とフォントの読み込みを待たずに印刷すると白く抜ける
         '--virtual-time-budget=25000', '--run-all-compositor-stages-before-draw',
-        f'--print-to-pdf={OUTPUT}', printable.as_uri(),
+        f'--print-to-pdf={output}', printable.as_uri(),
     ], capture_output=True)
     printable.unlink()
-    if not OUTPUT.exists():
+    if not output.exists():
         sys.exit('PDF を作れませんでした\n' + done.stderr.decode()[-2000:])
-    print(f'{OUTPUT}  {OUTPUT.stat().st_size // 1024} KB')
+    print(f'{output}  {output.stat().st_size // 1024} KB')
 
 
 if __name__ == '__main__':
