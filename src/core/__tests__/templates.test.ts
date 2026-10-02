@@ -86,20 +86,25 @@ function tilted(image: RgbaImage, degrees: number): RgbaImage {
 }
 
 describe('台紙のデータ', () => {
-  it('水族館6種・恐竜5種がそろっている', () => {
-    expect(TEMPLATES).toHaveLength(11)
+  it('水族館6種・恐竜5種・ハロウィン5種がそろっている', () => {
+    expect(TEMPLATES).toHaveLength(16)
     expect(SPECIES_IDS.sort()).toEqual([
       'ankylosaurus',
       'brontosaurus',
       'fish',
+      'franken',
       'iruka',
+      'kabocha',
+      'koumori',
       'kurage',
+      'majo',
       'pteranodon',
       'same',
       'stegosaurus',
       'tako',
       'triceratops',
       'umigame',
+      'yurei',
     ])
   })
 

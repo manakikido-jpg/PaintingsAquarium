@@ -27,6 +27,15 @@ export const CROSS_SECONDS: Record<string, readonly [number, number]> = {
   kurage: [80, 140],
   // 空を滑るので、地面の恐竜より速い
   pteranodon: [14, 22],
+  /*
+   * ハロウィン。**全部ただようが、速さで性格を分ける。**
+   * ゆうれいがいちばん遅く、こうもりとまじょが夜空を横切る。
+   */
+  koumori: [18, 28],
+  majo: [20, 30],
+  kabocha: [55, 80],
+  franken: [50, 75],
+  yurei: [80, 140],
 }
 
 /** その種類の速さ（ピクセル毎秒）。 */

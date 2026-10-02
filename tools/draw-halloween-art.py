@@ -136,19 +136,25 @@ class Sheet:
 
 
 def kabocha():
-    """ほぼ円（比 1.0）。外へ出る出っぱりはヘタ1本だけ。顔は内側の線なので自由。"""
+    """**横に平たいかぼちゃ**（比 1.2 ほど）。出っぱりはヘタ1本だけ。
+
+    **真円にしてはいけない。** 実測で、真円のかぼちゃは「ただの四角」と
+    0.76 で重なり、合格点 0.70 を超えた（紙まるごとの切り抜きが
+    かぼちゃとして判定されうる）。横に平たくすると 0.60 まで落ちる。
+    本物のかぼちゃも横に平たいので、見た目にも無理がない。
+    """
     s = Sheet()
-    s.add(ellipse(0, 0.06, 0.62, 0.58))
-    s.add(poly([(-0.10, -0.44), (0.10, -0.44), (0.08, -0.72), (-0.02, -0.74), (-0.04, -0.46)]))
-    s.line(vcurve(-0.30, 0.06, 0.50, -0.10))               # 縦のうね（左右対称）
-    s.line(vcurve(0.30, 0.06, 0.50, 0.10))
-    s.line([(-0.32, -0.16), (-0.08, -0.16), (-0.20, 0.06)], closed=True)   # 目
-    s.line([(0.32, -0.16), (0.08, -0.16), (0.20, 0.06)], closed=True)
-    s.line([(-0.08, 0.10), (0.08, 0.10), (0, 0.21)], closed=True)          # 鼻
-    s.line([(-0.34, 0.27), (0.34, 0.27)] + s.arc_points(0, 0.27, 0.34, 0.24, 10, 170)[::-1],
+    s.add(ellipse(0, 0.10, 0.76, 0.48))
+    s.add(band((0.0, -0.30), (0.14, -0.66), 0.062))                 # 太く曲がったヘタ
+    for cx, bulge in ((-0.40, -0.10), (0.40, 0.10)):                # 縦のうね
+        s.line(vcurve(cx, 0.10, 0.42, bulge))
+    s.line([(-0.34, -0.08), (-0.12, -0.08), (-0.23, 0.10)], closed=True)   # 目
+    s.line([(0.34, -0.08), (0.12, -0.08), (0.23, 0.10)], closed=True)
+    s.line([(-0.08, 0.13), (0.08, 0.13), (0, 0.23)], closed=True)          # 鼻
+    s.line([(-0.40, 0.28), (0.40, 0.28)] + s.arc_points(0, 0.28, 0.40, 0.21, 10, 170)[::-1],
            closed=True)                                                     # 口
-    for cx in (-0.19, 0.0, 0.19):                                           # 歯
-        s.line([(cx - 0.05, 0.27), (cx - 0.05, 0.37), (cx + 0.05, 0.36), (cx + 0.05, 0.27)])
+    for cx in (-0.22, 0.0, 0.22):                                           # 歯
+        s.line([(cx - 0.05, 0.28), (cx - 0.05, 0.37), (cx + 0.05, 0.36), (cx + 0.05, 0.28)])
     return s
 
 
@@ -250,12 +256,17 @@ def franken():
 
 
 def main():
-    OUT.mkdir(parents=True, exist_ok=True)
+    import sys
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else OUT
+    want = sys.argv[2:]
+    out.mkdir(parents=True, exist_ok=True)
     for name, make in (('01_kabocha', kabocha), ('02_koumori', koumori), ('03_yurei', yurei),
                        ('04_majo', majo), ('05_franken', franken)):
-        w, h = make().render(OUT / f'{name}.png')
+        if want and name not in want:
+            continue
+        w, h = make().render(out / f'{name}.png')
         print(f'{name:12} 外接 {w}x{h}  比 {max(w, h) / min(w, h):.2f}')
-    print(f'→ {OUT}')
+    print(f'→ {out}')
 
 
 if __name__ == '__main__':

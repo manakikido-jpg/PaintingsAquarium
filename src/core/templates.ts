@@ -22,6 +22,11 @@ export type SpeciesId =
   | 'same'
   | 'kurage'
   | 'umigame'
+  | 'kabocha'
+  | 'koumori'
+  | 'yurei'
+  | 'majo'
+  | 'franken'
   | 'pteranodon'
   | 'ankylosaurus'
   | 'brontosaurus'
@@ -61,6 +66,7 @@ export interface SpeciesInfo {
 
 const SEA = 'aquarium' as const
 const LAND = 'dinosaur' as const
+const NIGHT = 'halloween' as const
 
 export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
   fish: { id: 'fish', label: '魚', theme: SEA, head: { x: -1, y: 0 }, swimsSideways: true },
@@ -82,6 +88,18 @@ export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
   brontosaurus: { id: 'brontosaurus', label: 'ブロントサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
   stegosaurus: { id: 'stegosaurus', label: 'ステゴサウルス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
   triceratops: { id: 'triceratops', label: 'トリケラトプス', theme: LAND, head: { x: -1, y: 0 }, swimsSideways: true },
+
+  /*
+   * ハロウィン。**5種とも正面向きか、頭が上**（`swimsSideways: false`）。
+   * 魔女だけは横向きだが、ほうきに乗っていて進む向きが決まっているので横向きにする。
+   * `flies` は使わない。**このテーマは全部ただよう**ので、飛ぶ種類という区別が要らない
+   *（混ぜると R-072 の型に戻る）。
+   */
+  kabocha: { id: 'kabocha', label: 'かぼちゃ', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
+  koumori: { id: 'koumori', label: 'こうもり', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
+  yurei: { id: 'yurei', label: 'ゆうれい', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
+  majo: { id: 'majo', label: 'まじょ', theme: NIGHT, head: { x: 1, y: 0 }, swimsSideways: true },
+  franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
 }
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[]
@@ -597,6 +615,17 @@ export const KIND_OF: Record<SpeciesId, CreatureKind> = {
   brontosaurus: 'fish',
   stegosaurus: 'fish',
   triceratops: 'fish',
+  /*
+   * ハロウィンは**しならせない**。
+   * かぼちゃ・フランケン・こうもりは胴が硬いものとして描かれていて、
+   * 魚のようにしなると「溶けている」ように見える。
+   * ゆうれいだけは裾が波打つので、触手のある生き物と同じ扱いにする。
+   */
+  kabocha: 'unknown',
+  koumori: 'unknown',
+  yurei: 'tentacled',
+  majo: 'unknown',
+  franken: 'unknown',
 }
 
 /**
@@ -674,6 +703,8 @@ const TIPS_DOWN: Partial<Record<SpeciesId, boolean>> = {
   kurage: true,
   // 上から見た絵。頭が上・尾が下なので、振れるのは下
   umigame: true,
+  // 顔が上、裾の波が下
+  yurei: true,
 }
 
 /**

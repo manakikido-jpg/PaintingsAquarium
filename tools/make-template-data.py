@@ -33,6 +33,12 @@ SPECIES = {
     '05_same': 'same',
     '06_kurage': 'kurage',
     '07_umigame': 'umigame',
+    # ハロウィン（assets/templates/halloween/）
+    '01_kabocha': 'kabocha',
+    '02_koumori': 'koumori',
+    '03_yurei': 'yurei',
+    '04_majo': 'majo',
+    '05_franken': 'franken',
     # 恐竜（assets/templates/dinosaur/）
     '11_pteranodon': 'pteranodon',
     '12_ankylosaurus': 'ankylosaurus',
