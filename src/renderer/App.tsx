@@ -273,16 +273,43 @@ export function App(): React.JSX.Element {
         dinosaurStyle={settings?.dinosaurStyle ?? 'plain'}
       />
 
-      {settings && settings.watchFolder !== null && forTheme.length === 0 && pieces.length > 0 && (
+      {/*
+        * **絵が1枚も出ていないときは、いまのテーマを大きく出す。**
+        *
+        * テーマが合っていないと、絵は**無言で**別テーマとして記録される。
+        * 気づかずにスキャンを続けると、あとで切り替えても絵が出てこない。
+        *
+        * **`pieces.length > 0` を条件に入れてはいけない。**
+        * 会期を片付けた翌朝は 0 枚から始まるので、
+        * **いちばん必要な場面（その日の1枚目を通す前）で出なくなる**。
+        * 押すものは増やさない。気づければそれでいい。
+        */}
+      {settings && settings.watchFolder !== null && forTheme.length === 0 && (
         <div className="setup">
-          <h1>このテーマの絵はまだありません</h1>
-          <p>
-            ほかのテーマに {pieces.length} 枚あります。絵はテーマごとに分かれているので、
-            <br />
-            このテーマの絵は、このテーマを選んだ状態で写真を入れると増えます。
-            <br />
-            テーマは <strong>S</strong> キーの設定画面で切り替えられます。
+          <p className="theme-now">
+            いまは <strong>{THEMES.find((theme) => theme.id === settings.theme)?.name}</strong> です
           </p>
+          {pieces.length > 0 ? (
+            <>
+              <h1>このテーマの絵はまだありません</h1>
+              <p>
+                ほかのテーマに {pieces.length} 枚あります。絵はテーマごとに分かれているので、
+                <br />
+                このテーマの絵は、このテーマを選んだ状態で写真を入れると増えます。
+                <br />
+                テーマは <strong>S</strong> キーの設定画面で切り替えられます。
+              </p>
+            </>
+          ) : (
+            <>
+              <h1>写真を入れると、ここに出ます</h1>
+              <p>
+                取り込みフォルダに写真が入るのを待っています。アプリの操作は要りません。
+                <br />
+                テーマが違うときは <strong>S</strong> キーの設定画面で切り替えてください。
+              </p>
+            </>
+          )}
         </div>
       )}
 

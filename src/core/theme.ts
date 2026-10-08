@@ -28,12 +28,10 @@ export const THEMES: readonly ThemeMeta[] = [
   { id: 'aquarium', name: '水族館', motion: 'float', ready: true },
   { id: 'dinosaur', name: '恐竜', motion: 'walk', ready: true },
   /*
-   * **まだ台紙が無いので `ready: false`。** 設定画面には出さない。
-   * 世界（背景）だけ先に作ってある。台紙5種が確定したら true にする。
-   * ここを先に true にすると、会場で選べてしまい、
-   * 種類の付かない絵ばかりが漂う画面になる。
+   * 台紙5種が確定し、実機で 15/15 正しく判定・正しい向きで出ることを
+   * 確認したので選べるようにした（2026-10-09）。
    */
-  { id: 'halloween', name: 'ハロウィン', motion: 'float', ready: false },
+  { id: 'halloween', name: 'ハロウィン', motion: 'float', ready: true },
   { id: 'space', name: '宇宙', motion: 'float', ready: false },
   { id: 'meadow', name: '森・草原', motion: 'flutter', ready: false },
   { id: 'night', name: '夜空', motion: 'rise', ready: false },
