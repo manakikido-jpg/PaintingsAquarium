@@ -5,7 +5,7 @@
 
 A4・300dpi。上にテーマの題を入れ、その下に生き物を大きく置く。
 
-  docs/お絵かき台紙-全11枚.pdf     ← **全部まとめて刷るとき**
+  docs/お絵かき台紙-全16枚.pdf     ← **全部まとめて刷るとき**
   docs/お絵かき水族館-台紙.pdf     水族館だけ（6ページ）
   docs/お絵かきダイナソー-台紙.pdf 恐竜だけ（5ページ）
   sheets/<テーマ>/<種類>.png       1枚ずつ要るとき（リポジトリには入れない）
@@ -98,6 +98,12 @@ THEMES = {
         'folder': ROOT / 'assets/templates/dinosaur',
         'pdf': 'お絵かきダイナソー-台紙.pdf',
     },
+    'halloween': {
+        'title': 'お絵かきハロウィン',
+        'lead': 'すきな いろで ぬってね',
+        'folder': ROOT / 'assets/templates/halloween',
+        'pdf': 'お絵かきハロウィン-台紙.pdf',
+    },
 }
 
 
@@ -174,7 +180,9 @@ def main() -> int:
             print(f'  → {pdf.name}  {len(pages)} ページ  {pdf.stat().st_size / 1024 / 1024:.1f}MB')
 
     if all_pages:
-        every = (ROOT / 'docs' if out == ROOT / 'sheets' else out) / 'お絵かき台紙-全11枚.pdf'
+        # 名前に枚数を入れる。テーマを足したとき、手で直し忘れて嘘の名前が残る
+        every = ((ROOT / 'docs' if out == ROOT / 'sheets' else out)
+                 / f'お絵かき台紙-全{len(all_pages)}枚.pdf')
         all_pages[0].save(
             every,
             save_all=True,
