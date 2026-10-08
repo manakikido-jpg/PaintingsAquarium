@@ -11,62 +11,57 @@ import type { Scene } from './types'
  * 「高級感＝暗く」と解釈して真っ黒に寄せ、絵が沈んだ（R-011 / R-013）。
  * 見せる先はプロジェクターではなく**モニター**なので、黒は本当に沈む。
  *
- * ハロウィンは夜が必然なので、ここは地雷の上を歩くことになる。逃げ方は4つ。
+ * 逃げ方は4つ。
+ *   1. **真っ黒にしない。** 空は藍から紫・桃へ。地平線は橙まで上げる。
+ *   2. **明かりの源を1つに決める。** 大きな橙の月。空の明暗も、丘の縁も、
+ *      雲の照り返しも、全部この月の位置から作る。
+ *   3. **絵の後ろに淡い光を戻す。** 水族館では撤去したが、記録は
+ *      「**暗い背景では効いた**が、明るい水では白く濁った」（2026-08-14）。
+ *   4. **遠いものほど空の色に溶かす。** 同じ暗さで塗ると切り絵のように平たくなる。
  *
- *   1. **真っ黒にしない。** 空は濃紺から紫へのグラデーションで、彩度を残す。
- *   2. **明かりの源を1つに決める。** 大きな満月。**空の明暗も、飾りの縁の光も、
- *      地面の照り返しも、全部この月の位置から作る。** 光源が1つに揃っていると、
- *      同じ暗さでも「空間」に見える（水族館で効いたのと同じ理屈・`drawWater`）。
- *   3. **絵の後ろに淡い光を戻す。** 水族館では撤去したが、記録はこう残っている
- *      ——「**暗い背景では効いたが**、明るい水では白く濁って絵の色が浅くなるだけだった」
- *      （2026-08-14）。ここは効いたほうの条件に当たる。
- *   4. **遠いものほど空の色に溶かす。** 飾りを全部同じ暗さで塗ると、
- *      切り絵を並べたように平たくなる。遠近は大きさだけでは出ない。
+ * **画面の真ん中は空けておく。** 参考画像はお城が画面中央にそびえているが、
+ * そのまま作ると**絵が漂う場所と正面衝突する**。お城は地平線へ下ろし、
+ * 家と木は左右の端と下だけに置く。主役は子どもの絵のほう。
  *
- * 飾りは**画面の下だけ**に集める（水族館・恐竜と同じ）。
- * 中央まで増やすと絵を見つけにくくなる。
+ * **画像を貼らずに描いている理由。** 貼ると 4K で甘くなり、
+ * 飾りの量つまみ（`decorDensity`）も絵の後ろの光も効かなくなる。
  */
 
-/** 夜空。真っ黒にしない。 */
-const SKY_TOP = '#17103A'
-const SKY_MID = '#331A5E'
-const SKY_LOW = '#5B2472'
-const SKY_HORIZON = '#8A3568'
+/** 夜空。上から下へ。真っ黒にしない。 */
+const SKY_TOP = '#241561'
+const SKY_MID = '#53268E'
+const SKY_LOW = '#8C3A93'
+const SKY_HORIZON = '#E07A62'
 
-/** 月。明かりの源はこれ1つだけ。 */
-const MOON = '#FFF4D2'
-const MOON_WARM = '255, 226, 160'
-/** 月の中心（画面に対する割合）。飾りの縁の光も地面の照り返しもここから作る。 */
-const MOON_X = 0.78
-const MOON_Y = 0.19
+/** 月。明かりの源はこれ1つ。地平線に近いところに低く置く。 */
+const MOON_CORE = '#FFD98A'
+const MOON_EDGE = '#FFA93A'
+const MOON_WARM = '255, 176, 70'
+const MOON_X = 0.5
+const MOON_Y = 0.46
+const MOON_R = 0.2
 
-/** 遠くの丘と地面。空より暗く、しかし黒ではない。 */
-const HILL_FAR = '#3E2259'
-const HILL_NEAR = '#2A1540'
-const GROUND = '#1E0F31'
+/** 雲。月に近い側だけ明るい桃色になる。 */
+const CLOUD_DARK = '170, 96, 186'
+const CLOUD_LIT = '246, 158, 196'
 
-/*
- * 飾りの色。**絵より一段くすませる**（恐竜・水族館と同じ約束）。
- * 子どもの絵のほうが鮮やかでないと、飾りに目が行ってしまう。
- */
-const PUMPKIN = '#C9671F'
-const PUMPKIN_DARK = '#93460F'
-const STONE = '#6E6484'
-const STONE_DARK = '#4A4260'
-const TRUNK = '#1F1029'
+/** 丘。遠いほど明るく（空に溶ける）、手前ほど沈む。 */
+const HILL_FAR = '#7A51B4'
+const HILL_MID = '#57368F'
+const HILL_NEAR = '#3C2468'
+const GROUND = '#2A1750'
 
-const STAR_COUNT = 110
-const SPARKLE_COUNT = 7
-const CLOUD_COUNT = 4
-/*
- * **飾りは絵より小さく、少なく。**
- * 最初は墓石7・かぼちゃ8で作ったが、画面の下が飾りの壁になり、
- * **飾りのかぼちゃと、子どもが描いたかぼちゃが同じ大きさ**になった。
- * 主役は絵のほうなので、数も大きさも落としてある。
- */
-const TOMBSTONE_COUNT = 5
-const TREE_COUNT = 3
-const PUMPKIN_COUNT = 5
+/** 建物。シルエットは沈め、窓の灯りだけを暖色で出す。 */
+const BUILDING = '#2E1A57'
+const BUILDING_LIT = '#3A2268'
+const WINDOW = '#FFC94D'
+const TREE = '#1C1033'
+
+const STAR_COUNT = 120
+const SPARKLE_COUNT = 8
+const CLOUD_COUNT = 7
+const HOUSE_COUNT = 9
+const TREE_COUNT = 4
 
 interface Star {
   readonly x: number
@@ -85,7 +80,6 @@ interface Cloud {
   readonly alpha: number
 }
 
-/** 飾り1つ。`depth` は 0 が遠く、1 が手前。遠いものほど小さく、空の色に溶ける。 */
 interface Placed {
   readonly x: number
   readonly scale: number
@@ -101,30 +95,26 @@ function hex(color: string): [number, number, number] {
   ]
 }
 
-/** 2色を混ぜる。遠くの飾りを空の色へ溶かすのに使う（遠近は大きさだけでは出ない）。 */
+/** 2色を混ぜる。遠くのものを空へ溶かすのに使う（遠近は大きさだけでは出ない）。 */
 function mix(a: string, b: string, t: number): string {
   const [ar, ag, ab] = hex(a)
   const [br, bg, bb] = hex(b)
-  const r = Math.round(ar + (br - ar) * t)
-  const g = Math.round(ag + (bg - ag) * t)
-  const bl = Math.round(ab + (bb - ab) * t)
-  return `rgb(${r}, ${g}, ${bl})`
+  return `rgb(${Math.round(ar + (br - ar) * t)}, ${Math.round(ag + (bg - ag) * t)}, ${
+    Math.round(ab + (bb - ab) * t)})`
 }
 
 /** なだらかな稜線。正弦波3本の和で、繰り返しに見えないようにする。 */
 function ridge(seed: number, tank: Tank, baseY: number, amplitude: number): number[] {
   const random = seededRandom(seed)
   const waves = Array.from({ length: 3 }, (_, index) => ({
-    length: tank.width / (0.8 + index * 1.7),
+    length: tank.width / (0.7 + index * 1.6),
     height: amplitude / (index + 1),
     phase: random() * Math.PI * 2,
   }))
-  return Array.from({ length: 64 }, (_, index) => {
-    const x = (index / 63) * tank.width
+  return Array.from({ length: 72 }, (_, index) => {
+    const x = (index / 71) * tank.width
     let y = baseY
-    for (const wave of waves) {
-      y -= Math.sin((x / wave.length) * Math.PI * 2 + wave.phase) * wave.height
-    }
+    for (const wave of waves) y -= Math.sin((x / wave.length) * Math.PI * 2 + wave.phase) * wave.height
     return y
   })
 }
@@ -143,9 +133,9 @@ function ridgeAt(points: number[], tank: Tank, x: number): number {
   return points[i] + (points[i + 1] - points[i]) * (t - i)
 }
 
-/** 稜線の上端だけを月明かりで縁取る。無いと丘が1枚の板に見える。 */
+/** 稜線の上端を月明かりで縁取る。月のまわりだけ。全幅に引くと電線に見える。 */
 function rimLight(context: CanvasRenderingContext2D, points: number[], tank: Tank,
-                  color: string, width: number, alpha: number): void {
+                  width: number, alpha: number): void {
   const moonX = tank.width * MOON_X
   context.save()
   context.lineWidth = width
@@ -154,16 +144,10 @@ function rimLight(context: CanvasRenderingContext2D, points: number[], tank: Tan
     if (index === 0) return
     const x0 = ((index - 1) / (points.length - 1)) * tank.width
     const x1 = (index / (points.length - 1)) * tank.width
-    // 月に近いところほど強く光る
-    /*
-     * **月のまわりだけ光らせる。**
-     * 最初は端まで同じ強さで引いていて、稜線をなぞる白い線＝電線に見えた。
-     * 月から離れたところは 0 まで落とし、近くだけ残す。
-     */
-    const near = 1 - Math.min(1, Math.abs((x0 + x1) / 2 - moonX) / (tank.width * 0.42))
+    const near = 1 - Math.min(1, Math.abs((x0 + x1) / 2 - moonX) / (tank.width * 0.45))
     const lit = near * near * near
     if (lit < 0.02) return
-    context.strokeStyle = color.replace('ALPHA', String(lit * alpha))
+    context.strokeStyle = `rgba(255, 206, 150, ${lit * alpha})`
     context.beginPath()
     context.moveTo(x0, points[index - 1])
     context.lineTo(x1, y)
@@ -175,24 +159,28 @@ function rimLight(context: CanvasRenderingContext2D, points: number[], tank: Tan
 function drawMoon(context: CanvasRenderingContext2D, tank: Tank, strength: number): void {
   const cx = tank.width * MOON_X
   const cy = tank.height * MOON_Y
-  const r = Math.min(tank.width, tank.height) * 0.105
+  const r = Math.min(tank.width, tank.height) * MOON_R
 
-  // まわりのぼんやりした明かり。`filter: blur()` は大画面で重いので使わない（R-012）
-  const halo = context.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 6.5)
-  halo.addColorStop(0, `rgba(${MOON_WARM}, ${0.30 * strength})`)
-  halo.addColorStop(0.28, `rgba(${MOON_WARM}, ${0.11 * strength})`)
+  // まわりの明かり。`filter: blur()` は大画面で重いので使わない（R-012）
+  const halo = context.createRadialGradient(cx, cy, r * 0.85, cx, cy, r * 4.2)
+  halo.addColorStop(0, `rgba(${MOON_WARM}, ${0.42 * strength})`)
+  halo.addColorStop(0.3, `rgba(${MOON_WARM}, ${0.14 * strength})`)
   halo.addColorStop(1, `rgba(${MOON_WARM}, 0)`)
   context.fillStyle = halo
   context.fillRect(0, 0, tank.width, tank.height)
 
+  // 月そのもの。中心を明るく、縁を橙に落とす（平らな円だとシールに見える）
+  const body = context.createRadialGradient(cx - r * 0.2, cy - r * 0.25, r * 0.1, cx, cy, r)
+  body.addColorStop(0, MOON_CORE)
+  body.addColorStop(1, MOON_EDGE)
+  context.fillStyle = body
   context.beginPath()
   context.arc(cx, cy, r, 0, Math.PI * 2)
-  context.fillStyle = MOON
   context.fill()
 
-  // 月のくぼみ。月だと分かる最低限だけ。描き込むと絵より目立つ
-  context.fillStyle = 'rgba(221, 203, 156, 0.5)'
-  for (const [dx, dy, dr] of [[-0.30, -0.18, 0.20], [0.26, 0.10, 0.15], [-0.08, 0.34, 0.11]]) {
+  context.fillStyle = 'rgba(214, 138, 50, 0.32)'
+  for (const [dx, dy, dr] of [[-0.34, -0.2, 0.17], [0.3, 0.06, 0.13], [-0.06, 0.36, 0.1],
+                              [0.14, -0.4, 0.08], [-0.46, 0.22, 0.07]]) {
     context.beginPath()
     context.arc(cx + r * dx, cy + r * dy, r * dr, 0, Math.PI * 2)
     context.fill()
@@ -200,33 +188,25 @@ function drawMoon(context: CanvasRenderingContext2D, tank: Tank, strength: numbe
 }
 
 /**
- * 細くたなびく雲。**月に近い側だけ明るい。**
- * 月を横切る雲があるだけで夜空が静止画に見えなくなる。
- * 絵と同じ高さには出さない（絵が霞む）。
+ * たなびく雲。**縁を出さない。**
+ * 横長の楕円に円形のグラデーションを掛けると、上下だけ急に切れて
+ * 空に硬い円盤が浮いて見えた（UFO のように見える）。座標系ごと潰して正円で塗る。
  */
 function drawCloud(context: CanvasRenderingContext2D, tank: Tank, x: number, y: number,
                    w: number, h: number, alpha: number): void {
-  /*
-   * **縁を出さないこと。**
-   * 最初は横長の楕円に**円形の**グラデーションを掛けていた。
-   * 楕円を縦に潰すと、グラデーションは潰れないので**上下だけ急に切れ**、
-   * 空に硬い円盤が浮いて見えた（UFO のように見える）。
-   * 座標系ごと潰してから正円で塗れば、ぼけ方も一緒に潰れて縁が出ない。
-   */
-  const moonX = tank.width * MOON_X
-  const lit = 1 - Math.min(1, Math.abs(x - moonX) / (tank.width * 0.7))
+  const lit = 1 - Math.min(1, Math.abs(x - tank.width * MOON_X) / (tank.width * 0.55))
   for (let i = 0; i < 2; i++) {
     const cx = x + w * (i - 0.5) * 0.45
     const cy = y + h * (i - 0.5) * 0.5
     const rx = w * (0.62 - i * 0.12)
-    const ry = h * (1.0 - i * 0.15)
+    const ry = h * (1 - i * 0.15)
     context.save()
     context.translate(cx, cy)
     context.scale(1, ry / rx)
     const g = context.createRadialGradient(0, 0, 0, 0, 0, rx)
-    g.addColorStop(0, `rgba(222, 206, 243, ${alpha * (0.45 + lit * 0.75)})`)
-    g.addColorStop(0.45, `rgba(200, 180, 230, ${alpha * 0.35})`)
-    g.addColorStop(1, 'rgba(190, 170, 222, 0)')
+    g.addColorStop(0, `rgba(${lit > 0.4 ? CLOUD_LIT : CLOUD_DARK}, ${alpha * (0.5 + lit * 0.8)})`)
+    g.addColorStop(0.45, `rgba(${CLOUD_DARK}, ${alpha * 0.4})`)
+    g.addColorStop(1, `rgba(${CLOUD_DARK}, 0)`)
     context.fillStyle = g
     context.beginPath()
     context.arc(0, 0, rx, 0, Math.PI * 2)
@@ -235,62 +215,99 @@ function drawCloud(context: CanvasRenderingContext2D, tank: Tank, x: number, y: 
   }
 }
 
-
-function drawTombstone(context: CanvasRenderingContext2D, tank: Tank, x: number, y: number,
-                       s: number, kind: number, depth: number): void {
-  const w = s * 0.62
-  const h = s
-  const face = mix(STONE, HILL_NEAR, 1 - depth)
-  const shade = mix(STONE_DARK, HILL_NEAR, 1 - depth)
-  context.fillStyle = face
-  if (kind === 0) {
-    context.beginPath()
-    context.moveTo(x - w / 2, y)
-    context.lineTo(x - w / 2, y - h * 0.62)
-    context.arc(x, y - h * 0.62, w / 2, Math.PI, 0)
-    context.lineTo(x + w / 2, y)
-    context.closePath()
-    context.fill()
-    context.fillStyle = shade
-    context.fillRect(x - w * 0.26, y - h * 0.50, w * 0.52, h * 0.08)
-    context.fillRect(x - w * 0.20, y - h * 0.34, w * 0.40, h * 0.07)
-  } else {
-    context.fillRect(x - w * 0.16, y - h, w * 0.32, h)
-    context.fillRect(x - w * 0.55, y - h * 0.76, w * 1.10, h * 0.24)
-  }
-
-  // 月に向いた側の縁だけ光らせる。光源が1つに揃っていると立体に見える
-  const side = x < tank.width * MOON_X ? 1 : -1
-  context.fillStyle = `rgba(255, 238, 198, ${0.30 * depth})`
-  if (kind === 0) {
-    context.fillRect(x + side * w * 0.42, y - h * 0.62, w * 0.08, h * 0.62)
-  } else {
-    context.fillRect(x + side * w * 0.10, y - h, w * 0.06, h)
-  }
+/** 窓の灯り。四角を塗るだけだと点に見えるので、外へにじませる。 */
+function litWindow(context: CanvasRenderingContext2D, x: number, y: number,
+                   w: number, h: number): void {
+  const g = context.createRadialGradient(x + w / 2, y + h / 2, 0, x + w / 2, y + h / 2, w * 2.6)
+  g.addColorStop(0, 'rgba(255, 201, 77, 0.55)')
+  g.addColorStop(1, 'rgba(255, 201, 77, 0)')
+  context.fillStyle = g
+  context.fillRect(x - w * 2.6, y - w * 2.6, w * 5.2 + w, w * 5.2 + h)
+  context.fillStyle = WINDOW
+  context.fillRect(x, y, w, h)
 }
 
-function drawDeadTree(context: CanvasRenderingContext2D, x: number, y: number, s: number,
-                      lean: number, depth: number): void {
-  /*
-   * **幹を1本と、上半分からの又だけ。**
-   * 最初は幹の下のほうから長い枝を4本伸ばしたが、交差した棒に見えて
-   * 木に見えなかった（海藻が「竹串」に見えた R-009 と同じ型）。
-   * 枝は**上へ向かって短く又に分かれる**形にする。
-   */
-  context.strokeStyle = mix(TRUNK, HILL_NEAR, 1 - depth)
+/**
+ * お城。**地平線に下ろして、画面の真ん中を空ける。**
+ * 参考画像では中央にそびえているが、そこは絵が漂う場所なので譲る。
+ */
+function drawCastle(context: CanvasRenderingContext2D, x: number, baseY: number,
+                    s: number): void {
+  const tower = (tx: number, w: number, h: number, roof: number): void => {
+    context.fillStyle = BUILDING
+    context.fillRect(x + tx - w / 2, baseY - h, w, h)
+    context.beginPath()
+    context.moveTo(x + tx - w * 0.72, baseY - h)
+    context.lineTo(x + tx, baseY - h - roof)
+    context.lineTo(x + tx + w * 0.72, baseY - h)
+    context.closePath()
+    context.fill()
+    for (let i = 0; i < Math.max(1, Math.round(h / (s * 0.26))); i++) {
+      litWindow(context, x + tx - w * 0.12, baseY - h + s * 0.14 + i * s * 0.26,
+                w * 0.24, s * 0.12)
+    }
+  }
+  // 本体
+  context.fillStyle = BUILDING_LIT
+  context.fillRect(x - s * 0.52, baseY - s * 0.62, s * 1.04, s * 0.62)
+  tower(-s * 0.62, s * 0.22, s * 0.74, s * 0.3)
+  tower(s * 0.62, s * 0.22, s * 0.74, s * 0.3)
+  tower(-s * 0.3, s * 0.2, s * 0.92, s * 0.26)
+  tower(s * 0.3, s * 0.2, s * 0.92, s * 0.26)
+  tower(0, s * 0.28, s * 1.2, s * 0.4)
+  // 月を背負っているので、輪郭のきわだけ明るくする（真っ黒だと板に見える）
+  context.strokeStyle = 'rgba(255, 196, 120, 0.5)'
+  context.lineWidth = Math.max(1, s * 0.012)
+  context.beginPath()
+  context.moveTo(x - s * 0.52, baseY - s * 0.62)
+  context.lineTo(x + s * 0.52, baseY - s * 0.62)
+  context.stroke()
+
+  // 門。中から光がもれる
+  const gate = context.createLinearGradient(0, baseY - s * 0.3, 0, baseY)
+  gate.addColorStop(0, 'rgba(255, 201, 77, 0.9)')
+  gate.addColorStop(1, 'rgba(255, 170, 60, 0.35)')
+  context.fillStyle = gate
+  context.beginPath()
+  context.moveTo(x - s * 0.1, baseY)
+  context.lineTo(x - s * 0.1, baseY - s * 0.22)
+  context.arc(x, baseY - s * 0.22, s * 0.1, Math.PI, 0)
+  context.lineTo(x + s * 0.1, baseY)
+  context.closePath()
+  context.fill()
+}
+
+/** 村の家。窓の灯りが**画面の下の帯**をつくる。 */
+function drawHouse(context: CanvasRenderingContext2D, x: number, baseY: number, s: number,
+                   depth: number, flip: number): void {
+  const body = mix(BUILDING, HILL_FAR, (1 - depth) * 0.7)
+  context.fillStyle = body
+  context.fillRect(x - s * 0.5, baseY - s * 0.56, s, s * 0.56)
+  context.beginPath()
+  context.moveTo(x - s * 0.62, baseY - s * 0.54)
+  context.lineTo(x + flip * s * 0.06, baseY - s * 0.95)
+  context.lineTo(x + s * 0.62, baseY - s * 0.54)
+  context.closePath()
+  context.fill()
+  context.fillRect(x + flip * s * 0.3, baseY - s * 0.92, s * 0.12, s * 0.3)   // 煙突
+  litWindow(context, x - s * 0.3, baseY - s * 0.42, s * 0.2, s * 0.2)
+  if (depth > 0.4) litWindow(context, x + s * 0.1, baseY - s * 0.42, s * 0.2, s * 0.2)
+}
+
+/** 枯れ木。幹1本と、上半分からの又だけ（下から長い枝を出すと交差した棒に見える）。 */
+function drawTree(context: CanvasRenderingContext2D, x: number, y: number, s: number,
+                  lean: number, color: string): void {
+  context.strokeStyle = color
   context.lineCap = 'round'
   context.lineJoin = 'round'
-
-  const topX = x + lean * s * 0.10
+  const topX = x + lean * s * 0.1
   const topY = y - s * 0.58
-  context.lineWidth = s * 0.10
+  context.lineWidth = s * 0.1
   context.beginPath()
   context.moveTo(x, y)
   context.quadraticCurveTo(x + lean * s * 0.03, y - s * 0.3, topX, topY)
   context.stroke()
-
-  const forks: [number, number][] = [[-0.52, -0.40], [0.46, -0.44], [-0.06, -0.52]]
-  for (const [dx, dy] of forks) {
+  for (const [dx, dy] of [[-0.52, -0.4], [0.46, -0.44], [-0.06, -0.52]] as const) {
     const ex = topX + s * dx
     const ey = topY + s * dy
     context.lineWidth = s * 0.055
@@ -303,54 +320,10 @@ function drawDeadTree(context: CanvasRenderingContext2D, x: number, y: number, s
       context.beginPath()
       context.moveTo(ex, ey)
       context.quadraticCurveTo(ex + s * dx * 0.2, ey - s * 0.08,
-                               ex + s * (dx * 0.22 + t * 0.10), ey - s * 0.20)
+                               ex + s * (dx * 0.22 + t * 0.1), ey - s * 0.2)
       context.stroke()
     }
   }
-}
-
-function drawPumpkin(context: CanvasRenderingContext2D, tank: Tank, x: number, y: number,
-                     s: number, lit: boolean, depth: number): void {
-  context.fillStyle = mix(PUMPKIN, HILL_NEAR, (1 - depth) * 0.8)
-  context.beginPath()
-  context.ellipse(x, y - s * 0.44, s * 0.58, s * 0.44, 0, 0, Math.PI * 2)
-  context.fill()
-  context.fillStyle = mix(PUMPKIN_DARK, HILL_NEAR, (1 - depth) * 0.8)
-  for (const dx of [-0.30, 0.30]) {
-    context.beginPath()
-    context.ellipse(x + s * dx, y - s * 0.44, s * 0.14, s * 0.42, 0, 0, Math.PI * 2)
-    context.fill()
-  }
-  context.fillStyle = mix(TRUNK, HILL_NEAR, 1 - depth)
-  context.fillRect(x - s * 0.06, y - s * 1.02, s * 0.12, s * 0.18)
-
-  // 月に向いた側の照り返し
-  const side = x < tank.width * MOON_X ? 1 : -1
-  const g = context.createRadialGradient(
-    x + side * s * 0.3, y - s * 0.56, s * 0.04, x + side * s * 0.3, y - s * 0.56, s * 0.5)
-  g.addColorStop(0, `rgba(255, 228, 176, ${0.28 * depth})`)
-  g.addColorStop(1, 'rgba(255, 228, 176, 0)')
-  context.fillStyle = g
-  context.beginPath()
-  context.ellipse(x, y - s * 0.44, s * 0.58, s * 0.44, 0, 0, Math.PI * 2)
-  context.fill()
-
-  // 灯りが入っているものだけ顔を出す。全部に顔を付けると画面の下がうるさい
-  if (!lit) return
-  context.fillStyle = `rgba(255, 216, 130, ${0.55 + 0.45 * depth})`
-  context.beginPath()
-  context.moveTo(x - s * 0.26, y - s * 0.52)
-  context.lineTo(x - s * 0.10, y - s * 0.52)
-  context.lineTo(x - s * 0.18, y - s * 0.36)
-  context.closePath()
-  context.fill()
-  context.beginPath()
-  context.moveTo(x + s * 0.26, y - s * 0.52)
-  context.lineTo(x + s * 0.10, y - s * 0.52)
-  context.lineTo(x + s * 0.18, y - s * 0.36)
-  context.closePath()
-  context.fill()
-  context.fillRect(x - s * 0.22, y - s * 0.30, s * 0.44, s * 0.09)
 }
 
 /** ハロウィン。絵は夜空をただよう。 */
@@ -360,49 +333,58 @@ export function createHalloweenScene(tank: Tank, decorDensity = 1): Scene {
 
   const stars: Star[] = Array.from({ length: STAR_COUNT }, () => ({
     x: random() * tank.width,
-    y: random() * tank.height * 0.66,
+    y: random() * tank.height * 0.6,
     radius: Math.max(1, random() * tank.height * 0.0026),
     phase: random() * Math.PI * 2,
     speed: 0.5 + random() * 1.1,
   }))
   const sparkles: Star[] = Array.from({ length: SPARKLE_COUNT }, () => ({
     x: random() * tank.width,
-    y: random() * tank.height * 0.5,
+    y: random() * tank.height * 0.45,
     radius: tank.height * (0.006 + random() * 0.004),
     phase: random() * Math.PI * 2,
     speed: 0.3 + random() * 0.4,
   }))
   const clouds: Cloud[] = Array.from({ length: CLOUD_COUNT }, (_, index) => ({
-    y: tank.height * (0.10 + random() * 0.42),
-    width: tank.width * (0.26 + random() * 0.26),
-    height: tank.height * (0.020 + random() * 0.022),
-    speed: tank.width * (0.0032 + random() * 0.0040),
-    offset: (index / CLOUD_COUNT + random() * 0.15) * tank.width * 1.6,
-    alpha: 0.10 + random() * 0.09,
+    y: tank.height * (0.06 + random() * 0.44),
+    width: tank.width * (0.22 + random() * 0.26),
+    height: tank.height * (0.018 + random() * 0.024),
+    speed: tank.width * (0.003 + random() * 0.004),
+    offset: (index / CLOUD_COUNT + random() * 0.12) * tank.width * 1.6,
+    alpha: 0.16 + random() * 0.14,
   }))
 
-  const hillFar = ridge(7711, tank, tank.height * 0.74, tank.height * 0.055)
-  const hillNear = ridge(2240, tank, tank.height * 0.82, tank.height * 0.040)
-  const ground = ridge(9182, tank, tank.height * 0.90, tank.height * 0.018)
+  const hillFar = ridge(7711, tank, tank.height * 0.66, tank.height * 0.05)
+  const hillMid = ridge(4409, tank, tank.height * 0.74, tank.height * 0.042)
+  const hillNear = ridge(2240, tank, tank.height * 0.83, tank.height * 0.034)
+  const ground = ridge(9182, tank, tank.height * 0.92, tank.height * 0.016)
   const groundY = (x: number): number => ridgeAt(ground, tank, x)
 
-  const place = (count: number, seed: number): Placed[] => {
-    const r = seededRandom(seed)
-    return Array.from({ length: count }, (_, index) => {
-      const depth = r()
-      return {
-        x: ((index + 0.5) / count) * tank.width + (r() - 0.5) * (tank.width / count) * 0.7,
-        // 遠いものほど小さく。大きさと色の両方を動かさないと遠近が出ない
-        scale: (0.62 + depth * 0.62) * (0.88 + r() * 0.28),
-        kind: r() < 0.3 ? 1 : 0,
-        depth,
-      }
-    })
-  }
-  const stones = place(many(TOMBSTONE_COUNT), 5512)
-  const trees = place(many(TREE_COUNT), 8831)
-  const pumpkins = place(many(PUMPKIN_COUNT), 1177)
-  // 遠いものから描く。手前のものが上に重なって、重なりでも奥行きが出る
+  /*
+   * 家は**左右の端に寄せる**。真ん中はお城と、その上を漂う絵のために空ける。
+   */
+  const houses: Placed[] = Array.from({ length: many(HOUSE_COUNT) }, (_, index) => {
+    const r = seededRandom(5512 + index * 97)
+    const side = index % 2 === 0 ? -1 : 1
+    const t = r()
+    return {
+      x: tank.width * (0.5 + side * (0.2 + t * 0.32)),
+      scale: 0.7 + r() * 0.6,
+      kind: r() < 0.5 ? 1 : -1,
+      depth: r(),
+    }
+  })
+  const trees: Placed[] = Array.from({ length: many(TREE_COUNT) }, (_, index) => {
+    const r = seededRandom(8831 + index * 131)
+    const side = index % 2 === 0 ? -1 : 1
+    return {
+      // 端に寄せる。中央に掛かると絵と重なる
+      x: tank.width * (0.5 + side * (0.42 + r() * 0.14)),
+      scale: 0.72 + r() * 0.36,
+      kind: side,
+      depth: 0.9,
+    }
+  })
   const byDepth = (list: Placed[]): Placed[] => [...list].sort((a, b) => a.depth - b.depth)
 
   let staticStrength = -1
@@ -410,27 +392,24 @@ export function createHalloweenScene(tank: Tank, decorDensity = 1): Scene {
   let groundLayer: BakedLayer | null = null
 
   const paintSky = (context: CanvasRenderingContext2D, strength: number): void => {
-    const sky = context.createLinearGradient(0, 0, 0, tank.height)
+    const sky = context.createLinearGradient(0, 0, 0, tank.height * 0.78)
     sky.addColorStop(0, SKY_TOP)
-    sky.addColorStop(0.40, SKY_MID)
-    sky.addColorStop(0.74, SKY_LOW)
+    sky.addColorStop(0.42, SKY_MID)
+    sky.addColorStop(0.78, SKY_LOW)
     sky.addColorStop(1, SKY_HORIZON)
     context.fillStyle = sky
     context.fillRect(0, 0, tank.width, tank.height)
 
     /*
-     * **月を中心にした明暗。** 縦のグラデーションだけだと、
-     * どの高さも横一直線に同じ明るさになり、空が「壁紙」に見える。
-     * 光源の位置から明暗を作ると、同じ色でも空間に見える
-     *（水族館の `drawWater` で効いたのと同じ理屈）。
+     * **月を中心にした明暗。** 縦のグラデーションだけだと、どの高さも
+     * 横一直線に同じ明るさになり、空が壁紙に見える。
      */
     const depth = context.createRadialGradient(
       tank.width * MOON_X, tank.height * MOON_Y, tank.height * 0.05,
-      tank.width * MOON_X, tank.height * MOON_Y, Math.hypot(tank.width, tank.height) * 0.95)
-    // 月から遠い隅ほど沈める（#0D0822 ＝ 空のいちばん深い色）
-    depth.addColorStop(0, 'rgba(13, 8, 34, 0)')
-    depth.addColorStop(0.45, `rgba(13, 8, 34, ${0.18 * strength})`)
-    depth.addColorStop(1, `rgba(13, 8, 34, ${0.62 * strength})`)
+      tank.width * MOON_X, tank.height * MOON_Y, Math.hypot(tank.width, tank.height) * 0.78)
+    depth.addColorStop(0, 'rgba(20, 10, 48, 0)')
+    depth.addColorStop(0.45, `rgba(20, 10, 48, ${0.2 * strength})`)
+    depth.addColorStop(1, `rgba(20, 10, 48, ${0.66 * strength})`)
     context.fillStyle = depth
     context.fillRect(0, 0, tank.width, tank.height)
 
@@ -438,52 +417,62 @@ export function createHalloweenScene(tank: Tank, decorDensity = 1): Scene {
   }
 
   const paintGround = (context: CanvasRenderingContext2D, strength: number): void => {
-    ridgePath(context, hillFar, tank)
-    context.fillStyle = HILL_FAR
-    context.fill()
-    rimLight(context, hillFar, tank, 'rgba(255, 228, 180, ALPHA)',
-             Math.max(1.5, tank.height * 0.0022), 0.26 * strength)
+    for (const [points, color, rim] of [
+      [hillFar, HILL_FAR, 0.3], [hillMid, HILL_MID, 0.26], [hillNear, HILL_NEAR, 0.22],
+    ] as const) {
+      ridgePath(context, points, tank)
+      context.fillStyle = color
+      context.fill()
+      rimLight(context, points, tank, Math.max(1.5, tank.height * 0.0025), rim * strength)
+    }
 
-    ridgePath(context, hillNear, tank)
-    context.fillStyle = HILL_NEAR
-    context.fill()
-    rimLight(context, hillNear, tank, 'rgba(255, 224, 176, ALPHA)',
-             Math.max(1.5, tank.height * 0.0025), 0.22 * strength)
+    /*
+     * お城。**小さく、丘の上に置く。**
+     * 参考画像では画面中央にそびえているが、そのまま作ると
+     * **絵が漂う場所と正面衝突する**（実機で確認した）。月の手前に収まる大きさまで下げる。
+     */
+    const castleBase = ridgeAt(hillMid, tank, tank.width * 0.5) + tank.height * 0.015
+    drawCastle(context, tank.width * 0.5, castleBase, tank.height * 0.125)
 
     ridgePath(context, ground, tank)
     context.fillStyle = GROUND
     context.fill()
 
-    /*
-     * 月の真下あたりの地面だけ明るくする（照り返し）。
-     * 地面が一様だと、下半分がただの暗い帯になる。
-     */
+    // 月の真下の地面を明るく。一様だと下半分がただの暗い帯になる
     const pool = context.createRadialGradient(
-      tank.width * MOON_X, tank.height * 0.92, tank.height * 0.02,
-      tank.width * MOON_X, tank.height * 0.92, tank.width * 0.5)
-    pool.addColorStop(0, `rgba(255, 220, 170, ${0.13 * strength})`)
-    pool.addColorStop(1, 'rgba(255, 220, 170, 0)')
+      tank.width * MOON_X, tank.height * 0.93, tank.height * 0.02,
+      tank.width * MOON_X, tank.height * 0.93, tank.width * 0.45)
+    pool.addColorStop(0, `rgba(255, 190, 120, ${0.14 * strength})`)
+    pool.addColorStop(1, 'rgba(255, 190, 120, 0)')
     context.save()
     ridgePath(context, ground, tank)
     context.clip()
     context.fillStyle = pool
     context.fillRect(0, 0, tank.width, tank.height)
     context.restore()
+    rimLight(context, ground, tank, Math.max(1.5, tank.height * 0.003), 0.26 * strength)
 
-    rimLight(context, ground, tank, 'rgba(255, 226, 178, ALPHA)',
-             Math.max(1.5, tank.height * 0.0028), 0.24 * strength)
+    // お城へ続く道。中央の下だけ明るくして、視線が中央の絵へ上がるようにする
+    const path = context.createLinearGradient(0, tank.height, 0, castleBase)
+    path.addColorStop(0, `rgba(154, 127, 200, ${0.5 * strength})`)
+    path.addColorStop(1, `rgba(154, 127, 200, ${0.08 * strength})`)
+    context.fillStyle = path
+    context.beginPath()
+    context.moveTo(tank.width * 0.42, tank.height)
+    context.quadraticCurveTo(tank.width * 0.52, tank.height * 0.95,
+                             tank.width * 0.495, groundY(tank.width * 0.5))
+    context.lineTo(tank.width * 0.505, groundY(tank.width * 0.5))
+    context.quadraticCurveTo(tank.width * 0.56, tank.height * 0.95, tank.width * 0.62, tank.height)
+    context.closePath()
+    context.fill()
 
+    for (const h of byDepth(houses)) {
+      drawHouse(context, h.x, groundY(h.x) - tank.height * 0.01,
+                tank.height * 0.088 * h.scale, h.depth, h.kind)
+    }
     for (const t of byDepth(trees)) {
-      drawDeadTree(context, t.x, groundY(t.x), tank.height * 0.22 * t.scale,
-                   t.kind === 1 ? -1 : 1, t.depth)
-    }
-    for (const s of byDepth(stones)) {
-      drawTombstone(context, tank, s.x, groundY(s.x), tank.height * 0.085 * s.scale,
-                    s.kind, s.depth)
-    }
-    for (const p of byDepth(pumpkins)) {
-      drawPumpkin(context, tank, p.x, groundY(p.x) + tank.height * 0.010,
-                  tank.height * 0.042 * p.scale, p.kind === 1, p.depth)
+      drawTree(context, t.x, groundY(t.x) + tank.height * 0.02,
+               tank.height * 0.22 * t.scale, t.kind, TREE)
     }
     drawVignette(context, tank, strength)
   }
@@ -503,26 +492,19 @@ export function createHalloweenScene(tank: Tank, decorDensity = 1): Scene {
       if (skyLayer) skyLayer.draw(context, tank, 1)
       else paintSky(context, strength)
 
-      /*
-       * 星はまたたかせるので焼けない。点を塗るだけなので毎フレームでよい
-       *（`filter` も影も使わない。R-012 の教訓）。
-       */
+      // 星はまたたかせるので焼けない。点を塗るだけなので毎フレームでよい
       for (const star of stars) {
         const twinkle = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(elapsed * star.speed + star.phase))
-        context.fillStyle = `rgba(255, 246, 214, ${twinkle * 0.8 * strength})`
+        context.fillStyle = `rgba(255, 244, 210, ${twinkle * 0.8 * strength})`
         context.beginPath()
         context.arc(star.x, star.y, star.radius, 0, Math.PI * 2)
         context.fill()
       }
-      // 大きい星は十字の光芒を付ける。点だけだと空が砂粒に見える
+      // 大きい星は細く短い光芒を付ける。太いと「＋」の記号が並んで見える
       for (const s of sparkles) {
         const t = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(elapsed * s.speed + s.phase))
-        /*
-         * 光芒は**細く短く**。太いと「＋」の記号が並んでいるように見えた。
-         * 中心に小さな丸を重ねて、線ではなく星に見せる。
-         */
         context.strokeStyle = `rgba(255, 248, 222, ${t * 0.34 * strength})`
-        context.lineWidth = Math.max(1, s.radius * 0.10)
+        context.lineWidth = Math.max(1, s.radius * 0.1)
         context.lineCap = 'round'
         context.beginPath()
         context.moveTo(s.x - s.radius * 0.8, s.y)
@@ -551,35 +533,31 @@ export function createHalloweenScene(tank: Tank, decorDensity = 1): Scene {
     },
 
     /*
-     * **絵の後ろの淡い光。** 水族館では撤去したが、そのときの記録は
+     * **絵の後ろの淡い光。** 水族館では撤去したが、記録は
      * 「暗い背景では効いたが、明るい水では白く濁った」。ここは暗いほうの条件。
-     * 子どもの絵は濃い色で塗られがちで、夜空に沈む。月明かりを借りて浮かせる。
      */
     drawBeneath(context, place, _laneIndex, strength) {
       const r = Math.max(place.width, place.height) * 0.9
       const glow = context.createRadialGradient(place.x, place.y, r * 0.15, place.x, place.y, r)
-      glow.addColorStop(0, `rgba(255, 233, 176, ${0.24 * strength})`)
-      glow.addColorStop(0.55, `rgba(255, 220, 160, ${0.09 * strength})`)
-      glow.addColorStop(1, 'rgba(255, 220, 160, 0)')
+      glow.addColorStop(0, `rgba(255, 214, 150, ${0.24 * strength})`)
+      glow.addColorStop(0.55, `rgba(255, 200, 140, ${0.09 * strength})`)
+      glow.addColorStop(1, 'rgba(255, 200, 140, 0)')
       context.fillStyle = glow
       context.fillRect(place.x - r, place.y - r, r * 2, r * 2)
     },
 
     drawFront(context, elapsed, strength) {
-      /*
-       * 地面に沿って流れる霧。**画面の下だけ**に出す。
-       * 中央に掛けると絵が霞むので、上端は地面のすぐ上までにする。
-       */
-      const top = tank.height * 0.80
+      // 地面に沿って流れる霧。画面の下だけ。中央に掛けると絵が霞む
+      const top = tank.height * 0.82
       for (let i = 0; i < 3; i++) {
         const drift = Math.sin(elapsed * (0.05 + i * 0.03) + i * 2.1) * tank.width * 0.06
         const y = top + (tank.height - top) * (i / 3)
-        const mist = context.createLinearGradient(0, y, 0, y + tank.height * 0.10)
-        mist.addColorStop(0, 'rgba(210, 190, 234, 0)')
-        mist.addColorStop(0.5, `rgba(210, 190, 234, ${0.11 * strength})`)
-        mist.addColorStop(1, 'rgba(210, 190, 234, 0)')
+        const mist = context.createLinearGradient(0, y, 0, y + tank.height * 0.09)
+        mist.addColorStop(0, 'rgba(214, 186, 236, 0)')
+        mist.addColorStop(0.5, `rgba(214, 186, 236, ${0.12 * strength})`)
+        mist.addColorStop(1, 'rgba(214, 186, 236, 0)')
         context.fillStyle = mist
-        context.fillRect(drift - tank.width * 0.1, y, tank.width * 1.2, tank.height * 0.10)
+        context.fillRect(drift - tank.width * 0.1, y, tank.width * 1.2, tank.height * 0.09)
       }
     },
   }
