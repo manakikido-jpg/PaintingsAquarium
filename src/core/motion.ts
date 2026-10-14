@@ -18,7 +18,7 @@ import {
 } from './walk'
 import type { MotionKind } from './theme'
 import { sharePrey, speedRange, steer, type Prey } from './behaviour'
-import { speciesFlies, speciesWalks, type SpeciesId } from './templates'
+import { SPECIES, speciesFlies, speciesIsStiff, speciesWalks, type SpeciesId } from './templates'
 
 /**
  * テーマごとに違う動きを、画面側から同じ扱いにするための層。
@@ -119,6 +119,16 @@ export function spawnCreature(
    */
   const speed = speedRange(tank.width, species) ?? (drifts ? { minSpeed: 12, maxSpeed: 38 } : {})
 
+  /*
+   * **ハロウィンは、浮く絵も歩く絵と同じ大きさにする。**
+   *
+   * ハロウィンは歩く絵（フランケン）と浮く絵が**同じ画面に並ぶ**唯一のテーマ。
+   * 浮く側だけ泳ぐ絵の基準（0.07）にすると、同じ子が塗った台紙どうしで
+   * 大きさが 1.7 倍違って見える。プテラノドンで先に同じことをしている。
+   * 背景が城と山の絵なので、0.07 では絵が背景の木と同じ大きさになる。
+   */
+  const night = species !== undefined && SPECIES[species].theme === 'halloween'
+
   return {
     kind: 'float',
     fish: spawnFish(seed, tank, imageWidth, imageHeight, {
@@ -127,9 +137,14 @@ export function spawnCreature(
        * 泳ぐ絵の基準を使うと、同じ画面の恐竜より小さくなり、
        * 空の1匹だけ遠くに居るように見える。
        */
-      targetSize: creatureSize(tank, flies ? WALKER_SIZE_RATIO : FISH_SIZE_RATIO, sizeScale),
+      targetSize: creatureSize(tank, flies || night ? WALKER_SIZE_RATIO : FISH_SIZE_RATIO, sizeScale),
       ...speed,
       species,
+      /*
+       * **体が硬い絵からは、共通の「魚のゆらゆら」を外す。**
+       * 種類ごとの道を付けても、これが残っていると魚に見える（本人の指摘）。
+       */
+      ...(speciesIsStiff(species) ? { sway: 0 } : {}),
       wall: swimsAcross || species === undefined ? 'turnOutside' : 'bounce',
     }),
   }

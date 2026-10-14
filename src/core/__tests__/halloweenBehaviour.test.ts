@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { placeCreature, spawnCreature, stepCreatures, type Creature } from '../motion'
 import type { Lane } from '../walk'
 import type { Tank } from '../swim'
-import type { SpeciesId } from '../templates'
+import { SPECIES, SPECIES_IDS, speciesIsStiff, type SpeciesId } from '../templates'
 
 /*
  * **ハロウィンの5種は、道の形で性格を分ける。**
@@ -215,5 +215,76 @@ describe('ハロウィン: フランケンの歩きは変えていない', () =>
     for (let seed = 0; seed < 20; seed++) {
       expect(spawn('franken', seed).kind).toBe('walk')
     }
+  })
+})
+
+describe('ハロウィン: 魚の動きを当てない', () => {
+  /*
+   * **「まだ魚みたいにゆらゆらしている」（本人・2026-10-14）。**
+   *
+   * 種類ごとの道を付けても、2つの「魚の動き」が全部の浮く絵に乗ったままだった。
+   * 1つは胴のしなり（`undulate.ts`・描画側）、もう1つが共通の上下のゆらぎ
+   *（`spawnFish` の `amplitude`・最大 20px × 1.2〜2.8rad/秒 ＝ 56px/秒）。
+   * どちらも「胴をくねらせて水を押す」生き物のための動きで、
+   * かぼちゃにも、おばけにも、こうもりにも理由が無い。
+   */
+  it('5種とも「体が硬い」印が付いている', () => {
+    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].theme === 'halloween')) {
+      expect(speciesIsStiff(id), id).toBe(true)
+    }
+  })
+
+  it('水族館と恐竜には付けていない（見え方を変えない）', () => {
+    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].theme !== 'halloween')) {
+      expect(speciesIsStiff(id), id).toBe(false)
+    }
+  })
+
+  it('共通の上下のゆらぎが乗らない（描画の Y と道の Y が一致する）', () => {
+    for (const id of ['koumori', 'majo', 'kabocha', 'yurei'] as SpeciesId[]) {
+      let creatures = [spawn(id, 3)]
+      for (let step = 0; step < 20 * FPS; step++) {
+        creatures = stepCreatures(creatures, DT, TANK)
+        const creature = creatures[0]
+        if (creature.kind !== 'float') throw new Error(`${id} が歩いている`)
+        expect(placeCreature(creature, LANES).y, id).toBeCloseTo(creature.fish.y, 6)
+      }
+    }
+  })
+
+  it('水族館の魚には、今までどおりゆらぎが乗る', () => {
+    let creatures = [spawnCreature('float', 3, TANK, 420, 410, [], 1, 'fish', 'fish')]
+    let swayed = false
+    for (let step = 0; step < 20 * FPS; step++) {
+      creatures = stepCreatures(creatures, DT, TANK)
+      const creature = creatures[0]
+      if (creature.kind !== 'float') throw new Error('魚が歩いている')
+      if (Math.abs(placeCreature(creature, LANES).y - creature.fish.y) > 1) swayed = true
+    }
+    expect(swayed).toBe(true)
+  })
+})
+
+describe('ハロウィン: 浮く絵も歩く絵と同じ大きさ', () => {
+  /*
+   * ハロウィンは、歩く絵（フランケン）と浮く絵が同じ画面に並ぶ唯一のテーマ。
+   * 浮く側だけ泳ぐ絵の基準（0.07）だと、同じ台紙どうしで 1.7 倍違って見える。
+   */
+  it('4種の浮く絵が、フランケンと同じ長辺になる', () => {
+    const franken = spawn('franken', 1)
+    if (franken.kind !== 'walk') throw new Error('フランケンが歩いていない')
+    const walkerSide = Math.max(franken.walker.width, franken.walker.height)
+    for (const id of ['koumori', 'majo', 'kabocha', 'yurei'] as SpeciesId[]) {
+      const creature = spawn(id, 1)
+      if (creature.kind !== 'float') throw new Error(`${id} が歩いている`)
+      expect(Math.max(creature.fish.width, creature.fish.height), id).toBeCloseTo(walkerSide, 3)
+    }
+  })
+
+  it('水族館の魚の大きさは変えていない', () => {
+    const fish = spawnCreature('float', 1, TANK, 420, 410, [], 1, 'fish', 'fish')
+    if (fish.kind !== 'float') throw new Error('魚が歩いている')
+    // 泳ぐ絵の基準 0.07 × 画面幅 1920 ＝ 134.4px
+    expect(Math.max(fish.fish.width, fish.fish.height)).toBeCloseTo(1920 * 0.07, 3)
   })
 })

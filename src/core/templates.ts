@@ -65,6 +65,22 @@ export interface SpeciesInfo {
    * それでも混ぜるときは、**似ている相手との差**を測ってから決めること。
    */
   readonly walks?: boolean
+  /**
+   * **体が硬い絵**。魚の動きを当てない。
+   *
+   * この印が付いた絵には、次の2つを掛けない。
+   *
+   * 1. **胴のしなり**（`undulate.ts`）。「胴をくねらせて水を押す」動きなので、
+   *    体が硬いものに掛けると旗がはためいているようにしか見えない。
+   *    プテラノドンで先に分かっていた（掛けると**顔がなびいた**）。
+   * 2. **共通の上下のゆらぎ**（`spawnFish` の `amplitude`・最大 20px を
+   *    1.2〜2.8rad/秒）。これは種類に関係なく全部の浮く絵に乗るので、
+   *    種類ごとの道（`behaviour.ts`）を付けても**魚のゆらゆらが残る**。
+   *
+   * ハロウィンの5種に付けてある。かぼちゃも、おばけも、こうもりも、
+   * 水をくねって進んでいるわけではない。
+   */
+  readonly stiff?: boolean
   /** 台紙の中で頭が向いている向き */
   readonly head: Direction
   /**
@@ -105,17 +121,17 @@ export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
    * `flies` は使わない。**このテーマは全部ただよう**ので、飛ぶ種類という区別が要らない
    *（混ぜると R-072 の型に戻る）。
    */
-  kabocha: { id: 'kabocha', label: 'かぼちゃ', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
-  koumori: { id: 'koumori', label: 'こうもり', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
-  yurei: { id: 'yurei', label: 'ゆうれい', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
-  majo: { id: 'majo', label: 'まじょ', theme: NIGHT, head: { x: 1, y: 0 }, swimsSideways: true },
+  kabocha: { id: 'kabocha', label: 'かぼちゃ', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false, stiff: true },
+  koumori: { id: 'koumori', label: 'こうもり', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false, stiff: true },
+  yurei: { id: 'yurei', label: 'ゆうれい', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false, stiff: true },
+  majo: { id: 'majo', label: 'まじょ', theme: NIGHT, head: { x: 1, y: 0 }, swimsSideways: true, stiff: true },
   /*
    * **フランケンだけ地面を歩く**（本人の指示・2026-10-14）。
    * `swimsSideways: true` にしているのは、歩く絵は必ず横へ進むから。
    * いちばん似ているのは**ゆうれい**（重なり 0.63・差 +0.23）なので、
    * ここを取り違えると「おばけが歩く」になる。台紙を触るときは必ず測り直すこと。
    */
-  franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: -1, y: 0 }, swimsSideways: true, walks: true },
+  franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
 }
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[]
@@ -716,6 +732,16 @@ export function speciesFlies(id?: SpeciesId): boolean {
 }
 
 /** その種類だけ地面を歩くか（ただようテーマの中の例外）。 */
+/**
+ * 体が硬い絵か。魚の動き（胴のしなり・共通の上下のゆらぎ）を当てない。
+ *
+ * 飛ぶ絵（プテラノドン）は描画側で別に外してあるので、ここには入れていない。
+ * 恐竜テーマの見え方を変えないため（R-072 の差し戻しがあった経路）。
+ */
+export function speciesIsStiff(id?: SpeciesId): boolean {
+  return id ? SPECIES[id].stiff === true : false
+}
+
 export function speciesWalks(id?: SpeciesId): boolean {
   return id ? SPECIES[id].walks === true : false
 }

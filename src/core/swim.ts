@@ -176,6 +176,14 @@ export interface SpawnOptions {
   /** 泳ぐ速さの範囲（ピクセル/秒） */
   readonly minSpeed?: number
   readonly maxSpeed?: number
+  /**
+   * 上下のゆらぎの振れ幅（ピクセル）。既定は 6〜20 の乱数。
+   *
+   * **これは種類に関係なく全部の浮く絵に乗る「魚のゆらゆら」**で、
+   * 最大 56px/秒 ある。種類ごとの道（`behaviour.ts`）より大きいことがあり、
+   * ハロウィンのように道で性格を分けたい絵では邪魔になるので 0 を渡せる。
+   */
+  readonly sway?: number
 }
 
 /**
@@ -202,6 +210,7 @@ export function spawnFish(
     maxSpeed = 90,
     species,
     wall,
+    sway,
   } = options
   const random = seededRandom(seed)
   const longestSide = Math.max(imageWidth, imageHeight, 1)
@@ -211,7 +220,12 @@ export function spawnFish(
 
   const speed = minSpeed + random() * (maxSpeed - minSpeed)
   const towardsRight = random() < 0.5
-  const amplitude = 6 + random() * 14
+  /*
+   * **乱数は必ず引く。** `sway` を渡したときに引かずに飛ばすと、
+   * このあとの位置と速さの乱数が1つぶんずれて、同じ seed で違う場所に出る。
+   */
+  const wobble = 6 + random() * 14
+  const amplitude = sway ?? wobble
 
   const marginY = height / 2 + amplitude
   const usableHeight = Math.max(0, tank.height - marginY * 2)

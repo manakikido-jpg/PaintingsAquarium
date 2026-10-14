@@ -20,7 +20,7 @@ import {
   tailAngle,
 } from '../core/undulate'
 import { headIsKnown, headsRightOf, rigIsUsable, type CreatureKind } from '../core/rig'
-import { partsForPiece, speciesFlies } from '../core/templates'
+import { partsForPiece, speciesFlies, speciesIsStiff } from '../core/templates'
 import { FLAP_SPEED, glideTilt } from '../core/behaviour'
 
 /**
@@ -266,6 +266,12 @@ export function Aquarium({
         const drifts = kind === 'tentacled'
         const flying = speciesFlies(swimmer.piece.species)
         /*
+         * **魚のしなりを当てない絵。** 飛ぶ絵（プテラノドン）と、
+         * ハロウィンの5種（`stiff`）。どちらも「胴をくねらせて水を押す」
+         * 生き物ではないので、掛けると旗がはためいて見える。
+         */
+        const stiff = flying || speciesIsStiff(swimmer.piece.species)
+        /*
          * 頭がどちら側か分かっている絵か。
          *
          * 分かっていないのに動かすと、**頭を振りながら尾から進む**（R-030）。
@@ -391,12 +397,12 @@ export function Aquarium({
             )
             context.restore()
           }
-        } else if (flying || strips <= 1 || (!headKnown && !drifts)) {
+        } else if (stiff || strips <= 1 || (!headKnown && !drifts)) {
           /*
            * そのまま1枚で描く。
            * - しなり 0（描画命令が1回に戻るので、重いときの逃げ道）
            * - 頭が分からない絵（どちらを止めればよいか決められない）
-           * - **飛ぶ絵**（プテラノドン）
+           * - **体が硬い絵**（プテラノドン・ハロウィンの5種／`stiff`）
            *
            * 飛ぶ絵に魚のしなりを掛けると、**顔がなびく**（実機で確認）。
            * しなりは「胴をくねらせて水を押す」動きなので、
