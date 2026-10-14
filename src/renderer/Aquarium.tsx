@@ -47,7 +47,11 @@ import type { Scene } from './scene/types'
 import type { Piece } from '../shared/types'
 
 interface Swimmer {
-  readonly piece: Piece
+  /**
+   * もとの絵。**作り直し（R-062）で差し替わるので `readonly` にしない。**
+   * 泳いでいる最中でも新しい見分け結果を受け取れるようにしてある（R-075）。
+   */
+  piece: Piece
   readonly element: HTMLImageElement
   /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
   readonly bornAt: number
@@ -207,7 +211,25 @@ export function Aquarium({
       }
 
       for (const piece of piecesRef.current) {
-        if (swimmers.has(piece.id)) continue
+        const swimming = swimmers.get(piece.id)
+        if (swimming) {
+          /*
+           * **泳いでいる絵にも、作り直しの結果を届ける（R-075）。**
+           *
+           * ここは長いあいだ `continue` だけだった。一度泳ぎ出した絵は
+           * 取り込んだときの `piece` を抱えたままなので、起動後の作り直し
+           *（`RIG_VERSION`・R-062）が**画面に出ている絵には効かなかった**。
+           * 実機で、まじょの向きを直して台帳も `headsRight: true` に
+           * 書き変わっているのに、**そのとき飛んでいたまじょだけが
+           * 逆を向いたまま**だった。
+           *
+           * 入れ替えるのは絵の情報だけ。泳ぎの状態（`creature`・`bornAt`・
+           * `beat`）はそのままにする。作り直しただけで**位置が飛ぶ**のは
+           * 来場者から見れば不具合でしかない。
+           */
+          if (swimming.piece !== piece) swimming.piece = piece
+          continue
+        }
         const element = new Image()
         element.src = `aqua://piece/${piece.id}`
         swimmers.set(piece.id, {

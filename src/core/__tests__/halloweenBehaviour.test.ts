@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { placeCreature, spawnCreature, stepCreatures, type Creature } from '../motion'
 import type { Lane } from '../walk'
 import type { Tank } from '../swim'
-import { SPECIES, SPECIES_IDS, speciesIsStiff, type SpeciesId } from '../templates'
+import { SPECIES, SPECIES_IDS, rigForSpecies, speciesIsStiff, type SpeciesId } from '../templates'
 
 /*
  * **ハロウィンの5種は、道の形で性格を分ける。**
@@ -286,5 +286,41 @@ describe('ハロウィン: 浮く絵も歩く絵と同じ大きさ', () => {
     if (fish.kind !== 'float') throw new Error('魚が歩いている')
     // 泳ぐ絵の基準 0.07 × 画面幅 1920 ＝ 134.4px
     expect(Math.max(fish.fish.width, fish.fish.height)).toBeCloseTo(1920 * 0.07, 3)
+  })
+})
+
+describe('横向きの台紙は、顔の向いているほうへ進む', () => {
+  /*
+   * **「魔女は顔の向いてる向きに飛んでください」（本人・2026-10-14）。**
+   *
+   * `rigForSpecies` が `headsRight: mirrored` と書かれていて、
+   * 「台紙の頭は必ず左」という前提がコードに埋まっていた。
+   * 横向きの台紙10枚のうち9枚は左向きなので長く気づかれず、
+   * **右向きに描いてあるまじょだけ**、描画側が逆に反転していた。
+   */
+  it('台紙の頭の向きと、描画に渡す「頭が右か」が一致する', () => {
+    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].swimsSideways)) {
+      const headsRight = SPECIES[id].head.x > 0
+      expect(rigForSpecies(id, false).headsRight, `${id}（台紙のまま）`).toBe(headsRight)
+      // 台紙に合わせて左右を裏返した絵は、頭の側も入れ替わる
+      expect(rigForSpecies(id, true).headsRight, `${id}（反転して一致）`).toBe(!headsRight)
+    }
+  })
+
+  it('まじょだけが右向きの台紙（ここが変わったら上のテストを見直す）', () => {
+    const rightward = SPECIES_IDS.filter((n) => SPECIES[n].swimsSideways && SPECIES[n].head.x > 0)
+    expect(rightward).toEqual(['majo'])
+  })
+
+  /*
+   * 水族館・恐竜は全部が左向きの台紙なので、値は前と同じ（`mirrored` と一致）。
+   * **R-072 のあと、既存テーマを変えないことは毎回ここで確かめる。**
+   */
+  it('水族館と恐竜の向きは変わっていない', () => {
+    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].theme !== 'halloween')) {
+      for (const mirrored of [false, true]) {
+        expect(rigForSpecies(id, mirrored).headsRight, `${id}/${mirrored}`).toBe(mirrored)
+      }
+    }
   })
 })

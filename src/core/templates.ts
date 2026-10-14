@@ -860,12 +860,31 @@ const TIPS_DOWN: Partial<Record<SpeciesId, boolean>> = {
 export function rigForSpecies(id: SpeciesId, mirrored: boolean): SpeciesRig {
   const kind = KIND_OF[id]
   const rig = TEMPLATE_RIG[id]
-  if (!rig) return { kind, headsRight: mirrored, tail: null, tipsDown: TIPS_DOWN[id] }
+
+  /*
+   * **頭が台紙のどちら側にあるかは、台紙ごとに違う。**
+   *
+   * ここは長いあいだ `headsRight: mirrored` と書いてあった。
+   * 「台紙の頭は必ず左」という前提をコードに埋めていたことになる。
+   * 実際、横向きの台紙は10枚中9枚が左向きで、**まじょだけが右向き**。
+   * そのため、まじょは `headsRight: false` と報告され、描画側が
+   * 右へ進むときに絵を反転していた ＝ **ほうきで顔と逆向きに飛んでいた**
+   *（本人の指摘・2026-10-14）。
+   *
+   * 台紙の `head` を見て決める。`mirrored` は「台紙に合わせるのに
+   * 左右を裏返したか」なので、裏返していれば頭の側も入れ替わる。
+   * 頭が上下を向いている台紙（`head.x === 0`・かぼちゃなど）は
+   * これまでどおり `mirrored` と同じ値になり、見え方は変わらない
+   *（そもそも `swimsSideways: false` なので反転しても対称に近い）。
+   */
+  const headsRight = SPECIES[id].head.x > 0 !== mirrored
+
+  if (!rig) return { kind, headsRight, tail: null, tipsDown: TIPS_DOWN[id] }
 
   const pivotX = mirrored ? 1 - rig.tailFrom : rig.tailFrom
   return {
     kind,
-    headsRight: mirrored,
+    headsRight,
     tail: { from: rig.tailFrom, pivot: { x: pivotX, y: rig.tailY } },
     tipsDown: TIPS_DOWN[id],
   }
