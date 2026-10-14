@@ -18,7 +18,7 @@ import {
 } from './walk'
 import type { MotionKind } from './theme'
 import { sharePrey, speedRange, steer, type Prey } from './behaviour'
-import { speciesFlies, type SpeciesId } from './templates'
+import { speciesFlies, speciesWalks, type SpeciesId } from './templates'
 
 /**
  * テーマごとに違う動きを、画面側から同じ扱いにするための層。
@@ -70,7 +70,16 @@ export function spawnCreature(
   const flies = speciesFlies(species)
   if (flies && skyBottom) tank = { width: tank.width, height: skyBottom }
 
-  if (motion === 'walk' && !flies) {
+  /*
+   * **ただようテーマの中でも、この種類だけ地面を歩く**（フランケンシュタイン）。
+   * `flies` の裏返し。
+   *
+   * **列が無いテーマでは歩かせない。** 地面の高さが決まらないので、
+   * 足が宙に浮くか画面外へ沈む。種類の印だけを見て歩かせてはいけない。
+   */
+  const walks = speciesWalks(species) && lanes.length > 0
+
+  if ((motion === 'walk' && !flies) || walks) {
     return {
       kind: 'walk',
       walker: spawnWalker(seed, tank, lanes, imageWidth, imageHeight, {

@@ -55,6 +55,16 @@ export interface SpeciesInfo {
    * 翼竜が地面を歩いていると、作りかけに見える。
    */
   readonly flies?: boolean
+  /**
+   * 地面を歩くか。**ただようテーマの中で、この種類だけ地面に乗せる。**
+   *
+   * `flies` の裏返し。テーマの動き方（`ThemeMeta.motion`）を種類ごとに覆す。
+   *
+   * **混ぜるのは危ない。** 動き方そのものが変わるので、見分けを1つ間違えると
+   * 「おばけが地面を歩く」「フランケンが空に浮く」になる（R-072）。
+   * それでも混ぜるときは、**似ている相手との差**を測ってから決めること。
+   */
+  readonly walks?: boolean
   /** 台紙の中で頭が向いている向き */
   readonly head: Direction
   /**
@@ -99,7 +109,13 @@ export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
   koumori: { id: 'koumori', label: 'こうもり', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
   yurei: { id: 'yurei', label: 'ゆうれい', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
   majo: { id: 'majo', label: 'まじょ', theme: NIGHT, head: { x: 1, y: 0 }, swimsSideways: true },
-  franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false },
+  /*
+   * **フランケンだけ地面を歩く**（本人の指示・2026-10-14）。
+   * `swimsSideways: true` にしているのは、歩く絵は必ず横へ進むから。
+   * いちばん似ているのは**ゆうれい**（重なり 0.63・差 +0.23）なので、
+   * ここを取り違えると「おばけが歩く」になる。台紙を触るときは必ず測り直すこと。
+   */
+  franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: true, walks: true },
 }
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[]
@@ -519,6 +535,100 @@ const PTERA_PARTS: readonly SpritePart[] = [
   },
 ]
 
+/**
+ * フランケンシュタイン: **二本足で歩き、腕を振る。**
+ *
+ * 四足（`WALKER_PARTS`）は前足と後足を前後に振る作りで、
+ * **正面を向いた二本足には合わない**。こちらは左右の脚を逆向きに振る。
+ *
+ * **切る位置は台紙を測って決めた**（`05_franken.png` の行ごとの幅）。
+ *
+ * | 高さ | 何があるか | 幅の割合 |
+ * |---|---|---|
+ * | 0.00〜0.39 | 頭と肩 | 0.34〜0.44 |
+ * | **0.39〜0.53** | **腕**（左右いっぱいに張り出す） | 0.89〜1.00 |
+ * | 0.53〜0.73 | 胴と腰 | 0.32〜0.39 |
+ * | **0.73〜1.00** | **脚**（ここから左右2本に分かれる） | 0.33〜0.70 |
+ *
+ * **腕は肩の位置で切る**（0.32 / 0.68）。胴の上で切ると、胴の横に
+ * 段差が出る。肩で切れば、ずれるのは**もともと何も無い高さ**だけになる。
+ *
+ * 動かし方は**せん断だけ**で、回さない。回すと切り目の両側がずれて裂ける（R-037）。
+ */
+const FRANKEN_HIP = 0.73
+const FRANKEN_ARM_TOP = 0.39
+const FRANKEN_ARM_BOTTOM = 0.53
+const FRANKEN_SHOULDER_L = 0.32
+const FRANKEN_SHOULDER_R = 0.68
+/** 脚の振り。脚の長さは絵の 27%（四足の 20% より長いので控えめにする） */
+const FRANKEN_LEG_SWING = 0.18
+/** 腕の振り。肩から手先までの距離に対する上下のずれ */
+const FRANKEN_ARM_SWING = 0.16
+const FRANKEN_BODY_LIFT = 0.025
+/**
+ * 左右の脚を分ける幅。**脚はもともと離れている**ので、四足（`WALK_BLEND`）
+ * のようになだらかにする必要がない。真ん中で切り替えて、きれいに互い違いにする。
+ */
+const FRANKEN_LEG_BLEND = 0.1
+
+/** 左の脚が +1、右の脚が -1。 */
+export function frankenLegWeight(x: number): number {
+  return Math.max(-1, Math.min(1, (0.5 - x) / FRANKEN_LEG_BLEND))
+}
+
+const FRANKEN_BODY = {
+  pivot: { x: 0.5, y: FRANKEN_HIP },
+  swing: 0,
+  /** 脚より少し遅れて体が上下する（体重が移って見える） */
+  beat: 0.25,
+  lift: FRANKEN_BODY_LIFT,
+  liftAxis: 'y',
+} as const
+
+const FRANKEN_PARTS: readonly SpritePart[] = [
+  // 脚。左右で逆向きに振る
+  ...Array.from({ length: WALK_STRIPS }, (_, index): SpritePart => {
+    const from = index / WALK_STRIPS
+    const width = 1 / WALK_STRIPS
+    const centre = from + width / 2
+    return {
+      box: { x: from, y: FRANKEN_HIP, w: width, h: 1 - FRANKEN_HIP },
+      pivot: { x: centre, y: FRANKEN_HIP },
+      swing: 0,
+      beat: 0,
+      shear: FRANKEN_LEG_SWING * frankenLegWeight(centre),
+      shearAxis: 'y',
+    }
+  }),
+  // 左腕。肩を軸に、手先が上下する（脚と逆向き）
+  {
+    ...FRANKEN_BODY,
+    box: { x: 0, y: FRANKEN_ARM_TOP, w: FRANKEN_SHOULDER_L, h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
+    pivot: { x: FRANKEN_SHOULDER_L, y: FRANKEN_HIP },
+    shear: -FRANKEN_ARM_SWING,
+    shearAxis: 'x',
+  },
+  // 右腕
+  {
+    ...FRANKEN_BODY,
+    box: { x: FRANKEN_SHOULDER_R, y: FRANKEN_ARM_TOP, w: 1 - FRANKEN_SHOULDER_R,
+           h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
+    pivot: { x: FRANKEN_SHOULDER_R, y: FRANKEN_HIP },
+    shear: FRANKEN_ARM_SWING,
+    shearAxis: 'x',
+  },
+  // 頭と肩
+  { ...FRANKEN_BODY, box: { x: 0, y: 0, w: 1, h: FRANKEN_ARM_TOP } },
+  // 腕の高さの胴（ここは振らない。振ると胴の横に段差が出る）
+  {
+    ...FRANKEN_BODY,
+    box: { x: FRANKEN_SHOULDER_L, y: FRANKEN_ARM_TOP, w: FRANKEN_SHOULDER_R - FRANKEN_SHOULDER_L,
+           h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
+  },
+  // 胴と腰
+  { ...FRANKEN_BODY, box: { x: 0, y: FRANKEN_ARM_BOTTOM, w: 1, h: FRANKEN_HIP - FRANKEN_ARM_BOTTOM } },
+]
+
 export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
   umigame: KAME_PARTS,
   pteranodon: PTERA_PARTS,
@@ -531,6 +641,7 @@ export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
   brontosaurus: WALKER_PARTS,
   stegosaurus: WALKER_PARTS,
   triceratops: WALKER_PARTS,
+  franken: FRANKEN_PARTS,
 }
 
 /** 左右反転。 */
@@ -600,6 +711,11 @@ export function partsForPiece(
 /** その台紙は空を飛ぶか。台紙に一致しなかった絵（`undefined`）は歩く。 */
 export function speciesFlies(id?: SpeciesId): boolean {
   return id ? SPECIES[id].flies === true : false
+}
+
+/** その種類だけ地面を歩くか（ただようテーマの中の例外）。 */
+export function speciesWalks(id?: SpeciesId): boolean {
+  return id ? SPECIES[id].walks === true : false
 }
 
 export const KIND_OF: Record<SpeciesId, CreatureKind> = {

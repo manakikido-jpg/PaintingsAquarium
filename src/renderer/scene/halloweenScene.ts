@@ -1,4 +1,5 @@
 import backgroundUrl from '../../../assets/scene/halloween-background.webp?url'
+import type { Lane } from '../../core/walk'
 import {
   moonPulse,
   moteFade,
@@ -56,6 +57,18 @@ const VIOLET = '206, 178, 245'
 /** 月の位置（**背景の絵の中**での割合）。光を避ける場所と、ほのかな脈の中心 */
 const MOON_IMAGE_X = 0.505
 const MOON_IMAGE_Y = 0.465
+/**
+ * 同梱している背景の絵の大きさ。**読み込みを待たずに位置を決めるために要る。**
+ * 絵の中の位置（月・地面）を画面の位置に直すとき、読み込み前は縮尺が分からない。
+ * **絵を差し替えたらこの数字も直すこと。**
+ */
+const BG_WIDTH = 1672
+const BG_HEIGHT = 941
+/**
+ * 地面の高さ（**絵の中**での割合）。フランケンシュタインがここを歩く。
+ * 絵の手前の丘と道が来るあたり。下げすぎると足が画面の外に切れる。
+ */
+const GROUND_IMAGE_Y = 0.95
 
 /** ハロウィン。絵は夜空をただよう。 */
 export function createHalloweenScene(tank: Tank, _decorDensity = 1): Scene {
@@ -82,16 +95,32 @@ export function createHalloweenScene(tank: Tank, _decorDensity = 1): Scene {
 
   /**
    * 背景の絵の中の位置（0〜1）を、画面の上の位置に直す。
-   * **月の位置は絵に焼き込まれている**ので、画面の割合で決め打ちすると
+   * **月も地面も絵に焼き込まれている**ので、画面の割合で決め打ちすると
    * 画面の縦横比が変わったときにずれる（`cover` が切り落とす量が変わるため）。
+   *
+   * **読み込みを待たない。** 絵の大きさは定数で持っている（`BG_WIDTH`）。
+   * 待つと、地面の高さが決まる前に歩く絵が置かれてしまう。
    */
   const fromImage = (ix: number, iy: number): { x: number; y: number } => {
-    if (!ready) return { x: tank.width * ix, y: tank.height * iy }
-    const scale = Math.max(tank.width / image.naturalWidth, tank.height / image.naturalHeight)
-    const w = image.naturalWidth * scale
-    const h = image.naturalHeight * scale
+    const scale = Math.max(tank.width / BG_WIDTH, tank.height / BG_HEIGHT)
+    const w = BG_WIDTH * scale
+    const h = BG_HEIGHT * scale
     return { x: (tank.width - w) / 2 + w * ix, y: (tank.height - h) / 2 + h * iy }
   }
+
+  /*
+   * **列を1本だけ持つ。** 地面を歩く種類（フランケンシュタイン）のため。
+   * 背景は1枚の絵なので地面を描く必要はなく（`drawLane` は何もしない）、
+   * 要るのは「どの高さに足を置くか」だけ。
+   *
+   * **2本以上にしてはいけない。** 描画ループは列があると
+   * 「奥の地面 → その列の絵 → …」の順に**列ごとに分けて**絵を描く。
+   * ただよう絵は全部 0 番の列に入るので、列を増やすと
+   * **ただよう絵だけが先にまとめて描かれて**、重なり順が崩れる。
+   */
+  const lanes: Lane[] = [
+    { groundY: Math.min(tank.height * 0.99, fromImage(0.5, GROUND_IMAGE_Y).y), scale: 1, depth: 1 },
+  ]
 
   /** 光をひと粒。中心だけ明るく、縁は透明（四角い点に見せない）。 */
   const dot = (context: CanvasRenderingContext2D, x: number, y: number, r: number,
@@ -108,7 +137,7 @@ export function createHalloweenScene(tank: Tank, _decorDensity = 1): Scene {
 
   return {
     motion: 'float',
-    lanes: [],
+    lanes,
 
     drawBehind(context, elapsed, strength) {
       /*
