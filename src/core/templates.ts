@@ -115,7 +115,7 @@ export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
    * いちばん似ているのは**ゆうれい**（重なり 0.63・差 +0.23）なので、
    * ここを取り違えると「おばけが歩く」になる。台紙を触るときは必ず測り直すこと。
    */
-  franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: true, walks: true },
+  franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: -1, y: 0 }, swimsSideways: true, walks: true },
 }
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[]
@@ -536,48 +536,45 @@ const PTERA_PARTS: readonly SpritePart[] = [
 ]
 
 /**
- * フランケンシュタイン: **二本足で歩き、腕を振る。**
+ * フランケンシュタイン: **横向きで歩く。**
  *
- * 四足（`WALKER_PARTS`）は前足と後足を前後に振る作りで、
- * **正面を向いた二本足には合わない**。こちらは左右の脚を逆向きに振る。
+ * 台紙は**横を向いて歩いている姿**（2026-10-14 に正面向きから差し替え）。
+ * 正面向きのときは左右の脚を上下に振っていたが、横向きなら
+ * **恐竜と同じ「前後に振る」**が使える。
  *
- * **切る位置は台紙を測って決めた**（`05_franken.png` の行ごとの幅）。
+ * **切る位置は台紙を測って決めた**（行ごとの左端・右端・かたまりの数）。
  *
- * | 高さ | 何があるか | 幅の割合 |
+ * | 高さ | 何があるか | 幅 |
  * |---|---|---|
- * | 0.00〜0.39 | 頭と肩 | 0.34〜0.44 |
- * | **0.39〜0.53** | **腕**（左右いっぱいに張り出す） | 0.89〜1.00 |
- * | 0.53〜0.73 | 胴と腰 | 0.32〜0.39 |
- * | **0.73〜1.00** | **脚**（ここから左右2本に分かれる） | 0.33〜0.70 |
- *
- * **腕は肩の位置で切る**（0.32 / 0.68）。胴の上で切ると、胴の横に
- * 段差が出る。肩で切れば、ずれるのは**もともと何も無い高さ**だけになる。
+ * | 0.00〜0.45 | 頭 | 0.42〜0.48 |
+ * | **0.47〜0.63** | **腕**（前後へ大きく張り出す） | 0.85〜0.98 |
+ * | 0.63〜0.70 | 胴と腰 | 0.38〜0.59 |
+ * | **0.70〜1.00** | **脚**（前後に開いている） | 0.38〜0.96 |
  *
  * 動かし方は**せん断だけ**で、回さない。回すと切り目の両側がずれて裂ける（R-037）。
  */
-const FRANKEN_HIP = 0.73
-const FRANKEN_ARM_TOP = 0.39
-const FRANKEN_ARM_BOTTOM = 0.53
-const FRANKEN_SHOULDER_L = 0.32
-const FRANKEN_SHOULDER_R = 0.68
-/** 脚の振り。脚の長さは絵の 27%（四足の 20% より長いので控えめにする） */
-const FRANKEN_LEG_SWING = 0.18
-/** 腕の振り。肩から手先までの距離に対する上下のずれ */
-const FRANKEN_ARM_SWING = 0.16
+const FRANKEN_HIP = 0.7
+const FRANKEN_ARM_TOP = 0.47
+const FRANKEN_ARM_BOTTOM = 0.63
+/** 腕を切る位置。**肩で切る。** 胴の上で切ると胴に段差が出る */
+const FRANKEN_FRONT_SHOULDER = 0.4
+const FRANKEN_BACK_SHOULDER = 0.72
+/** 脚の付け根の横位置。ここを境に、前の脚と後ろの脚が逆に振れる */
+const FRANKEN_HIP_X = 0.52
+const FRANKEN_HIP_BLEND = 0.12
+/** 脚の振り。脚は絵の 3 割あって四足（2 割）より長いので控えめにする */
+const FRANKEN_LEG_SWING = 0.16
+/** 腕の振り。肩から手先までの距離に対する**上下**のずれ */
+const FRANKEN_ARM_SWING = 0.14
 const FRANKEN_BODY_LIFT = 0.025
-/**
- * 左右の脚を分ける幅。**脚はもともと離れている**ので、四足（`WALK_BLEND`）
- * のようになだらかにする必要がない。真ん中で切り替えて、きれいに互い違いにする。
- */
-const FRANKEN_LEG_BLEND = 0.1
 
-/** 左の脚が +1、右の脚が -1。 */
+/** 前の脚（左）が +1、後ろの脚（右）が -1。 */
 export function frankenLegWeight(x: number): number {
-  return Math.max(-1, Math.min(1, (0.5 - x) / FRANKEN_LEG_BLEND))
+  return Math.max(-1, Math.min(1, (FRANKEN_HIP_X - x) / FRANKEN_HIP_BLEND))
 }
 
 const FRANKEN_BODY = {
-  pivot: { x: 0.5, y: FRANKEN_HIP },
+  pivot: { x: FRANKEN_HIP_X, y: FRANKEN_HIP },
   swing: 0,
   /** 脚より少し遅れて体が上下する（体重が移って見える） */
   beat: 0.25,
@@ -586,7 +583,7 @@ const FRANKEN_BODY = {
 } as const
 
 const FRANKEN_PARTS: readonly SpritePart[] = [
-  // 脚。左右で逆向きに振る
+  // 脚。前と後ろで逆向きに振る（恐竜と同じ考え方）
   ...Array.from({ length: WALK_STRIPS }, (_, index): SpritePart => {
     const from = index / WALK_STRIPS
     const width = 1 / WALK_STRIPS
@@ -600,30 +597,35 @@ const FRANKEN_PARTS: readonly SpritePart[] = [
       shearAxis: 'y',
     }
   }),
-  // 左腕。肩を軸に、手先が上下する（脚と逆向き）
+  /*
+   * 腕。**肩を軸に、手先が上下する。**
+   * 横向きなので本当は前後に振れてほしいが、**腕は横長の帯**なので
+   * 前後へ動かすには帯ごと平行移動するしかなく、胴との継ぎ目が開く。
+   * 上下なら軸（肩）の上は動かないので、どれだけ振っても裂けない。
+   * 脚と逆の符号にして、前の腕と前の脚が互い違いになるようにしてある。
+   */
   {
     ...FRANKEN_BODY,
-    box: { x: 0, y: FRANKEN_ARM_TOP, w: FRANKEN_SHOULDER_L, h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
-    pivot: { x: FRANKEN_SHOULDER_L, y: FRANKEN_HIP },
+    box: { x: 0, y: FRANKEN_ARM_TOP, w: FRANKEN_FRONT_SHOULDER, h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
+    pivot: { x: FRANKEN_FRONT_SHOULDER, y: FRANKEN_HIP },
     shear: -FRANKEN_ARM_SWING,
     shearAxis: 'x',
   },
-  // 右腕
   {
     ...FRANKEN_BODY,
-    box: { x: FRANKEN_SHOULDER_R, y: FRANKEN_ARM_TOP, w: 1 - FRANKEN_SHOULDER_R,
+    box: { x: FRANKEN_BACK_SHOULDER, y: FRANKEN_ARM_TOP, w: 1 - FRANKEN_BACK_SHOULDER,
            h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
-    pivot: { x: FRANKEN_SHOULDER_R, y: FRANKEN_HIP },
+    pivot: { x: FRANKEN_BACK_SHOULDER, y: FRANKEN_HIP },
     shear: FRANKEN_ARM_SWING,
     shearAxis: 'x',
   },
-  // 頭と肩
+  // 頭
   { ...FRANKEN_BODY, box: { x: 0, y: 0, w: 1, h: FRANKEN_ARM_TOP } },
-  // 腕の高さの胴（ここは振らない。振ると胴の横に段差が出る）
+  // 腕の高さの胴（ここは振らない。振ると胴に段差が出る）
   {
     ...FRANKEN_BODY,
-    box: { x: FRANKEN_SHOULDER_L, y: FRANKEN_ARM_TOP, w: FRANKEN_SHOULDER_R - FRANKEN_SHOULDER_L,
-           h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
+    box: { x: FRANKEN_FRONT_SHOULDER, y: FRANKEN_ARM_TOP,
+           w: FRANKEN_BACK_SHOULDER - FRANKEN_FRONT_SHOULDER, h: FRANKEN_ARM_BOTTOM - FRANKEN_ARM_TOP },
   },
   // 胴と腰
   { ...FRANKEN_BODY, box: { x: 0, y: FRANKEN_ARM_BOTTOM, w: 1, h: FRANKEN_HIP - FRANKEN_ARM_BOTTOM } },
