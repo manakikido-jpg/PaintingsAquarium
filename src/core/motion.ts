@@ -100,9 +100,18 @@ export function spawnCreature(
    * 魚・イルカ・サメは、画面の端で跳ね返らずに**外へ出てから向きを変える**。
    * 端で跳ね返ると水槽のガラスに当たったように見える（会場からの指摘）。
    * 上から見た生き物（タコ・クラゲ・ウミガメ）は画面内で折り返す。
+   *
+   * **こうもりとまじょも、外へ出てから戻る。** この2種は夜空を横切る役なので、
+   * 見えない壁で跳ね返ると、空ではなく箱の中に見える。
+   * かぼちゃとゆうれいはその場に漂う役なので、今までどおり画面内で折り返す。
    */
   const swimsAcross =
-    species === 'fish' || species === 'iruka' || species === 'same' || flies
+    species === 'fish' ||
+    species === 'iruka' ||
+    species === 'same' ||
+    species === 'koumori' ||
+    species === 'majo' ||
+    flies
 
   /*
    * 速さは種類ごとに決める（`CROSS_SECONDS`）。種類が分からない絵だけ、

@@ -28,12 +28,16 @@ export const CROSS_SECONDS: Record<string, readonly [number, number]> = {
   // 空を滑るので、地面の恐竜より速い
   pteranodon: [14, 22],
   /*
-   * ハロウィン。**全部ただようが、速さで性格を分ける。**
-   * ゆうれいがいちばん遅く、こうもりとまじょが夜空を横切る。
+   * ハロウィン。**種類ごとに道の形が違う**（`steer` のハロウィンの節）。
+   * 速さはその道に合わせて決めてある。
+   *
+   * かぼちゃは「横へ進む絵」ではなく**その場で浮いている絵**にしたいので、
+   * ゆうれいと同じくらい遅くしてある。55〜80秒のときは、
+   * ふわふわ（上下 3%）より横の移動のほうが速く、浮いて見えなかった。
    */
   koumori: [18, 28],
   majo: [20, 30],
-  kabocha: [55, 80],
+  kabocha: [90, 140],
   franken: [50, 75],
   yurei: [80, 140],
 }
@@ -137,6 +141,65 @@ export const KURAGE_PULSE_RISE = 0.09
 
 /** 脈の鋭さ。大きいほど「ひとかき」が短く鋭くなる。 */
 const PULSE_DECAY = 3.2
+
+/* ------------------------------------------------- ハロウィンの5種
+
+ * **5種とも「ただよう」仲間だが、道の形で性格を分ける。**
+ *
+ * 速さだけを変えていたときは、5種が同じ道を違う速さで流れるだけで、
+ * 「かぼちゃが浮いている」「こうもりが飛んでいる」には見えなかった。
+ * フランケンだけは地面を歩く（`speciesWalks`）ので、ここには出てこない。
+ */
+
+/**
+ * こうもり: **細かく速いジグザグ**。波長を画面幅の 13% にしてある。
+ *
+ * 魚やウミガメのS字（波長 35〜50%）と同じ考え方で、数字だけ変える。
+ * 短くするほど「羽ばたいて進む」に近づくが、**これ以上短くすると
+ * 上下の速さが横を追い越して、その場で震えて見える**。
+ * 画面 1920×1080・横切り23秒だと縦は最大 101px/秒、横は 83px/秒。
+ */
+export const KOUMORI_WAVE = { amplitude: 0.045, wavelength: 0.13 } as const
+
+/**
+ * まじょ: **大きくゆるい弧**。波長を画面幅より長く（1.2）してある。
+ *
+ * 1回画面を横切る間に山が1つも来ない。ほうきで滑空して、
+ * ゆっくり上がってゆっくり下がる、という道になる。
+ * 同じ 1920×1080 で縦は最大 39px/秒（横 77px/秒）。横のほうが速い。
+ */
+export const MAJO_WAVE = { amplitude: 0.17, wavelength: 1.2 } as const
+
+/**
+ * かぼちゃ: その場でふわふわ上下する周期（秒）と振れ幅（画面の高さに対する割合）。
+ *
+ * クラゲの脈（`pulse`・上がるのは速く沈むのはゆっくり）ではなく**正弦**にした。
+ * かぼちゃは自分で泳いでいるのではなく、浮かんでいるものが揺れているため。
+ */
+export const KABOCHA_BOB_SECONDS = 5
+export const KABOCHA_BOB = 0.03
+
+/**
+ * かぼちゃが行き来する高さの帯（画面の高さに対する割合）。
+ *
+ * **かぼちゃだけは画面の下のほうに留める。** 空を飛ぶ理由が無いものが
+ * 月より高いところに居ると、ほかの4種と区別がつかなくなる。
+ * `centre ± band` なので 46%〜78%。地面（95%）には着かない。
+ */
+export const KABOCHA_BAND = { centre: 0.62, band: 0.16 } as const
+
+/**
+ * ゆうれい: ふらふらの周期（秒・2つ）と振れ幅（画面の高さに対する割合）。
+ *
+ * **周期を2つ重ねるのは、1つだと規則正しく見えるため。**
+ * 7.3 と 11.9 は割り切れない組み合わせなので、足し合わせた波は
+ * 同じ形に戻るまで 87秒かかる。目には不規則にしか見えない。
+ *
+ * 振れ幅は横の速さ（1920px を 110秒 ＝ 17px/秒）と同じくらいに抑えてある。
+ * 縦が横より速いと、漂うのではなく暴れて見える（R-035）。
+ */
+export const YUREI_SWAY_SECONDS = [7.3, 11.9] as const
+export const YUREI_SWAY = 0.025
 
 const TAU = Math.PI * 2
 
@@ -295,6 +358,21 @@ export function steer(fish: Fish, tank: Tank, prey: readonly Prey[] = []): Fish 
       return leap(fish, tank)
     case 'same':
       return chase(fish, prey)
+
+    /* ---- ハロウィン。道の形で性格を分ける ---- */
+    case 'koumori':
+      return wave(fish, tank, KOUMORI_WAVE)
+    case 'majo':
+      return wave(fish, tank, MAJO_WAVE)
+    case 'kabocha':
+      return bob(fish, tank)
+    case 'yurei':
+      return haunt(fish, tank)
+    /*
+     * フランケンはここに来ない（地面を歩く＝`Walker` なので `steer` を通らない）。
+     * 来たとしても、ここで縦の速度を付けると足が地面から離れる。
+     */
+
     default:
       return fish
   }
@@ -383,9 +461,17 @@ function nearEdge(vy: number, fish: Fish, tank: Tank): number {
  * **目標は必ず内側にあり、そちらへ引き戻される**。
  * 位相は絵ごとにずらす。揃っていると、全部が同時に潜って同時に浮く。
  */
-function wanderY(fish: Fish, tank: Tank): number {
+function wanderY(
+  fish: Fish,
+  tank: Tank,
+  /**
+   * 行き来する帯。既定は画面の真ん中を中心に上下 35%（15%〜85%）。
+   * **かぼちゃだけ下のほうの狭い帯にする**ので、引数で渡せるようにしてある。
+   */
+  { centre = 0.5, band = WANDER_BAND }: { centre?: number; band?: number } = {},
+): number {
   const turn = (Math.PI * 2) / WANDER_SECONDS
-  const target = tank.height * (0.5 + WANDER_BAND * Math.cos(fish.age * turn + fish.wavePhase))
+  const target = tank.height * (centre + band * Math.cos(fish.age * turn + fish.wavePhase))
   // 上限を掛ける。生まれた場所が目標から遠いと、初速が跳ね上がって不自然になる
   const limit = tank.height * WANDER_RATE
   return Math.max(-limit, Math.min(limit, (target - fish.y) * WANDER_GAIN))
@@ -410,6 +496,51 @@ function drift(fish: Fish, tank: Tank): Fish {
   const beat = pulse(fish.age, KURAGE_PULSE_SECONDS, fish.wavePhase)
   const lift = (beat - pulseMean()) * tank.height * KURAGE_PULSE_RISE
   return { ...fish, vy: nearEdge(-lift, fish, tank) + wanderY(fish, tank) }
+}
+
+/**
+ * その場でふわふわ上下する（かぼちゃ）。
+ *
+ * **横はほとんど進まない**（横切るのに 90〜140秒）ので、見えている動きは
+ * ほぼこの上下だけになる。クラゲと同じ作りに見えるが、違いが2つある。
+ *
+ * 1. 正弦にしてある。クラゲは「かさを閉じてぐっと上がる」脈だが、
+ *    かぼちゃは自分で泳いでいない。浮いているものが揺れているだけ。
+ * 2. 行き来する帯を画面の下のほう（46%〜78%）に狭めてある。
+ *    空を飛ぶ理由が無いものを月より高くに上げない。
+ *
+ * 速度を返すだけで位置は書き換えない。壁で止める処理（`stepFish`）を効かせるため。
+ */
+function bob(fish: Fish, tank: Tank): Fish {
+  const turn = (Math.PI * 2) / KABOCHA_BOB_SECONDS
+  // 揺れの「速さ」は、揺れ幅を時間で微分したもの。上が -、下が + になる
+  const lift = -tank.height * KABOCHA_BOB * turn * Math.cos(fish.age * turn + fish.wavePhase)
+  return { ...fish, vy: nearEdge(lift, fish, tank) + wanderY(fish, tank, KABOCHA_BAND) }
+}
+
+/**
+ * ふらふら不規則に漂う（ゆうれい）。
+ *
+ * **それまで、ゆうれいには動きが1つも無かった。** `steer` に分岐が無く、
+ * 生まれたときの速度のまま直線で流れていた（まる魚が R-043 で直したのと同じ形）。
+ *
+ * 周期の違う2つの波を足す。1つだと、遅いだけの規則正しい上下になり、
+ * 「浮いている板」に見える。2つ足すと同じ形に戻るまで 87秒かかるので、
+ * 会場で見ている間は同じ動きが繰り返されない。
+ */
+function haunt(fish: Fish, tank: Tank): Fish {
+  const [slow, slower] = YUREI_SWAY_SECONDS
+  const fast = (Math.PI * 2) / slow
+  const lazy = (Math.PI * 2) / slower
+  /*
+   * 位相を2つの波でずらす（`wavePhase` と その 1.7 倍）。
+   * 同じ位相から始めると、生まれた直後だけ2つの波が重なって大きく動く。
+   */
+  const lift =
+    -((tank.height * YUREI_SWAY) / 2) *
+    (fast * Math.cos(fish.age * fast + fish.wavePhase) +
+      lazy * Math.cos(fish.age * lazy + fish.wavePhase * 1.7))
+  return { ...fish, vy: nearEdge(lift, fish, tank) + wanderY(fish, tank) }
 }
 
 /**
