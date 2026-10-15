@@ -121,7 +121,13 @@ export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
    * `flies` は使わない。**このテーマは全部ただよう**ので、飛ぶ種類という区別が要らない
    *（混ぜると R-072 の型に戻る）。
    */
-  kabocha: { id: 'kabocha', label: 'かぼちゃ', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false, stiff: true },
+  /*
+   * **かぼちゃは浮かせない**（本人の指示・2026-10-15）。
+   * 空を飛ぶ理由が無い。地面に置いて、ころころ転がるように動かす。
+   * `swimsSideways: false`（頭が上）のままにしてあるのは、
+   * かぼちゃに前後が無いから。横を向かせる意味がない。
+   */
+  kabocha: { id: 'kabocha', label: 'かぼちゃ', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false, stiff: true, walks: true },
   koumori: { id: 'koumori', label: 'こうもり', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false, stiff: true },
   yurei: { id: 'yurei', label: 'ゆうれい', theme: NIGHT, head: { x: 0, y: -1 }, swimsSideways: false, stiff: true },
   majo: { id: 'majo', label: 'まじょ', theme: NIGHT, head: { x: 1, y: 0 }, swimsSideways: true, stiff: true },

@@ -82,7 +82,7 @@ function peakRate(values: readonly number[]): number {
   return peak
 }
 
-describe('ハロウィン: 4種のただよいが、それぞれ違う道になる', () => {
+describe('ハロウィン: 3種のただよいが、それぞれ違う道になる', () => {
   /*
    * こうもりの波長は画面幅の 13%、まじょは 120%。**9倍以上違う**。
    * 60秒のあいだに折り返す回数で、その差がそのまま出る。
@@ -108,35 +108,74 @@ describe('ハロウィン: 4種のただよいが、それぞれ違う道にな�
   })
 })
 
-describe('ハロウィン: かぼちゃは下のほうでふわふわする', () => {
+describe('ハロウィン: かぼちゃは浮かない', () => {
   /*
-   * 帯は 46%〜78%。生まれた場所がその外でも、`wanderY` が中へ引き戻す。
-   * 引き戻しには上限があるので（`WANDER_RATE`）、最初の数秒は帯の外に居てよい。
+   * **「かぼちゃは浮かないでほしい」（本人・2026-10-15）。**
+   *
+   * それまでは画面の 46%〜78% の帯でふわふわ上下させていた。
+   * 地面に下ろして、転がるように動かす。
    */
-  it('15秒たてば、画面の下半分から出ない', () => {
-    for (let seed = 0; seed < 12; seed++) {
-      const { ys } = run('kabocha', seed, 90)
-      for (const y of ys.slice(15 * FPS)) {
-        expect(y, `seed=${seed}`).toBeGreaterThan(TANK.height * 0.4)
-        expect(y, `seed=${seed}`).toBeLessThan(TANK.height * 0.9)
-      }
+  const ground = (seed: number, seconds: number): { ys: number[]; xs: number[] } => {
+    let creatures = [spawn('kabocha', seed)]
+    const ys: number[] = []
+    const xs: number[] = []
+    for (let step = 0; step < seconds * FPS; step++) {
+      creatures = stepCreatures(creatures, DT, TANK)
+      const place = placeCreature(creatures[0], LANES)
+      ys.push(place.y + place.height / 2)
+      xs.push(place.x)
+    }
+    return { ys, xs }
+  }
+
+  it('歩く絵として生まれる', () => {
+    for (let seed = 0; seed < 40; seed++) {
+      expect(spawn('kabocha', seed).kind, `seed=${seed}`).toBe('walk')
     }
   })
 
-  it('地面（95%）には着かない。歩く絵と見分けがつかなくなる', () => {
+  it('底が地面から離れない（90秒ぶん動かしても）', () => {
+    const line = LANES[0].groundY
     for (let seed = 0; seed < 12; seed++) {
-      const { ys } = run('kabocha', seed, 90)
-      expect(Math.max(...ys)).toBeLessThan(LANES[0].groundY)
+      const { ys } = ground(seed, 90)
+      /*
+       * 地面の線ちょうどには揃わない（`groundOffset`・わざと散らしてある）。
+       * 転がる弾みも乗るので、絵の高さの 2 割ぶんを許す。
+       * 画面の高さ 1080 に対して 230px の絵なので ±46px。
+       */
+      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThan(line - 230 * 0.2)
+      expect(Math.max(...ys), `seed=${seed}`).toBeLessThan(line + 230 * 0.2)
+    }
+  })
+
+  it('画面の上半分へは行かない', () => {
+    for (let seed = 0; seed < 12; seed++) {
+      const { ys } = ground(seed, 90)
+      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThan(TANK.height * 0.5)
     }
   })
 
   /*
-   * **かぼちゃは「横へ進む絵」ではない。** 上下のふわふわのほうが目に入る、
-   * が狙いなので、同じ時間での上下の最大の速さが横を上回ること。
+   * **歩く絵の中でいちばん遅い。** フランケン（既定 22〜62px/秒）と
+   * 同じ速さで転がすと、足のないかぼちゃが地面を滑って見える。
    */
-  it('横に流れるより、上下にふわふわするほうが目立つ', () => {
-    const track = run('kabocha', 5, 60)
-    expect(peakRate(track.ys)).toBeGreaterThan(peakRate(track.xs))
+  it('フランケンより遅く転がる', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const kabocha = spawn('kabocha', seed)
+      const franken = spawn('franken', seed)
+      if (kabocha.kind !== 'walk' || franken.kind !== 'walk') throw new Error('歩いていない')
+      expect(Math.abs(kabocha.walker.vx), `seed=${seed}`).toBeLessThan(Math.abs(franken.walker.vx))
+    }
+  })
+
+  it('1920px の画面で 10〜17px/秒（120〜180秒で横切る速さ）', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const kabocha = spawn('kabocha', seed)
+      if (kabocha.kind !== 'walk') throw new Error('歩いていない')
+      const speed = Math.abs(kabocha.walker.vx)
+      expect(speed, `seed=${seed}`).toBeGreaterThanOrEqual(1920 / 180)
+      expect(speed, `seed=${seed}`).toBeLessThanOrEqual(1920 / 120)
+    }
   })
 })
 
@@ -241,7 +280,8 @@ describe('ハロウィン: 魚の動きを当てない', () => {
   })
 
   it('共通の上下のゆらぎが乗らない（描画の Y と道の Y が一致する）', () => {
-    for (const id of ['koumori', 'majo', 'kabocha', 'yurei'] as SpeciesId[]) {
+    // かぼちゃとフランケンは歩く絵なので、そもそもこのゆらぎを持たない
+    for (const id of ['koumori', 'majo', 'yurei'] as SpeciesId[]) {
       let creatures = [spawn(id, 3)]
       for (let step = 0; step < 20 * FPS; step++) {
         creatures = stepCreatures(creatures, DT, TANK)
@@ -267,14 +307,14 @@ describe('ハロウィン: 魚の動きを当てない', () => {
 
 describe('ハロウィン: 浮く絵も歩く絵と同じ大きさ', () => {
   /*
-   * ハロウィンは、歩く絵（フランケン）と浮く絵が同じ画面に並ぶ唯一のテーマ。
+   * ハロウィンは、歩く絵と浮く絵が同じ画面に並ぶ唯一のテーマ。
    * 浮く側だけ泳ぐ絵の基準（0.07）だと、同じ台紙どうしで 1.7 倍違って見える。
    */
-  it('4種の浮く絵が、フランケンと同じ長辺になる', () => {
+  it('3種の浮く絵が、フランケンと同じ長辺になる', () => {
     const franken = spawn('franken', 1)
     if (franken.kind !== 'walk') throw new Error('フランケンが歩いていない')
     const walkerSide = Math.max(franken.walker.width, franken.walker.height)
-    for (const id of ['koumori', 'majo', 'kabocha', 'yurei'] as SpeciesId[]) {
+    for (const id of ['koumori', 'majo', 'yurei'] as SpeciesId[]) {
       const creature = spawn(id, 1)
       if (creature.kind !== 'float') throw new Error(`${id} が歩いている`)
       expect(Math.max(creature.fish.width, creature.fish.height), id).toBeCloseTo(walkerSide, 3)

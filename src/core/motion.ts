@@ -17,7 +17,7 @@ import {
   type Walker,
 } from './walk'
 import type { MotionKind } from './theme'
-import { sharePrey, speedRange, steer, type Prey } from './behaviour'
+import { sharePrey, speedRange, steer, walkSpeedRange, type Prey } from './behaviour'
 import { SPECIES, speciesFlies, speciesIsStiff, speciesWalks, type SpeciesId } from './templates'
 
 /**
@@ -84,6 +84,11 @@ export function spawnCreature(
       kind: 'walk',
       walker: spawnWalker(seed, tank, lanes, imageWidth, imageHeight, {
         targetSize: creatureSize(tank, WALKER_SIZE_RATIO, sizeScale),
+        /*
+         * 歩く速さを種類ごとに決める（`WALK_CROSS_SECONDS`）。
+         * 表に無い種類は `spawnWalker` の既定（22〜62px/秒）のまま。
+         */
+        ...(walkSpeedRange(tank.width, species) ?? {}),
       }),
     }
   }

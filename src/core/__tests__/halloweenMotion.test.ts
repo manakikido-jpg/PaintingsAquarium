@@ -5,11 +5,16 @@ import type { Lane } from '../walk'
 import type { Tank } from '../swim'
 
 /*
- * **ハロウィンは「全部ただよう」テーマの中で、フランケンだけ地面を歩く。**
+ * **ハロウィンは、地面を歩く2種（かぼちゃ・フランケン）と
+ * 夜空を飛ぶ3種（こうもり・まじょ・ゆうれい）が同じ画面に並ぶ。**
  *
  * 歩く絵と浮く絵を混ぜるのは、恐竜で事故になった型そのもの（R-072）。
- * 見分けを1つ間違えると「おばけが地面を歩く」「フランケンが空に浮く」になる。
+ * 見分けを1つ間違えると「おばけが地面を歩く」「かぼちゃが空に浮く」になる。
  * **混ぜると決めた以上、どちらも起きないことをここで固定する。**
+ *
+ * かぼちゃは、ふわふわ浮かせていたのを地面に下ろした（本人の指示・2026-10-15）。
+ * いちばん似ているのは**ゆうれい**（重なり 0.72）で、そこを取り違えると
+ * 「おばけが地面を転がる」になる。似た相手が浮く側にいるのが怖いところ。
  */
 
 const TANK: Tank = { width: 1920, height: 1080 }
@@ -22,22 +27,29 @@ function spawn(species: SpeciesId, lanes: readonly Lane[] = LANES, seed = 7): Cr
   return spawnCreature('float', seed, TANK, 420, 410, lanes, 1, 'unknown', species)
 }
 
-describe('ハロウィン: フランケンだけ地面を歩く', () => {
-  it('台紙は5種で、歩く印が付いているのはフランケンだけ', () => {
+/** 地面を歩く2種 */
+const WALKERS: SpeciesId[] = ['kabocha', 'franken']
+/** 夜空を飛ぶ3種 */
+const FLOATERS = NIGHT.filter((id) => !WALKERS.includes(id))
+
+describe('ハロウィン: 地面を歩くのはかぼちゃとフランケンだけ', () => {
+  it('台紙は5種で、歩く印が付いているのは2種だけ', () => {
     expect(NIGHT).toHaveLength(5)
-    expect(NIGHT.filter((id) => speciesWalks(id))).toEqual(['franken'])
+    expect(NIGHT.filter((id) => speciesWalks(id)).sort()).toEqual([...WALKERS].sort())
   })
 
-  it('フランケンは歩く', () => {
-    for (let seed = 0; seed < 40; seed++) {
-      expect(spawn('franken', LANES, seed).kind).toBe('walk')
+  it('かぼちゃとフランケンは歩く', () => {
+    for (const id of WALKERS) {
+      for (let seed = 0; seed < 40; seed++) {
+        expect(spawn(id, LANES, seed).kind, id).toBe('walk')
+      }
     }
   })
 
-  it('ほかの4種は、地面の列があっても歩かない', () => {
-    for (const id of NIGHT.filter((n) => n !== 'franken')) {
+  it('ほかの3種は、地面の列があっても歩かない', () => {
+    for (const id of FLOATERS) {
       for (let seed = 0; seed < 40; seed++) {
-        expect(spawn(id, LANES, seed).kind).toBe('float')
+        expect(spawn(id, LANES, seed).kind, id).toBe('float')
       }
     }
   })
@@ -46,14 +58,16 @@ describe('ハロウィン: フランケンだけ地面を歩く', () => {
    * **列が無いテーマでは歩かせない。** 地面の高さが決まらないので、
    * 足が宙に浮くか画面の外へ沈む。種類の印だけを見て歩かせてはいけない。
    */
-  it('地面の列が無ければ、フランケンもただよう', () => {
-    expect(spawn('franken', []).kind).toBe('float')
+  it('地面の列が無ければ、どちらもただよう', () => {
+    for (const id of WALKERS) expect(spawn(id, []).kind, id).toBe('float')
   })
 })
 
-describe('ハロウィン: フランケンが空に浮かない', () => {
+describe('ハロウィン: 歩く2種が空に浮かない', () => {
   it('足が地面から離れない（60秒ぶん動かしても）', () => {
-    let creatures = Array.from({ length: 8 }, (_, i) => spawn('franken', LANES, i))
+    let creatures = WALKERS.flatMap((id) =>
+      Array.from({ length: 8 }, (_, i) => spawn(id, LANES, i)),
+    )
     const ground = LANES[0].groundY
     for (let step = 0; step < 60 * 30; step++) {
       creatures = stepCreatures(creatures, 1 / 30, TANK)
@@ -73,17 +87,19 @@ describe('ハロウィン: フランケンが空に浮かない', () => {
   })
 
   it('画面の上半分へは行かない', () => {
-    let creatures = [spawn('franken', LANES, 3)]
+    let creatures = WALKERS.map((id) => spawn(id, LANES, 3))
     for (let step = 0; step < 60 * 30; step++) {
       creatures = stepCreatures(creatures, 1 / 30, TANK)
-      expect(placeCreature(creatures[0], LANES).y).toBeGreaterThan(TANK.height * 0.5)
+      for (const creature of creatures) {
+        expect(placeCreature(creature, LANES).y).toBeGreaterThan(TANK.height * 0.5)
+      }
     }
   })
 })
 
-describe('ハロウィン: ほかの4種が地面を歩かない', () => {
-  it('ただよう4種は、画面の上のほうにも出る', () => {
-    for (const id of NIGHT.filter((n) => n !== 'franken')) {
+describe('ハロウィン: ほかの3種が地面を歩かない', () => {
+  it('ただよう3種は、画面の上のほうにも出る', () => {
+    for (const id of FLOATERS) {
       let creatures = Array.from({ length: 12 }, (_, i) => spawn(id, LANES, i * 13 + 1))
       let reachedUpper = false
       for (let step = 0; step < 60 * 20; step++) {
