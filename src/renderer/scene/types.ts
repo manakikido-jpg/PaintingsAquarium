@@ -17,6 +17,20 @@ export interface Scene {
    * こうしないと、手前の地面が奥の絵の上に描かれて足が埋まる。
    */
   readonly lanes: Lane[]
+  /**
+   * 列ごとに地面を描かないテーマ（背景が1枚の絵・ハロウィン）。
+   *
+   * `true` なら、描画ループは**列で分けずに、足元の低い順（奥から手前）**に
+   * 絵を描く。`drawLane` は呼ばない。
+   *
+   * **これが無いと、列を増やしたとたんに重なり順が崩れる。**
+   * 列で分けて描く順番は「0番の列 → 1番の列 → …」で、
+   * ただよう絵は全部 0番の列にいる扱いなので（`creatureLane`）、
+   * **空のおばけが、手前の地面にいる絵より先に描かれる**。
+   * 地面を描き分けるテーマ（恐竜）はこの順番が要るが、
+   * 背景が1枚の絵なら足元の高さで並べるほうが素直で、正しい。
+   */
+  readonly drawsFlat?: boolean
 
   /** 絵より奥のすべて（空・水・光・遠景） */
   drawBehind(context: CanvasRenderingContext2D, elapsed: number, strength: number): void

@@ -52,6 +52,24 @@ export function makeLanes(
   })
 }
 
+/**
+ * ハロウィンの地面の列。**数と帯をここに置くのは、単体テストで固定するため。**
+ *
+ * 歩く種類が1つ（フランケンだけ）のうちは1本で足りていたが、
+ * かぼちゃを地面に下ろして2つになった。会場の設定（同時50枚）だと
+ * 歩く絵が約20体になり、実測で**重なった組が平均 3.6 → 18.9**（最大27）
+ * まで悪化する。1本の線に20体を並べれば当然で、
+ * **自分の絵を見つけられない**（要件定義 §3 5c）。
+ *
+ * 実測（20体・60秒・重なった組）: 1本 18.9／3本 4.5／**4本 3.0**／5本 3.5。
+ *
+ * 帯の上端は背景の絵の手前の丘に合わせてある。これより上げると、
+ * 城と村の上を歩くことになる。下端は背景の絵から出す（`halloweenScene.ts`）。
+ */
+export const HALLOWEEN_LANES = 4
+export const HALLOWEEN_BACK_RATIO = 0.84
+export const HALLOWEEN_MIN_SCALE = 0.72
+
 export interface Walker {
   readonly x: number
   readonly vx: number

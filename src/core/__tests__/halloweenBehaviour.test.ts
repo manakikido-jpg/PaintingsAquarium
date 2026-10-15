@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { placeCreature, spawnCreature, stepCreatures, type Creature } from '../motion'
-import type { Lane } from '../walk'
+import {
+  HALLOWEEN_BACK_RATIO,
+  HALLOWEEN_LANES,
+  HALLOWEEN_MIN_SCALE,
+  makeLanes,
+  type Lane,
+} from '../walk'
 import type { Tank } from '../swim'
 import { SPECIES, SPECIES_IDS, rigForSpecies, speciesIsStiff, type SpeciesId } from '../templates'
 
@@ -361,6 +367,72 @@ describe('横向きの台紙は、顔の向いているほうへ進む', () => {
       for (const mirrored of [false, true]) {
         expect(rigForSpecies(id, mirrored).headsRight, `${id}/${mirrored}`).toBe(mirrored)
       }
+    }
+  })
+})
+
+describe('ハロウィン: 地面が混みすぎない', () => {
+  /*
+   * **かぼちゃを地面に下ろしたら、列1本では足りなくなった。**
+   *
+   * 歩く種類が1つ（フランケンだけ）のうちは足りていた。2つになると、
+   * 会場の設定（同時50枚）で歩く絵が約20体になり、1本の線に並ぶ。
+   * 実測（20体・60秒・重なった組の平均）: 1本 18.9／3本 4.5／4本 3.0／5本 3.5。
+   * 重なると自分の絵を見つけられない（要件定義 §3 5c）。
+   */
+  const HALLOWEEN: Lane[] = makeLanes({ width: 1920, height: 1080 }, HALLOWEEN_LANES, {
+    backRatio: HALLOWEEN_BACK_RATIO,
+    frontRatio: 0.99,
+    minScale: HALLOWEEN_MIN_SCALE,
+    maxScale: 1,
+  })
+
+  /** 60秒動かして、同じ列で重なっていた組の平均を返す。 */
+  function crowding(lanes: Lane[], walkers: number): number {
+    let creatures = Array.from({ length: walkers }, (_, i) =>
+      spawnCreature('float', i * 7 + 1, TANK, 420, 410, lanes, 1, 'unknown',
+        i % 2 ? 'kabocha' : 'franken'),
+    )
+    let sum = 0
+    let frames = 0
+    for (let step = 0; step < 60 * 30; step++) {
+      creatures = stepCreatures(creatures, 1 / 30, TANK)
+      const placed = creatures.map((creature) => ({
+        ...placeCreature(creature, lanes),
+        lane: creature.kind === 'walk' ? creature.walker.lane : 0,
+      }))
+      for (let a = 0; a < placed.length; a++) {
+        for (let b = a + 1; b < placed.length; b++) {
+          if (placed[a].lane !== placed[b].lane) continue
+          const limit = ((placed[a].width + placed[b].width) / 2) * 0.5
+          if (Math.abs(placed[a].x - placed[b].x) < limit) sum++
+        }
+      }
+      frames++
+    }
+    return sum / frames
+  }
+
+  it('会場の設定（歩く絵20体）で、重なった組が平均5組を超えない', () => {
+    expect(crowding(HALLOWEEN, 20)).toBeLessThan(5)
+  })
+
+  it('列を1本に戻すと、同じ条件でひどく重なる（この列が効いている証拠）', () => {
+    const single: Lane[] = [{ groundY: 1080 * 0.99, scale: 1, depth: 1 }]
+    expect(crowding(single, 20)).toBeGreaterThan(10)
+  })
+
+  it('列は画面の下のほうだけを使う（城と村の上を歩かない）', () => {
+    for (const lane of HALLOWEEN) {
+      expect(lane.groundY).toBeGreaterThan(1080 * 0.8)
+      expect(lane.groundY).toBeLessThanOrEqual(1080 * 0.99)
+    }
+  })
+
+  it('奥の列ほど小さく、手前ほど大きい', () => {
+    for (let i = 1; i < HALLOWEEN.length; i++) {
+      expect(HALLOWEEN[i].scale).toBeGreaterThan(HALLOWEEN[i - 1].scale)
+      expect(HALLOWEEN[i].groundY).toBeGreaterThan(HALLOWEEN[i - 1].groundY)
     }
   })
 })

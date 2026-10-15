@@ -1,5 +1,11 @@
 import backgroundUrl from '../../../assets/scene/halloween-background.webp?url'
-import type { Lane } from '../../core/walk'
+import {
+  HALLOWEEN_BACK_RATIO,
+  HALLOWEEN_LANES,
+  HALLOWEEN_MIN_SCALE,
+  makeLanes,
+  type Lane,
+} from '../../core/walk'
 import {
   moonPulse,
   moteFade,
@@ -109,18 +115,32 @@ export function createHalloweenScene(tank: Tank, _decorDensity = 1): Scene {
   }
 
   /*
-   * **列を1本だけ持つ。** 地面を歩く種類（フランケンシュタイン）のため。
+   * **奥行きの列を4本持つ。** 地面を歩く種類（かぼちゃ・フランケン）のため。
    * 背景は1枚の絵なので地面を描く必要はなく（`drawLane` は何もしない）、
    * 要るのは「どの高さに足を置くか」だけ。
    *
-   * **2本以上にしてはいけない。** 描画ループは列があると
-   * 「奥の地面 → その列の絵 → …」の順に**列ごとに分けて**絵を描く。
-   * ただよう絵は全部 0 番の列に入るので、列を増やすと
-   * **ただよう絵だけが先にまとめて描かれて**、重なり順が崩れる。
+   * **1本だと足りない。** 歩く種類が1つ（フランケンだけ）のうちは足りていたが、
+   * かぼちゃを地面に下ろして2つになった。会場の設定（同時50枚）だと
+   * 歩く絵が約20体になり、実測で**重なった組が平均 3.6 → 18.9**（最大27）
+   * まで悪化した。1本の線に20体を並べれば当然で、
+   * **自分の絵を見つけられない**（要件定義 §3 5c）。
+   * 列を増やすと 3本で 4.5・**4本で 3.0**・5本で 3.5。4本を採る。
+   *
+   * 帯は背景の絵の手前の丘に合わせてある（画面の高さの 84%〜99%）。
+   * これより上げると、城と村の上を歩くことになる。
+   *
+   * **重なり順は `drawsFlat` で解いてある。** 列ごとに分けて描くと、
+   * ただよう絵は全部 0 番の列に入るので、空のおばけが手前の絵より
+   * 先に描かれてしまう。足元の低い順に描けばよい（`scene/types.ts`）。
    */
-  const lanes: Lane[] = [
-    { groundY: Math.min(tank.height * 0.99, fromImage(0.5, GROUND_IMAGE_Y).y), scale: 1, depth: 1 },
-  ]
+  const frontGroundY = Math.min(tank.height * 0.99, fromImage(0.5, GROUND_IMAGE_Y).y)
+  const lanes: Lane[] = makeLanes(tank, HALLOWEEN_LANES, {
+    backRatio: HALLOWEEN_BACK_RATIO,
+    frontRatio: frontGroundY / tank.height,
+    // 奥ほど小さく。奥行きは高さだけでなく大きさでも出す（R-009 / R-011）
+    minScale: HALLOWEEN_MIN_SCALE,
+    maxScale: 1,
+  })
 
   /** 光をひと粒。中心だけ明るく、縁は透明（四角い点に見せない）。 */
   const dot = (context: CanvasRenderingContext2D, x: number, y: number, r: number,
@@ -138,6 +158,8 @@ export function createHalloweenScene(tank: Tank, _decorDensity = 1): Scene {
   return {
     motion: 'float',
     lanes,
+    // 背景が1枚の絵なので、列ごとではなく足元の低い順に描く
+    drawsFlat: true,
 
     drawBehind(context, elapsed, strength) {
       /*

@@ -602,6 +602,20 @@ export function Aquarium({
 
       if (scene.lanes.length === 0) {
         for (const swimmer of list) drawSwimmer(swimmer)
+      } else if (scene.drawsFlat) {
+        /*
+         * **足元の低い順（奥）から描く。** 地面を描き分けないテーマはこちら。
+         * 列で分けて描くと、ただよう絵は全部 0番の列にいる扱いなので
+         *（`creatureLane`）、空のおばけが手前の絵より先に描かれる。
+         */
+        const lanes = scene.lanes
+        const bottomOf = (swimmer: Swimmer): number => {
+          const place = placeCreature(swimmer.creature, lanes)
+          return place.y + place.height / 2
+        }
+        for (const swimmer of [...list].sort((a, b) => bottomOf(a) - bottomOf(b))) {
+          drawSwimmer(swimmer)
+        }
       } else {
         // 奥の地面 → その列の絵 → 次の地面、の順。まとめて描くと
         // 手前の地面が奥の絵にかぶさって足が埋まる。
