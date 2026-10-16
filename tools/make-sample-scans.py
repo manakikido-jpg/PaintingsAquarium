@@ -232,7 +232,11 @@ def main() -> int:
         # 一度も試さないまま「全種通った」と言うことになる
         doodle = '--scribble' in sys.argv
         made = 0
-        for theme in ('aquarium', 'dinosaur'):
+        # **テーマを並べるのではなく、あるフォルダを全部回す。**
+        # ここに 'aquarium', 'dinosaur' と**書いていた**ので、ハロウィンを足しても
+        # 回らず、「題入りの台紙を塗った紙」での確認が一度もされないままだった。
+        # テーマが増えるたびにここを直す作りにしない。
+        for theme in sorted(d.name for d in sheets.iterdir() if d.is_dir()):
             target = out / theme
             target.mkdir(parents=True, exist_ok=True)
             for path in sorted((sheets / theme).glob('*.png')):
