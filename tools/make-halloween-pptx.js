@@ -54,7 +54,7 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
     x: M, y: 1.95, w: 6.6, h: 1.55, fontFace: FONT, fontSize: 42, bold: true,
     color: 'FFFFFF', lineSpacing: 50, margin: 0,
   })
-  s.addText('子どもが塗ったおばけが、その場で\n大画面の夜空をふわふわ漂い出します。', {
+  s.addText('子どもが塗ったおばけが夜空を飛び、塗った\nフランケンが月あかりの丘を歩き出します。', {
     x: M, y: 3.6, w: 5.3, h: 0.9, fontFace: FONT, fontSize: 19, color: 'EDE2FA',
     lineSpacing: 30, margin: 0,
   })
@@ -200,7 +200,7 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
   s.addText([
     { text: '大きなモニターの中に、', options: {} },
     { text: '満月の出ている紫の夜空', options: { bold: true, color: SEA } },
-    { text: 'が広がっています。下には枯れ木・墓石・かぼちゃ畑があり、霧が流れています。その中を、子どもたちが塗ったおばけたちがふわふわ漂っています。', options: {} },
+    { text: 'が広がっています。月を背にお城が建ち、ふもとには灯りのともった村と丘があります。その夜空を子どもたちが塗ったおばけ・こうもり・まじょが飛び、手前の丘ではフランケンが歩き、かぼちゃが転がります。', options: {} },
   ], { x: bx, y: 1.72, w: 4.72, h: 1.7, fontFace: FONT, fontSize: 14.5, color: INK, lineSpacing: 26, margin: 0 })
 
   card(s, { x: bx, y: 3.62, w: 4.72, h: 1.75, fill: 'FDF1EC', stroke: 'F2CDBF' })
@@ -219,17 +219,17 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
 /* ------------------------------------------------- 6 塗れる5種 */
 {
   const s = slide(false)
-  heading(s, '塗れるのは5種類です', '5種とも夜空を「浮く」動きで揃えています')
+  heading(s, '塗れるのは5種類です', '5種とも動きが違います。遠くからでも自分の絵が分かります')
 
   s.addImage({ path: SHOT_SHEETS, x: M, y: 1.66, w: W - M * 2, h: 1.18, shadow: shadow() })
   s.addImage({ path: SHOT_COLORED, x: M, y: 2.94, w: W - M * 2, h: 1.18, shadow: shadow() })
 
   const kinds = [
-    ['かぼちゃ', 'E8653F', '夜空をゆっくり上下に漂います'],
-    ['おばけ', '9B7BD1', 'ふわふわと、いちばんゆっくり漂います'],
-    ['こうもり', '5B4A86', '翼を広げて、左右へすいっと進みます'],
-    ['まじょ', '2E9E7B', 'ほうきに乗って夜空を横切ります'],
-    ['フランケンシュタイン', '7A3FB5', '手を広げたまま、ゆったり漂います'],
+    ['フランケンシュタイン', '7A3FB5', '月あかりの丘を横向きに歩きます。脚と腕を交互に振ります'],
+    ['かぼちゃ', 'E8653F', '丘をころころ転がります。5種でいちばんゆっくり'],
+    ['こうもり', '5B4A86', '夜空を細かくジグザグに、いちばん速く飛び回ります'],
+    ['まじょ', '2E9E7B', 'ほうきで大きな弧を描き、顔の向いているほうへ横切ります'],
+    ['おばけ', '9B7BD1', 'ふらふらと不規則に、ゆっくり漂います'],
   ]
   kinds.forEach(([name, dot, desc], i) => {
     const x = M + i * 2.42
@@ -245,7 +245,7 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
       lineSpacing: 17, margin: 0,
     })
   })
-  s.addText('歩く絵と浮く絵を混ぜると、見分けを1つ間違えただけで「地面を歩くはずのものが空に浮く」事故になります。ハロウィンは題材そのものが空に合うので、混ぜない設計にしました。', {
+  s.addText('歩く絵と浮く絵を混ぜるのは、見分けを1つ間違えると「おばけが地面を歩く」になる危ないやり方です。それでも混ぜているのは、全部が同じように漂っていると5種類の違いが伝わらないからです。どちらの向きにも間違わないことは、自動の検査で毎回確かめています。', {
     x: M, y: 6.12, w: W - M * 2, h: 0.5, fontFace: FONT, fontSize: 12, color: MUTE, lineSpacing: 18, margin: 0,
   })
   s.addNotes('台紙の形は、互いに見分けられることを測ってから印刷している。')
