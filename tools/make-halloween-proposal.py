@@ -146,7 +146,7 @@ def main() -> None:
         <thead><tr><th>台紙</th><th>どこを</th><th>動き</th></tr></thead>
         <tbody>
           <tr><td><strong>フランケンシュタイン</strong></td><td>月あかりの丘</td><td><b>横向きに歩く。</b>脚と腕を控えめに交互に振り、端で向きを変える</td></tr>
-          <tr><td><strong>かぼちゃ</strong></td><td>月あかりの丘</td><td><b>体の高さの半分ほどぽんと跳び、着地して進む。</b>5種でいちばんゆっくり</td></tr>
+          <tr><td><strong>かぼちゃ</strong></td><td>月あかりの丘</td><td><b>斜め上へ跳び、横へ進んで着地する。</b>着地すると少し休む</td></tr>
           <tr><td><strong>こうもり</strong></td><td>夜空</td><td>細かくジグザグに、いちばん速く飛び回る</td></tr>
           <tr><td><strong>まじょ</strong></td><td>夜空</td><td>ほうきで大きな弧を描き、顔の向いているほうへ横切る</td></tr>
           <tr><td><strong>おばけ</strong></td><td>夜空</td><td>大きさを控えめに、夜空をゆっくり不規則に漂う</td></tr>

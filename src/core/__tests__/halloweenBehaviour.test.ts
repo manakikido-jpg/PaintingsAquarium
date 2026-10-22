@@ -165,7 +165,7 @@ describe('ハロウィン: かぼちゃは浮かない', () => {
    * **歩く絵の中でいちばん遅い。** フランケン（既定 22〜62px/秒）と
    * 同じ速さで転がすと、足のないかぼちゃが地面を滑って見える。
    */
-  it('フランケンより遅く転がる', () => {
+  it('接地中の基礎速度はフランケンより遅い', () => {
     for (let seed = 0; seed < 20; seed++) {
       const kabocha = spawn('kabocha', seed)
       const franken = spawn('franken', seed)
@@ -174,7 +174,7 @@ describe('ハロウィン: かぼちゃは浮かない', () => {
     }
   })
 
-  it('1920px の画面で 10〜17px/秒（120〜180秒で横切る速さ）', () => {
+  it('1920px の画面で基礎速度は10〜17px/秒（跳躍中の前進は別）', () => {
     for (let seed = 0; seed < 20; seed++) {
       const kabocha = spawn('kabocha', seed)
       if (kabocha.kind !== 'walk') throw new Error('歩いていない')

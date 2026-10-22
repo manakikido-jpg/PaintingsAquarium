@@ -148,17 +148,31 @@ export function spawnWalker(
     groundOffset: (random() - 0.5) * spacing * 0.5,
   }
   // 既存の乱数列を保ち、ジャンプの指定で出現位置・速度まで変わらないようにする。
-  return options.jump ? { ...walker, jump: true, bounce: height * 0.5 } : walker
+  return options.jump
+    ? { ...walker, jump: true, bounce: height * 0.5, stepSpeed: Math.PI / 2.4 }
+    : walker
+}
+
+/** 周期をまたいでも連続する、空中で横へ進んだ距離の割合。接地中は増えない。 */
+function jumpTravel(phase: number): number {
+  const cycles = phase / Math.PI
+  const completed = Math.floor(cycles)
+  return completed + Math.min((cycles - completed) / 0.65, 1)
 }
 
 export function stepWalker(walker: Walker, dtSeconds: number, tank: Tank): Walker {
   const dt = Math.max(0, dtSeconds)
-  let x = walker.x + walker.vx * dt
+  const nextPhase = walker.stepPhase + walker.stepSpeed * dt
+  // 真上で跳ねて見えないよう、離陸から着地までに体幅の8割ぶん前へ飛ぶ。
+  const leap = walker.jump
+    ? (jumpTravel(nextPhase) - jumpTravel(walker.stepPhase)) * walker.width * 0.8 * Math.sign(walker.vx)
+    : 0
+  let x = walker.x + walker.vx * dt + leap
   let vx = walker.vx
 
   // 去る途中は折り返さない。折り返すと画面から出られない
   if (walker.exiting) {
-    return { ...walker, x, stepPhase: walker.stepPhase + walker.stepSpeed * dt }
+    return { ...walker, x, stepPhase: nextPhase }
   }
 
   const halfWidth = walker.width / 2
@@ -175,7 +189,7 @@ export function stepWalker(walker: Walker, dtSeconds: number, tank: Tank): Walke
     vx = -Math.abs(vx)
   }
 
-  return { ...walker, x, vx, stepPhase: walker.stepPhase + walker.stepSpeed * dt }
+  return { ...walker, x, vx, stepPhase: nextPhase }
 }
 
 /** 描画に使う Y（中心）。足が地面につき、歩くたびに少し弾む。 */
