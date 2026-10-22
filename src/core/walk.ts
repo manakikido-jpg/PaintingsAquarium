@@ -102,6 +102,8 @@ export interface SpawnWalkerOptions {
   readonly targetSize?: number
   readonly minSpeed?: number
   readonly maxSpeed?: number
+  /** 絵の大きさ・歩調を変えず、地面から跳ねる高さだけを調整する。 */
+  readonly bounceScale?: number
 }
 
 export function spawnWalker(
@@ -140,7 +142,7 @@ export function spawnWalker(
     height,
     stepPhase: random() * Math.PI * 2,
     stepSpeed: 3 + random() * 2.5,
-    bounce: height * (0.02 + random() * 0.03),
+    bounce: height * (0.02 + random() * 0.03) * (options.bounceScale ?? 1),
     turnMargin: random() * tank.width * 0.14,
     groundOffset: (random() - 0.5) * spacing * 0.5,
   }
