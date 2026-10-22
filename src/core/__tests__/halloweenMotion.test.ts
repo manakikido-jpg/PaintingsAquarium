@@ -64,7 +64,7 @@ describe('ハロウィン: 地面を歩くのはかぼちゃとフランケン�
 })
 
 describe('ハロウィン: 歩く2種が空に浮かない', () => {
-  it('足が地面から離れない（60秒ぶん動かしても）', () => {
+  it('ジャンプを含めても地面を基準に動き、空へ上がり続けない（60秒）', () => {
     let creatures = WALKERS.flatMap((id) =>
       Array.from({ length: 8 }, (_, i) => spawn(id, LANES, i)),
     )
@@ -77,11 +77,13 @@ describe('ハロウィン: 歩く2種が空に浮かない', () => {
         /*
          * 地面の線ちょうどには揃わない。わざと散らしてある（`groundOffset`）。
          * 同じ高さに並ぶと、すれ違うときに「ぶつかっている」ようにしか見えないため。
-         * 歩くたびの弾みも乗るので、絵の高さの 2 割ぶんを許す。
+         * かぼちゃはジャンプするので、各個体の実際の跳躍高さを上限にする。
          * **見たいのは「空へ上がっていかないこと」。**
          */
-        expect(feet).toBeGreaterThan(ground - place.height * 0.2)
-        expect(feet).toBeLessThan(ground + place.height * 0.2)
+        if (creature.kind !== 'walk') throw new Error('地面の絵が浮遊している')
+        const home = ground + creature.walker.groundOffset
+        expect(feet).toBeGreaterThanOrEqual(home - creature.walker.bounce - 1e-8)
+        expect(feet).toBeLessThanOrEqual(home + 1e-8)
       }
     }
   })

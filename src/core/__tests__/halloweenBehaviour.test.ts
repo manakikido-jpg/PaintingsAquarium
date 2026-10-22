@@ -140,16 +140,16 @@ describe('ハロウィン: かぼちゃは浮かない', () => {
     }
   })
 
-  it('底が地面から離れない（90秒ぶん動かしても）', () => {
+  it('ジャンプしても地面の帯に戻り、地下へ潜らない（90秒）', () => {
     const line = LANES[0].groundY
     for (let seed = 0; seed < 12; seed++) {
       const { ys } = ground(seed, 90)
       /*
        * 地面の線ちょうどには揃わない（`groundOffset`・わざと散らしてある）。
-       * 転がる弾みも乗るので、絵の高さの 2 割ぶんを許す。
-       * 画面の高さ 1080 に対して 230px の絵なので ±46px。
+       * ジャンプの頂点は絵の高さの半分。地面のずれも含めて6割まで。
+       * 着地時は元の地面へ戻り、地面の帯から空の上半分へ抜けない。
        */
-      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThan(line - 230 * 0.2)
+      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThan(line - 230 * 0.6)
       expect(Math.max(...ys), `seed=${seed}`).toBeLessThan(line + 230 * 0.2)
     }
   })

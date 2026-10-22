@@ -102,7 +102,7 @@ export function spawnCreature(
          * 表に無い種類は `spawnWalker` の既定（22〜62px/秒）のまま。
          */
         ...(walkSpeedRange(tank.width, species) ?? {}),
-        ...(species === 'kabocha' ? { bounceScale: 1.5 } : {}),
+        ...(species === 'kabocha' ? { jump: true } : {}),
       }),
     }
   }

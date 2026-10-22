@@ -7,8 +7,8 @@ import { walkSpeedRange } from '../behaviour'
 const tank = { width: 1920, height: 1080 }
 const lanes = [{ groundY: 1000, scale: 1, depth: 1 }]
 
-describe('かぼちゃは跳ねる高さだけ1.5倍', () => {
-  it('同じseedで、大きさ・位置・速度・テンポを変えず跳ねる高さを増す', () => {
+describe('かぼちゃは高さの半分までジャンプして着地する', () => {
+  it('同じseedで、大きさ・位置・速度・周期を変えず、明確に離陸・着地する', () => {
     for (let seed = 0; seed < 20; seed++) {
       const before = spawnWalker(seed, tank, lanes, 600, 500, {
         targetSize: creatureSize(tank, halloweenSizeRatio('kabocha'), 1),
@@ -17,13 +17,13 @@ describe('かぼちゃは跳ねる高さだけ1.5倍', () => {
       const creature = spawnCreature('float', seed, tank, 600, 500, lanes, 1, 'unknown', 'kabocha')
       if (creature.kind !== 'walk') throw new Error('かぼちゃが地面にいない')
       const after = creature.walker
-      expect(after).toEqual({ ...before, bounce: before.bounce * 1.5 })
+      expect(after).toEqual({ ...before, jump: true, bounce: before.height * 0.5 })
       const ground = lanes[0].groundY + before.groundOffset
-      for (const phase of [0, Math.PI / 4, Math.PI / 2, Math.PI]) {
-        const beforeFeet = walkerY({ ...before, stepPhase: phase }, lanes) + before.height / 2
-        const afterFeet = walkerY({ ...after, stepPhase: phase }, lanes) + after.height / 2
-        expect(ground - afterFeet).toBeCloseTo((ground - beforeFeet) * 1.5)
-        expect(afterFeet).toBeLessThanOrEqual(ground + 1e-8)
+      for (const fraction of [0, 0.325, 0.65, 0.8, 1]) {
+        const feet = walkerY({ ...after, stepPhase: fraction * Math.PI }, lanes) + after.height / 2
+        expect(feet).toBeLessThanOrEqual(ground + 1e-8)
+        if (fraction === 0.325) expect(ground - feet).toBeCloseTo(after.height * 0.5)
+        else expect(feet).toBeCloseTo(ground)
       }
     }
   })

@@ -82,6 +82,8 @@ export interface Walker {
   readonly stepSpeed: number
   /** 弾む高さ（ピクセル） */
   readonly bounce: number
+  /** 歩行の小さな弾みではなく、離陸・着地・接地時間のあるジャンプ。 */
+  readonly jump?: boolean
   /**
    * 壁の手前どれだけで折り返すか（ピクセル）。
    * 全員が画面の端ちょうどで折り返すと、端に何匹も集まって固まる。
@@ -102,8 +104,7 @@ export interface SpawnWalkerOptions {
   readonly targetSize?: number
   readonly minSpeed?: number
   readonly maxSpeed?: number
-  /** 絵の大きさ・歩調を変えず、地面から跳ねる高さだけを調整する。 */
-  readonly bounceScale?: number
+  readonly jump?: boolean
 }
 
 export function spawnWalker(
@@ -134,7 +135,7 @@ export function spawnWalker(
   const speed = (minSpeed + random() * (maxSpeed - minSpeed)) * scale
   const marginX = Math.min(width / 2, tank.width / 2)
 
-  return {
+  const walker: Walker = {
     x: marginX + random() * Math.max(0, tank.width - marginX * 2),
     vx: random() < 0.5 ? speed : -speed,
     lane: laneIndex,
@@ -142,10 +143,12 @@ export function spawnWalker(
     height,
     stepPhase: random() * Math.PI * 2,
     stepSpeed: 3 + random() * 2.5,
-    bounce: height * (0.02 + random() * 0.03) * (options.bounceScale ?? 1),
+    bounce: height * (0.02 + random() * 0.03),
     turnMargin: random() * tank.width * 0.14,
     groundOffset: (random() - 0.5) * spacing * 0.5,
   }
+  // 既存の乱数列を保ち、ジャンプの指定で出現位置・速度まで変わらないようにする。
+  return options.jump ? { ...walker, jump: true, bounce: height * 0.5 } : walker
 }
 
 export function stepWalker(walker: Walker, dtSeconds: number, tank: Tank): Walker {
@@ -179,7 +182,12 @@ export function stepWalker(walker: Walker, dtSeconds: number, tank: Tank): Walke
 export function walkerY(walker: Walker, lanes: readonly Lane[]): number {
   const lane = lanes[walker.lane] ?? lanes[lanes.length - 1]
   const groundY = (lane ? lane.groundY : 0) + walker.groundOffset
-  return groundY - walker.height / 2 - Math.abs(Math.sin(walker.stepPhase)) * walker.bounce
+  const phase = ((walker.stepPhase % Math.PI) + Math.PI) % Math.PI / Math.PI
+  const flight = phase / 0.65
+  const lift = walker.jump
+    ? (flight < 1 ? 4 * flight * (1 - flight) : 0)
+    : Math.abs(Math.sin(walker.stepPhase))
+  return groundY - walker.height / 2 - lift * walker.bounce
 }
 
 /**
