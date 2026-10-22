@@ -14,6 +14,7 @@ import { RIG_VERSION } from '../shared/types'
 import { DINOSAUR_STYLES, THEMES, themeOf, type DinosaurStyle, type ThemeId } from '../core/theme'
 import { NOTICE_MODES, showsNotice, type NoticeMode } from '../core/notices'
 import { GALLERY_PAGE_SIZE, galleryPage, needsRebuild } from '../core/gallery'
+import { pieceImageUrl } from '../core/pieceImage'
 
 /**
  * 最新版の置き場。**アプリからは見に行かない**（画面に出すだけ）。
@@ -823,7 +824,7 @@ export function App(): React.JSX.Element {
             {pieces.length === 0 && <p className="note">まだ 1 枚も取り込んでいません。</p>}
             {galleryPage(pieces, shown).items.map((piece) => (
               <figure key={piece.id}>
-                <img src={`aqua://piece/${piece.id}`} alt={piece.fileName} />
+                <img src={pieceImageUrl(piece)} alt={piece.fileName} />
                 <figcaption>{piece.fileName}</figcaption>
                 <button type="button" onClick={() => void handleDelete(piece.id)}>
                   消す

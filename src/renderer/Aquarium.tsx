@@ -46,6 +46,7 @@ import type { DinosaurStyle, ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
 import type { Piece } from '../shared/types'
+import { pieceImageUrl } from '../core/pieceImage'
 
 interface Swimmer {
   /**
@@ -53,7 +54,8 @@ interface Swimmer {
    * 泳いでいる最中でも新しい見分け結果を受け取れるようにしてある（R-075）。
    */
   piece: Piece
-  readonly element: HTMLImageElement
+  element: HTMLImageElement
+  imageSource: string
   /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
   readonly bornAt: number
   /** しなりの拍。絵ごとにずらさないと、群れが1枚の布のように揃って見える */
@@ -214,6 +216,16 @@ export function Aquarium({
       for (const piece of piecesRef.current) {
         const swimming = swimmers.get(piece.id)
         if (swimming) {
+          const source = pieceImageUrl(piece)
+          if (swimming.imageSource !== source) {
+            swimming.imageSource = source
+            const image = new Image()
+            image.onload = () => {
+              // 読み込みが逆順で終わっても古い画像へ戻さない。完了までは前の絵を描く。
+              if (swimming.imageSource === source) swimming.element = image
+            }
+            image.src = source
+          }
           /*
            * **泳いでいる絵にも、作り直しの結果を届ける（R-075）。**
            *
@@ -238,10 +250,11 @@ export function Aquarium({
           continue
         }
         const element = new Image()
-        element.src = `aqua://piece/${piece.id}`
+        element.src = pieceImageUrl(piece)
         swimmers.set(piece.id, {
           piece,
           element,
+          imageSource: pieceImageUrl(piece),
           // 起動前からある絵は演出しない。起動のたびに全部が一斉に現れると
           // 不具合に見えるため。
           bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? elapsed : -Infinity,
