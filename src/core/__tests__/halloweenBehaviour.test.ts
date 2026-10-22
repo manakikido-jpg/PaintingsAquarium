@@ -311,20 +311,15 @@ describe('ハロウィン: 魚の動きを当てない', () => {
   })
 })
 
-describe('ハロウィン: 浮く絵も歩く絵と同じ大きさ', () => {
-  /*
-   * ハロウィンは、歩く絵と浮く絵が同じ画面に並ぶ唯一のテーマ。
-   * 浮く側だけ泳ぐ絵の基準（0.07）だと、同じ台紙どうしで 1.7 倍違って見える。
-   */
-  it('3種の浮く絵が、フランケンと同じ長辺になる', () => {
-    const franken = spawn('franken', 1)
-    if (franken.kind !== 'walk') throw new Error('フランケンが歩いていない')
-    const walkerSide = Math.max(franken.walker.width, franken.walker.height)
-    for (const id of ['koumori', 'majo', 'yurei'] as SpeciesId[]) {
-      const creature = spawn(id, 1)
-      if (creature.kind !== 'float') throw new Error(`${id} が歩いている`)
-      expect(Math.max(creature.fish.width, creature.fish.height), id).toBeCloseTo(walkerSide, 3)
-    }
+describe('ハロウィン: 種類ごとの見た目の大きさ', () => {
+  it('縦長のゆうれいを抑え、横長のフランケンは豆粒にしない', () => {
+    const ghost = spawnCreature('float', 1, TANK, 650, 780, LANES, 1, 'unknown', 'yurei')
+    const franken = spawnCreature('float', 1, TANK, 880, 590, LANES, 1, 'unknown', 'franken')
+    const witch = spawnCreature('float', 1, TANK, 800, 720, LANES, 1, 'unknown', 'majo')
+    if (ghost.kind !== 'float' || witch.kind !== 'float' || franken.kind !== 'walk') throw new Error('動きが違う')
+    expect(ghost.fish.height).toBeLessThan(witch.fish.height)
+    expect(franken.walker.height).toBeGreaterThan(ghost.fish.height * 0.85)
+    expect(franken.walker.width).toBeLessThan(TANK.width * 0.15)
   })
 
   it('水族館の魚の大きさは変えていない', () => {

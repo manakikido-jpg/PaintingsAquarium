@@ -8,7 +8,7 @@
 const pptx = require('pptxgenjs')
 const path = require('path')
 
-const ROOT = '/home/user/PaintingsAquarium'
+const ROOT = path.resolve(__dirname, '..')
 const SHOT = path.join(ROOT, 'docs/images/画面-ハロウィン.jpg')
 const SHOT_COLORED = path.join(ROOT, 'docs/images/ハロウィン-塗った例.jpg')
 const SHOT_SHEETS = path.join(ROOT, 'docs/images/ハロウィン台紙5種.jpg')
@@ -225,11 +225,11 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
   s.addImage({ path: SHOT_COLORED, x: M, y: 2.94, w: W - M * 2, h: 1.18, shadow: shadow() })
 
   const kinds = [
-    ['フランケンシュタイン', '7A3FB5', '月あかりの丘を横向きに歩きます。脚と腕を交互に振ります'],
+    ['フランケンシュタイン', '7A3FB5', '月あかりの丘を横向きに歩きます。脚と腕を控えめに交互に振ります'],
     ['かぼちゃ', 'E8653F', '丘をころころ転がります。5種でいちばんゆっくり'],
     ['こうもり', '5B4A86', '夜空を細かくジグザグに、いちばん速く飛び回ります'],
     ['まじょ', '2E9E7B', 'ほうきで大きな弧を描き、顔の向いているほうへ横切ります'],
-    ['おばけ', '9B7BD1', 'ふらふらと不規則に、ゆっくり漂います'],
+    ['おばけ', '9B7BD1', '大きさを控えめに、夜空をゆっくり漂います'],
   ]
   kinds.forEach(([name, dot, desc], i) => {
     const x = M + i * 2.42

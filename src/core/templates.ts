@@ -585,10 +585,10 @@ const FRANKEN_BACK_SHOULDER = 0.72
 const FRANKEN_HIP_X = 0.52
 const FRANKEN_HIP_BLEND = 0.12
 /** 脚の振り。脚は絵の 3 割あって四足（2 割）より長いので控えめにする */
-const FRANKEN_LEG_SWING = 0.16
+const FRANKEN_LEG_SWING = 0.09
 /** 腕の振り。肩から手先までの距離に対する**上下**のずれ */
-const FRANKEN_ARM_SWING = 0.14
-const FRANKEN_BODY_LIFT = 0.025
+const FRANKEN_ARM_SWING = 0.07
+const FRANKEN_BODY_LIFT = 0
 
 /** 前の脚（左）が +1、後ろの脚（右）が -1。 */
 export function frankenLegWeight(x: number): number {
