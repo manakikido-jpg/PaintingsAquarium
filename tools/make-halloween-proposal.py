@@ -149,7 +149,7 @@ def main() -> None:
           <tr><td><strong>かぼちゃ</strong></td><td>月あかりの丘</td><td><b>斜め上へ跳び、横へ進んで着地する。</b>着地すると少し休む</td></tr>
           <tr><td><strong>こうもり</strong></td><td>夜空</td><td>細かくジグザグに、いちばん速く飛び回る</td></tr>
           <tr><td><strong>まじょ</strong></td><td>夜空</td><td>ほうきで大きな弧を描き、顔の向いているほうへ横切る</td></tr>
-          <tr><td><strong>おばけ</strong></td><td>夜空</td><td>大きさを控えめに、夜空をゆっくり不規則に漂う</td></tr>
+          <tr><td><strong>おばけ</strong></td><td>夜空</td><td>他の絵とのバランスを保ち、夜空をゆっくり不規則に漂う</td></tr>
         </tbody>
       </table>
     </div>

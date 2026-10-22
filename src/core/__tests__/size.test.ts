@@ -6,6 +6,7 @@ import {
   MIN_SIZE_SCALE,
   WALKER_SIZE_RATIO,
   creatureSize,
+  halloweenSizeRatio,
 } from '../size'
 import type { Tank } from '../swim'
 
@@ -13,6 +14,13 @@ const WIDE: Tank = { width: 1920, height: 1080 }
 const SMALL: Tank = { width: 800, height: 600 }
 
 describe('creatureSize', () => {
+  it('ハロウィン5種だけ従来の1.5倍にし、種類間の大きさの比を保つ', () => {
+    const previous = { kabocha: 0.12, koumori: 0.12, majo: 0.12, yurei: 0.12 * 0.78, franken: 0.12 * 1.15 }
+    for (const id of Object.keys(previous) as (keyof typeof previous)[]) {
+      expect(creatureSize(WIDE, halloweenSizeRatio(id), 1)).toBeCloseTo(
+        creatureSize(WIDE, previous[id], 1) * 1.5)
+    }
+  })
   it('倍率 1 では画面幅の 7%（R-015 の値）', () => {
     expect(creatureSize(WIDE, FISH_SIZE_RATIO, 1)).toBeCloseTo(1920 * 0.07)
   })

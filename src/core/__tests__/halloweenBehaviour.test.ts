@@ -141,16 +141,13 @@ describe('ハロウィン: かぼちゃは浮かない', () => {
   })
 
   it('ジャンプしても地面の帯に戻り、地下へ潜らない（90秒）', () => {
-    const line = LANES[0].groundY
     for (let seed = 0; seed < 12; seed++) {
+      const creature = spawn('kabocha', seed)
+      if (creature.kind !== 'walk') throw new Error('かぼちゃが地面にいない')
+      const home = LANES[0].groundY + creature.walker.groundOffset
       const { ys } = ground(seed, 90)
-      /*
-       * 地面の線ちょうどには揃わない（`groundOffset`・わざと散らしてある）。
-       * ジャンプの頂点は絵の高さの半分。地面のずれも含めて6割まで。
-       * 着地時は元の地面へ戻り、地面の帯から空の上半分へ抜けない。
-       */
-      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThan(line - 230 * 0.6)
-      expect(Math.max(...ys), `seed=${seed}`).toBeLessThan(line + 230 * 0.2)
+      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThanOrEqual(home - creature.walker.bounce - 1e-8)
+      expect(Math.max(...ys), `seed=${seed}`).toBeLessThanOrEqual(home + 1e-8)
     }
   })
 
@@ -319,7 +316,7 @@ describe('ハロウィン: 種類ごとの見た目の大きさ', () => {
     if (ghost.kind !== 'float' || witch.kind !== 'float' || franken.kind !== 'walk') throw new Error('動きが違う')
     expect(ghost.fish.height).toBeLessThan(witch.fish.height)
     expect(franken.walker.height).toBeGreaterThan(ghost.fish.height * 0.85)
-    expect(franken.walker.width).toBeLessThan(TANK.width * 0.15)
+    expect(franken.walker.width).toBeLessThan(TANK.width * 0.21)
   })
 
   it('水族館の魚の大きさは変えていない', () => {

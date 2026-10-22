@@ -54,6 +54,7 @@ export function makeLanes(
 
 /**
  * ハロウィンの地面の列。**数と帯をここに置くのは、単体テストで固定するため。**
+ * 2026-10-23: 5種を1.5倍にしたため6列へ分散。以下の4列の測定は拡大前の記録。
  *
  * 歩く種類が1つ（フランケンだけ）のうちは1本で足りていたが、
  * かぼちゃを地面に下ろして2つになった。会場の設定（同時50枚）だと
@@ -66,7 +67,7 @@ export function makeLanes(
  * 帯の上端は背景の絵の手前の丘に合わせてある。これより上げると、
  * 城と村の上を歩くことになる。下端は背景の絵から出す（`halloweenScene.ts`）。
  */
-export const HALLOWEEN_LANES = 4
+export const HALLOWEEN_LANES = 6
 export const HALLOWEEN_BACK_RATIO = 0.84
 export const HALLOWEEN_MIN_SCALE = 0.72
 
