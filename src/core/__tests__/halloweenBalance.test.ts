@@ -7,6 +7,33 @@ const lanes = makeLanes(tank, HALLOWEEN_LANES, {
   backRatio: HALLOWEEN_BACK_RATIO, frontRatio: 0.99, minScale: HALLOWEEN_MIN_SCALE,
 })
 
+describe('種類不明でも展示の標準サイズを保つ', () => {
+  it('ハロウィンの未判定画像は、縦横・設定倍率によらずかぼちゃと同じ基準サイズを使う', () => {
+    for (const [width, height] of [[880, 590], [590, 880]]) {
+      for (const scale of [0.5, 1, 2]) {
+        const unknown = spawnCreature('float', 7, tank, width, height,
+          lanes, scale, 'unknown', undefined, lanes[0].groundY, 'halloween')
+        const reference = spawnCreature('float', 7, tank, width, height,
+          [], scale, 'unknown', 'kabocha', undefined, 'halloween')
+        const place = placeCreature(unknown, lanes)
+        const expected = placeCreature(reference, [])
+        expect(place.width).toBeCloseTo(expected.width)
+        expect(place.height).toBeCloseTo(expected.height)
+        // 不確かな種類を決め打ちして、誤った歩行を付けない。
+        expect(unknown.kind).toBe('float')
+      }
+    }
+  })
+
+  it('水族館の自由画は従来サイズを保ち、ハロウィンだけを拡大する', () => {
+    const spawn = (theme?: 'aquarium' | 'halloween') => placeCreature(
+      spawnCreature('float', 7, tank, 880, 590, [], 1, 'unknown', undefined, undefined, theme), [])
+    expect(spawn('aquarium').width).toBeCloseTo(tank.width * 0.07)
+    expect(spawn().width).toBeCloseTo(spawn('aquarium').width)
+    expect(spawn('halloween').width).toBeCloseTo(tank.width * 0.18)
+  })
+})
+
 describe('作り直した種類を、表示中の動きにも反映する', () => {
   it('種類なしで漂っていた絵がフランケンになったら地面へ移す', () => {
     const before = { width: 880, height: 590 }

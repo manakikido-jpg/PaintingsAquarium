@@ -27,7 +27,7 @@ export const WALKER_SIZE_RATIO = 0.12
 export const HALLOWEEN_SIZE_SCALE = 1.5
 
 /** 長辺が同じでも縦長のおばけと横長の人形では見える面積が違う。印刷倍率とは分ける。 */
-export function halloweenSizeRatio(species: SpeciesId): number {
+export function halloweenSizeRatio(species?: SpeciesId): number {
   const base = WALKER_SIZE_RATIO * HALLOWEEN_SIZE_SCALE
   if (species === 'yurei') return base * 0.78
   if (species === 'franken') return base * 1.15
