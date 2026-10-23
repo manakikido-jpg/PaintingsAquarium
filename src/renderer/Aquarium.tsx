@@ -244,7 +244,7 @@ export function Aquarium({
           if (needsMotionRebuild(swimming.piece, piece)) {
             swimming.creature = spawnCreature(scene.motion, seedOf(piece.id), tank,
               piece.width, piece.height, scene.lanes, sizeRef.current,
-              piece.rig?.kind ?? 'unknown', piece.species, scene.lanes[0]?.groundY)
+              piece.rig?.kind ?? 'unknown', piece.species, scene.lanes[0]?.groundY, themeRef.current)
           }
           if (swimming.piece !== piece) swimming.piece = piece
           continue
@@ -272,6 +272,7 @@ export function Aquarium({
             piece.species,
             // 飛ぶ絵は地平線（一番奥の列の地面）より上だけを使う
             scene.lanes[0]?.groundY,
+            themeRef.current,
           ),
         })
       }

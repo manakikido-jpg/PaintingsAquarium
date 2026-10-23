@@ -17,7 +17,7 @@ import {
   type Lane,
   type Walker,
 } from './walk'
-import type { MotionKind } from './theme'
+import type { MotionKind, ThemeId } from './theme'
 import { sharePrey, speedRange, steer, walkSpeedRange, type Prey } from './behaviour'
 import { SPECIES, speciesFlies, speciesIsStiff, speciesWalks, type SpeciesId } from './templates'
 import type { Piece } from '../shared/types'
@@ -74,6 +74,8 @@ export function spawnCreature(
   species?: SpeciesId,
   /** 空の下端。飛ぶ絵はここより上に出す */
   skyBottom?: number,
+  /** 判定できない絵の大きさも、展示中のテーマに合わせる。 */
+  theme?: ThemeId,
 ): Creature {
   /*
    * 飛ぶ絵（プテラノドン）は、歩くテーマの中でも**浮遊**として扱う。
@@ -139,7 +141,7 @@ export function spawnCreature(
   const speed = speedRange(tank.width, species) ?? (drifts ? { minSpeed: 12, maxSpeed: 38 } : {})
 
   // 同じ長辺でも縦長と横長では見え方が違うため、夜の絵は種類ごとに補正する。
-  const night = species !== undefined && SPECIES[species].theme === 'halloween'
+  const night = theme === 'halloween' || (species !== undefined && SPECIES[species].theme === 'halloween')
 
   return {
     kind: 'float',
@@ -149,7 +151,8 @@ export function spawnCreature(
        * 泳ぐ絵の基準を使うと、同じ画面の恐竜より小さくなり、
        * 空の1匹だけ遠くに居るように見える。
        */
-      targetSize: creatureSize(tank, night && species ? halloweenSizeRatio(species)
+      // 未判定を魚サイズへ落とすと、同じ台紙でも約1/3になってしまう（R-079）。
+      targetSize: creatureSize(tank, night ? halloweenSizeRatio(species)
         : flies ? WALKER_SIZE_RATIO : FISH_SIZE_RATIO, sizeScale),
       ...speed,
       species,
