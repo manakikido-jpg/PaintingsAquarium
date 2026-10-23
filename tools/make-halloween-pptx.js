@@ -8,7 +8,7 @@
 const pptx = require('pptxgenjs')
 const path = require('path')
 
-const ROOT = '/home/user/PaintingsAquarium'
+const ROOT = path.resolve(__dirname, '..')
 const SHOT = path.join(ROOT, 'docs/images/画面-ハロウィン.jpg')
 const SHOT_COLORED = path.join(ROOT, 'docs/images/ハロウィン-塗った例.jpg')
 const SHOT_SHEETS = path.join(ROOT, 'docs/images/ハロウィン台紙5種.jpg')
@@ -200,7 +200,7 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
   s.addText([
     { text: '大きなモニターの中に、', options: {} },
     { text: '満月の出ている紫の夜空', options: { bold: true, color: SEA } },
-    { text: 'が広がっています。月を背にお城が建ち、ふもとには灯りのともった村と丘があります。その夜空を子どもたちが塗ったおばけ・こうもり・まじょが飛び、手前の丘ではフランケンが歩き、かぼちゃが転がります。', options: {} },
+    { text: 'が広がっています。月を背にお城が建ち、ふもとには灯りのともった村と丘があります。その夜空を子どもたちが塗ったおばけ・こうもり・まじょが飛び、手前の丘ではフランケンが歩き、かぼちゃが跳ねります。', options: {} },
   ], { x: bx, y: 1.72, w: 4.72, h: 1.7, fontFace: FONT, fontSize: 14.5, color: INK, lineSpacing: 26, margin: 0 })
 
   card(s, { x: bx, y: 3.62, w: 4.72, h: 1.75, fill: 'FDF1EC', stroke: 'F2CDBF' })
@@ -225,11 +225,11 @@ const { FONT, W, H, M, shadow, slide, heading, card } = require('./proposal-deck
   s.addImage({ path: SHOT_COLORED, x: M, y: 2.94, w: W - M * 2, h: 1.18, shadow: shadow() })
 
   const kinds = [
-    ['フランケンシュタイン', '7A3FB5', '月あかりの丘を横向きに歩きます。脚と腕を交互に振ります'],
-    ['かぼちゃ', 'E8653F', '丘をころころ転がります。5種でいちばんゆっくり'],
+    ['フランケンシュタイン', '7A3FB5', '月あかりの丘を横向きに歩きます。脚と腕を控えめに交互に振ります'],
+    ['かぼちゃ', 'E8653F', '丘を斜め上へ跳び、横へ進んで着地します。着地すると少し休む'],
     ['こうもり', '5B4A86', '夜空を細かくジグザグに、いちばん速く飛び回ります'],
     ['まじょ', '2E9E7B', 'ほうきで大きな弧を描き、顔の向いているほうへ横切ります'],
-    ['おばけ', '9B7BD1', 'ふらふらと不規則に、ゆっくり漂います'],
+    ['おばけ', '9B7BD1', '他の絵とのバランスを保ち、夜空をゆっくり漂います'],
   ]
   kinds.forEach(([name, dot, desc], i) => {
     const x = M + i * 2.42

@@ -7,6 +7,7 @@ import {
   sendCreatureOut,
   spawnCreature,
   stepCreatures,
+  needsMotionRebuild,
   type Creature,
 } from '../core/motion'
 import { appearAlpha, appearProgress, appearScale, isNewlyArrived } from '../core/appear'
@@ -45,6 +46,7 @@ import type { DinosaurStyle, ThemeId } from '../core/theme'
 import { createScene } from './scene'
 import type { Scene } from './scene/types'
 import type { Piece } from '../shared/types'
+import { pieceImageUrl } from '../core/pieceImage'
 
 interface Swimmer {
   /**
@@ -52,7 +54,8 @@ interface Swimmer {
    * 泳いでいる最中でも新しい見分け結果を受け取れるようにしてある（R-075）。
    */
   piece: Piece
-  readonly element: HTMLImageElement
+  element: HTMLImageElement
+  imageSource: string
   /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
   readonly bornAt: number
   /** しなりの拍。絵ごとにずらさないと、群れが1枚の布のように揃って見える */
@@ -213,6 +216,16 @@ export function Aquarium({
       for (const piece of piecesRef.current) {
         const swimming = swimmers.get(piece.id)
         if (swimming) {
+          const source = pieceImageUrl(piece)
+          if (swimming.imageSource !== source) {
+            swimming.imageSource = source
+            const image = new Image()
+            image.onload = () => {
+              // 読み込みが逆順で終わっても古い画像へ戻さない。完了までは前の絵を描く。
+              if (swimming.imageSource === source) swimming.element = image
+            }
+            image.src = source
+          }
           /*
            * **泳いでいる絵にも、作り直しの結果を届ける（R-075）。**
            *
@@ -223,18 +236,25 @@ export function Aquarium({
            * 書き変わっているのに、**そのとき飛んでいたまじょだけが
            * 逆を向いたまま**だった。
            *
-           * 入れ替えるのは絵の情報だけ。泳ぎの状態（`creature`・`bornAt`・
+           * 向きだけの修正では絵の情報だけを替え、動きの状態（`creature`・`bornAt`・
            * `beat`）はそのままにする。作り直しただけで**位置が飛ぶ**のは
-           * 来場者から見れば不具合でしかない。
+           * 来場者から見れば不具合でしかない。種類や寸法が変わった場合だけは、
+           * 地面と大きさを合わせ直す必要があるので動きも作り直す。
            */
+          if (needsMotionRebuild(swimming.piece, piece)) {
+            swimming.creature = spawnCreature(scene.motion, seedOf(piece.id), tank,
+              piece.width, piece.height, scene.lanes, sizeRef.current,
+              piece.rig?.kind ?? 'unknown', piece.species, scene.lanes[0]?.groundY)
+          }
           if (swimming.piece !== piece) swimming.piece = piece
           continue
         }
         const element = new Image()
-        element.src = `aqua://piece/${piece.id}`
+        element.src = pieceImageUrl(piece)
         swimmers.set(piece.id, {
           piece,
           element,
+          imageSource: pieceImageUrl(piece),
           // 起動前からある絵は演出しない。起動のたびに全部が一斉に現れると
           // 不具合に見えるため。
           bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? elapsed : -Infinity,
@@ -278,7 +298,7 @@ export function Aquarium({
          * 足元の影は**地面に立っている絵にだけ**付ける。
          * 飛んでいる絵に付けると、空の途中に影が浮く（実機で確認）。
          */
-        if (!speciesFlies(swimmer.piece.species)) {
+        if (swimmer.creature.kind === 'walk') {
           scene.drawBeneath?.(context, place, creatureLane(swimmer.creature), strength)
         }
         context.globalAlpha = 1
@@ -360,9 +380,12 @@ export function Aquarium({
         if (limbs.length > 0 && sway > 0) {
           const source = swimmer.element.naturalWidth
           const sourceHeight = swimmer.element.naturalHeight
-          const time = elapsed * swimmer.beat.rate * LIMB_SPEED
+          // 歩行の足踏みと胴の弾みを同じ位相にする。別時計だと足が滑って見える。
+          const walking = swimmer.creature.kind === 'walk' && swimmer.piece.species === 'franken'
+          const time = walking && swimmer.creature.kind === 'walk'
+            ? swimmer.creature.walker.stepPhase : elapsed * swimmer.beat.rate * LIMB_SPEED
           for (const part of limbs) {
-            const wave = Math.sin(time + part.beat * Math.PI * 2 + swimmer.beat.phase)
+            const wave = Math.sin(time + part.beat * Math.PI * 2 + (walking ? 0 : swimmer.beat.phase))
             const angle = part.swing === 0 ? 0 : part.swing * sway * wave
             /*
              * 伸び縮み（プテラノドンの翼）。**回すのとは別の動かし方。**

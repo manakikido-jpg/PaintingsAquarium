@@ -54,6 +54,7 @@ export function makeLanes(
 
 /**
  * ハロウィンの地面の列。**数と帯をここに置くのは、単体テストで固定するため。**
+ * 2026-10-23: 5種を1.5倍にしたため6列へ分散。以下の4列の測定は拡大前の記録。
  *
  * 歩く種類が1つ（フランケンだけ）のうちは1本で足りていたが、
  * かぼちゃを地面に下ろして2つになった。会場の設定（同時50枚）だと
@@ -66,7 +67,7 @@ export function makeLanes(
  * 帯の上端は背景の絵の手前の丘に合わせてある。これより上げると、
  * 城と村の上を歩くことになる。下端は背景の絵から出す（`halloweenScene.ts`）。
  */
-export const HALLOWEEN_LANES = 4
+export const HALLOWEEN_LANES = 6
 export const HALLOWEEN_BACK_RATIO = 0.84
 export const HALLOWEEN_MIN_SCALE = 0.72
 
@@ -82,6 +83,8 @@ export interface Walker {
   readonly stepSpeed: number
   /** 弾む高さ（ピクセル） */
   readonly bounce: number
+  /** 歩行の小さな弾みではなく、離陸・着地・接地時間のあるジャンプ。 */
+  readonly jump?: boolean
   /**
    * 壁の手前どれだけで折り返すか（ピクセル）。
    * 全員が画面の端ちょうどで折り返すと、端に何匹も集まって固まる。
@@ -102,6 +105,7 @@ export interface SpawnWalkerOptions {
   readonly targetSize?: number
   readonly minSpeed?: number
   readonly maxSpeed?: number
+  readonly jump?: boolean
 }
 
 export function spawnWalker(
@@ -132,7 +136,7 @@ export function spawnWalker(
   const speed = (minSpeed + random() * (maxSpeed - minSpeed)) * scale
   const marginX = Math.min(width / 2, tank.width / 2)
 
-  return {
+  const walker: Walker = {
     x: marginX + random() * Math.max(0, tank.width - marginX * 2),
     vx: random() < 0.5 ? speed : -speed,
     lane: laneIndex,
@@ -144,16 +148,32 @@ export function spawnWalker(
     turnMargin: random() * tank.width * 0.14,
     groundOffset: (random() - 0.5) * spacing * 0.5,
   }
+  // 既存の乱数列を保ち、ジャンプの指定で出現位置・速度まで変わらないようにする。
+  return options.jump
+    ? { ...walker, jump: true, bounce: height * 0.5, stepSpeed: Math.PI / 2.4 }
+    : walker
+}
+
+/** 周期をまたいでも連続する、空中で横へ進んだ距離の割合。接地中は増えない。 */
+function jumpTravel(phase: number): number {
+  const cycles = phase / Math.PI
+  const completed = Math.floor(cycles)
+  return completed + Math.min((cycles - completed) / 0.65, 1)
 }
 
 export function stepWalker(walker: Walker, dtSeconds: number, tank: Tank): Walker {
   const dt = Math.max(0, dtSeconds)
-  let x = walker.x + walker.vx * dt
+  const nextPhase = walker.stepPhase + walker.stepSpeed * dt
+  // 真上で跳ねて見えないよう、離陸から着地までに体幅の8割ぶん前へ飛ぶ。
+  const leap = walker.jump
+    ? (jumpTravel(nextPhase) - jumpTravel(walker.stepPhase)) * walker.width * 0.8 * Math.sign(walker.vx)
+    : 0
+  let x = walker.x + walker.vx * dt + leap
   let vx = walker.vx
 
   // 去る途中は折り返さない。折り返すと画面から出られない
   if (walker.exiting) {
-    return { ...walker, x, stepPhase: walker.stepPhase + walker.stepSpeed * dt }
+    return { ...walker, x, stepPhase: nextPhase }
   }
 
   const halfWidth = walker.width / 2
@@ -170,14 +190,19 @@ export function stepWalker(walker: Walker, dtSeconds: number, tank: Tank): Walke
     vx = -Math.abs(vx)
   }
 
-  return { ...walker, x, vx, stepPhase: walker.stepPhase + walker.stepSpeed * dt }
+  return { ...walker, x, vx, stepPhase: nextPhase }
 }
 
 /** 描画に使う Y（中心）。足が地面につき、歩くたびに少し弾む。 */
 export function walkerY(walker: Walker, lanes: readonly Lane[]): number {
   const lane = lanes[walker.lane] ?? lanes[lanes.length - 1]
   const groundY = (lane ? lane.groundY : 0) + walker.groundOffset
-  return groundY - walker.height / 2 - Math.abs(Math.sin(walker.stepPhase)) * walker.bounce
+  const phase = ((walker.stepPhase % Math.PI) + Math.PI) % Math.PI / Math.PI
+  const flight = phase / 0.65
+  const lift = walker.jump
+    ? (flight < 1 ? 4 * flight * (1 - flight) : 0)
+    : Math.abs(Math.sin(walker.stepPhase))
+  return groundY - walker.height / 2 - lift * walker.bounce
 }
 
 /**

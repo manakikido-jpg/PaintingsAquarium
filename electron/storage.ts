@@ -183,7 +183,10 @@ export function updatePiece(
     if (fs.existsSync(old) && old !== pieceFile(id)) fs.unlinkSync(old)
   }
 
-  const next = { ...pieces[index], ...rest }
+  const next = {
+    ...pieces[index], ...rest,
+    imageRevision: imageBase64 ? (pieces[index].imageRevision ?? 0) + 1 : pieces[index].imageRevision,
+  }
   pieces[index] = next
   writeJsonAtomic(indexPath(), pieces)
   return next

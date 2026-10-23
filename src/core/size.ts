@@ -1,4 +1,5 @@
 import type { Tank } from './swim'
+import type { SpeciesId } from './templates'
 
 /**
  * 絵の大きさ。
@@ -21,6 +22,17 @@ export const FISH_SIZE_RATIO = 0.07
  * 飛ぶ絵（プテラノドン）にもこちらを使う（`motion.ts`）。
  */
 export const WALKER_SIZE_RATIO = 0.12
+
+/** ハロウィンの5種を、種類ごとのバランスを保ったまま一律に拡大する。 */
+export const HALLOWEEN_SIZE_SCALE = 1.5
+
+/** 長辺が同じでも縦長のおばけと横長の人形では見える面積が違う。印刷倍率とは分ける。 */
+export function halloweenSizeRatio(species: SpeciesId): number {
+  const base = WALKER_SIZE_RATIO * HALLOWEEN_SIZE_SCALE
+  if (species === 'yurei') return base * 0.78
+  if (species === 'franken') return base * 1.15
+  return base
+}
 
 /** 設定で変えられる倍率の範囲。 */
 export const MIN_SIZE_SCALE = 0.5

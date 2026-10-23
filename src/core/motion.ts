@@ -3,6 +3,7 @@ import {
   DEFAULT_SIZE_SCALE,
   FISH_SIZE_RATIO,
   WALKER_SIZE_RATIO,
+  halloweenSizeRatio,
 } from './size'
 import type { CreatureKind } from './rig'
 import { isFishOutside, sendFishOut, facesRight, renderY, separateFish, spawnFish, stepFish, type Fish, type Tank } from './swim'
@@ -19,6 +20,17 @@ import {
 import type { MotionKind } from './theme'
 import { sharePrey, speedRange, steer, walkSpeedRange, type Prey } from './behaviour'
 import { SPECIES, speciesFlies, speciesIsStiff, speciesWalks, type SpeciesId } from './templates'
+import type { Piece } from '../shared/types'
+
+/** 作り直しで種類や画像の寸法が変わると、浮遊／歩行と衝突範囲も作り直す必要がある。 */
+export function needsMotionRebuild(before: Pick<Piece, 'species' | 'width' | 'height'>,
+  after: Pick<Piece, 'species' | 'width' | 'height'>): boolean {
+  return before.species !== after.species || before.width !== after.width || before.height !== after.height
+}
+
+function usesNightSky(species?: SpeciesId): boolean {
+  return species !== undefined && SPECIES[species].theme === 'halloween' && !speciesWalks(species)
+}
 
 /**
  * テーマごとに違う動きを、画面側から同じ扱いにするための層。
@@ -68,7 +80,7 @@ export function spawnCreature(
    * 地面の列に乗せると、翼竜が地面を歩くことになる。
    */
   const flies = speciesFlies(species)
-  if (flies && skyBottom) tank = { width: tank.width, height: skyBottom }
+  if ((flies || usesNightSky(species)) && skyBottom) tank = { width: tank.width, height: skyBottom }
 
   /*
    * **ただようテーマの中でも、この種類だけ地面を歩く**（フランケンシュタイン）。
@@ -83,12 +95,14 @@ export function spawnCreature(
     return {
       kind: 'walk',
       walker: spawnWalker(seed, tank, lanes, imageWidth, imageHeight, {
-        targetSize: creatureSize(tank, WALKER_SIZE_RATIO, sizeScale),
+        targetSize: creatureSize(tank, species && SPECIES[species].theme === 'halloween'
+          ? halloweenSizeRatio(species) : WALKER_SIZE_RATIO, sizeScale),
         /*
          * 歩く速さを種類ごとに決める（`WALK_CROSS_SECONDS`）。
          * 表に無い種類は `spawnWalker` の既定（22〜62px/秒）のまま。
          */
         ...(walkSpeedRange(tank.width, species) ?? {}),
+        ...(species === 'kabocha' ? { jump: true } : {}),
       }),
     }
   }
@@ -124,14 +138,7 @@ export function spawnCreature(
    */
   const speed = speedRange(tank.width, species) ?? (drifts ? { minSpeed: 12, maxSpeed: 38 } : {})
 
-  /*
-   * **ハロウィンは、浮く絵も歩く絵と同じ大きさにする。**
-   *
-   * ハロウィンは歩く絵（フランケン）と浮く絵が**同じ画面に並ぶ**唯一のテーマ。
-   * 浮く側だけ泳ぐ絵の基準（0.07）にすると、同じ子が塗った台紙どうしで
-   * 大きさが 1.7 倍違って見える。プテラノドンで先に同じことをしている。
-   * 背景が城と山の絵なので、0.07 では絵が背景の木と同じ大きさになる。
-   */
+  // 同じ長辺でも縦長と横長では見え方が違うため、夜の絵は種類ごとに補正する。
   const night = species !== undefined && SPECIES[species].theme === 'halloween'
 
   return {
@@ -142,7 +149,8 @@ export function spawnCreature(
        * 泳ぐ絵の基準を使うと、同じ画面の恐竜より小さくなり、
        * 空の1匹だけ遠くに居るように見える。
        */
-      targetSize: creatureSize(tank, flies || night ? WALKER_SIZE_RATIO : FISH_SIZE_RATIO, sizeScale),
+      targetSize: creatureSize(tank, night && species ? halloweenSizeRatio(species)
+        : flies ? WALKER_SIZE_RATIO : FISH_SIZE_RATIO, sizeScale),
       ...speed,
       species,
       /*
@@ -199,7 +207,8 @@ export function stepCreatures(
    * 動きの決まりごと（steer / stepFish）はそのまま使える。
    */
   const sky: Tank = skyBottom ? { width: tank.width, height: skyBottom } : tank
-  const tankFor = (fish: Fish): Tank => (speciesFlies(fish.species as SpeciesId) ? sky : tank)
+  const tankFor = (fish: Fish): Tank =>
+    (speciesFlies(fish.species as SpeciesId) || usesNightSky(fish.species as SpeciesId) ? sky : tank)
 
   /*
    * **順番が大事。種類ごとの動きを決めてから、避ける。**

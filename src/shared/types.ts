@@ -12,6 +12,8 @@ export interface Piece {
   readonly fileName: string
   readonly width: number
   readonly height: number
+  /** 同じidの画像を書き直した回数。表示側のキャッシュを更新する（古い台帳は0）。 */
+  readonly imageRevision?: number
   /** 取り込んだ時刻（ISO 8601） */
   readonly createdAt: string
   /**

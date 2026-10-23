@@ -140,17 +140,14 @@ describe('ハロウィン: かぼちゃは浮かない', () => {
     }
   })
 
-  it('底が地面から離れない（90秒ぶん動かしても）', () => {
-    const line = LANES[0].groundY
+  it('ジャンプしても地面の帯に戻り、地下へ潜らない（90秒）', () => {
     for (let seed = 0; seed < 12; seed++) {
+      const creature = spawn('kabocha', seed)
+      if (creature.kind !== 'walk') throw new Error('かぼちゃが地面にいない')
+      const home = LANES[0].groundY + creature.walker.groundOffset
       const { ys } = ground(seed, 90)
-      /*
-       * 地面の線ちょうどには揃わない（`groundOffset`・わざと散らしてある）。
-       * 転がる弾みも乗るので、絵の高さの 2 割ぶんを許す。
-       * 画面の高さ 1080 に対して 230px の絵なので ±46px。
-       */
-      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThan(line - 230 * 0.2)
-      expect(Math.max(...ys), `seed=${seed}`).toBeLessThan(line + 230 * 0.2)
+      expect(Math.min(...ys), `seed=${seed}`).toBeGreaterThanOrEqual(home - creature.walker.bounce - 1e-8)
+      expect(Math.max(...ys), `seed=${seed}`).toBeLessThanOrEqual(home + 1e-8)
     }
   })
 
@@ -165,7 +162,7 @@ describe('ハロウィン: かぼちゃは浮かない', () => {
    * **歩く絵の中でいちばん遅い。** フランケン（既定 22〜62px/秒）と
    * 同じ速さで転がすと、足のないかぼちゃが地面を滑って見える。
    */
-  it('フランケンより遅く転がる', () => {
+  it('接地中の基礎速度はフランケンより遅い', () => {
     for (let seed = 0; seed < 20; seed++) {
       const kabocha = spawn('kabocha', seed)
       const franken = spawn('franken', seed)
@@ -174,7 +171,7 @@ describe('ハロウィン: かぼちゃは浮かない', () => {
     }
   })
 
-  it('1920px の画面で 10〜17px/秒（120〜180秒で横切る速さ）', () => {
+  it('1920px の画面で基礎速度は10〜17px/秒（跳躍中の前進は別）', () => {
     for (let seed = 0; seed < 20; seed++) {
       const kabocha = spawn('kabocha', seed)
       if (kabocha.kind !== 'walk') throw new Error('歩いていない')
@@ -311,20 +308,15 @@ describe('ハロウィン: 魚の動きを当てない', () => {
   })
 })
 
-describe('ハロウィン: 浮く絵も歩く絵と同じ大きさ', () => {
-  /*
-   * ハロウィンは、歩く絵と浮く絵が同じ画面に並ぶ唯一のテーマ。
-   * 浮く側だけ泳ぐ絵の基準（0.07）だと、同じ台紙どうしで 1.7 倍違って見える。
-   */
-  it('3種の浮く絵が、フランケンと同じ長辺になる', () => {
-    const franken = spawn('franken', 1)
-    if (franken.kind !== 'walk') throw new Error('フランケンが歩いていない')
-    const walkerSide = Math.max(franken.walker.width, franken.walker.height)
-    for (const id of ['koumori', 'majo', 'yurei'] as SpeciesId[]) {
-      const creature = spawn(id, 1)
-      if (creature.kind !== 'float') throw new Error(`${id} が歩いている`)
-      expect(Math.max(creature.fish.width, creature.fish.height), id).toBeCloseTo(walkerSide, 3)
-    }
+describe('ハロウィン: 種類ごとの見た目の大きさ', () => {
+  it('縦長のゆうれいを抑え、横長のフランケンは豆粒にしない', () => {
+    const ghost = spawnCreature('float', 1, TANK, 650, 780, LANES, 1, 'unknown', 'yurei')
+    const franken = spawnCreature('float', 1, TANK, 880, 590, LANES, 1, 'unknown', 'franken')
+    const witch = spawnCreature('float', 1, TANK, 800, 720, LANES, 1, 'unknown', 'majo')
+    if (ghost.kind !== 'float' || witch.kind !== 'float' || franken.kind !== 'walk') throw new Error('動きが違う')
+    expect(ghost.fish.height).toBeLessThan(witch.fish.height)
+    expect(franken.walker.height).toBeGreaterThan(ghost.fish.height * 0.85)
+    expect(franken.walker.width).toBeLessThan(TANK.width * 0.21)
   })
 
   it('水族館の魚の大きさは変えていない', () => {
