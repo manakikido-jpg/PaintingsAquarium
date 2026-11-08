@@ -5,7 +5,7 @@
  * 変わるのは「どんな世界で、どう動かすか」だけ。設計は `docs/設計-テーマ.md`。
  */
 
-export type ThemeId = 'aquarium' | 'dinosaur' | 'halloween' | 'space' | 'meadow' | 'night'
+export type ThemeId = 'aquarium' | 'zoo' | 'dinosaur' | 'halloween' | 'space' | 'meadow' | 'night'
 
 /**
  * 絵の動き方。
@@ -26,6 +26,7 @@ export interface ThemeMeta {
 
 export const THEMES: readonly ThemeMeta[] = [
   { id: 'aquarium', name: '水族館', motion: 'float', ready: true },
+  { id: 'zoo', name: '動物園', motion: 'walk', ready: true },
   { id: 'dinosaur', name: '恐竜', motion: 'walk', ready: true },
   /*
    * 台紙5種が確定し、実機で 15/15 正しく判定・正しい向きで出ることを

@@ -382,7 +382,7 @@ export function Aquarium({
           const source = swimmer.element.naturalWidth
           const sourceHeight = swimmer.element.naturalHeight
           // 歩行の足踏みと胴の弾みを同じ位相にする。別時計だと足が滑って見える。
-          const walking = swimmer.creature.kind === 'walk' && swimmer.piece.species === 'franken'
+          const walking = swimmer.creature.kind === 'walk' && (swimmer.piece.species === 'franken' || themeRef.current === 'zoo')
           const time = walking && swimmer.creature.kind === 'walk'
             ? swimmer.creature.walker.stepPhase : elapsed * swimmer.beat.rate * LIMB_SPEED
           for (const part of limbs) {

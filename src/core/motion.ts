@@ -4,6 +4,7 @@ import {
   FISH_SIZE_RATIO,
   WALKER_SIZE_RATIO,
   halloweenSizeRatio,
+  zooSizeRatio,
 } from './size'
 import type { CreatureKind } from './rig'
 import { isFishOutside, sendFishOut, facesRight, renderY, separateFish, spawnFish, stepFish, type Fish, type Tank } from './swim'
@@ -97,7 +98,8 @@ export function spawnCreature(
     return {
       kind: 'walk',
       walker: spawnWalker(seed, tank, lanes, imageWidth, imageHeight, {
-        targetSize: creatureSize(tank, species && SPECIES[species].theme === 'halloween'
+        targetSize: creatureSize(tank, theme === 'zoo' || (species && SPECIES[species].theme === 'zoo')
+          ? zooSizeRatio(species) : species && SPECIES[species].theme === 'halloween'
           ? halloweenSizeRatio(species) : WALKER_SIZE_RATIO, sizeScale),
         /*
          * 歩く速さを種類ごとに決める（`WALK_CROSS_SECONDS`）。

@@ -16,6 +16,7 @@ import { TEMPLATE_BITS, TEMPLATE_GRID } from './templates.generated'
  */
 
 export type SpeciesId =
+  | 'zou' | 'raion' | 'kirin' | 'saru' | 'panda' | 'shimauma'
   | 'fish'
   | 'tako'
   | 'iruka'
@@ -95,6 +96,13 @@ const LAND = 'dinosaur' as const
 const NIGHT = 'halloween' as const
 
 export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
+  zou: { id: 'zou', label: 'ぞう', theme: 'zoo', head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
+  raion: { id: 'raion', label: 'ライオン', theme: 'zoo', head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
+  kirin: { id: 'kirin', label: 'キリン', theme: 'zoo', head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
+  saru: { id: 'saru', label: 'さる', theme: 'zoo', head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
+  panda: { id: 'panda', label: 'パンダ', theme: 'zoo', head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
+  shimauma: { id: 'shimauma', label: 'しまうま', theme: 'zoo', head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
+
   fish: { id: 'fish', label: '魚', theme: SEA, head: { x: -1, y: 0 }, swimsSideways: true },
   iruka: { id: 'iruka', label: 'イルカ', theme: SEA, head: { x: -1, y: 0 }, swimsSideways: true },
   same: { id: 'same', label: 'サメ', theme: SEA, head: { x: -1, y: 0 }, swimsSideways: true },
@@ -653,7 +661,25 @@ const FRANKEN_PARTS: readonly SpritePart[] = [
   { ...FRANKEN_BODY, box: { x: 0, y: FRANKEN_ARM_BOTTOM, w: 1, h: FRANKEN_HIP - FRANKEN_ARM_BOTTOM } },
 ]
 
+/** 台紙の腹より下を動かし、首・顔・鼻を固定する。帯の付け根は連続させる。 */
+function zooParts(knee: number): readonly SpritePart[] {
+  return [
+    ...Array.from({ length: WALK_STRIPS }, (_, index): SpritePart => {
+      const x = index / WALK_STRIPS
+      const centre = x + 0.5 / WALK_STRIPS
+      return {
+        box: { x, y: knee, w: 1 / WALK_STRIPS, h: 1 - knee },
+        pivot: { x: centre, y: knee }, swing: 0, beat: 0,
+        shear: 0.16 * Math.max(-1, Math.min(1, (0.52 - centre) / 0.25)), shearAxis: 'y',
+      }
+    }),
+    { box: { x: 0, y: 0, w: 1, h: knee }, pivot: { x: 0.5, y: knee }, swing: 0, beat: 0 },
+  ]
+}
+
 export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
+  zou: zooParts(0.82), raion: zooParts(0.83), kirin: zooParts(0.78),
+  saru: zooParts(0.80), panda: zooParts(0.83), shimauma: zooParts(0.74),
   umigame: KAME_PARTS,
   pteranodon: PTERA_PARTS,
   /*
@@ -753,6 +779,13 @@ export function speciesWalks(id?: SpeciesId): boolean {
 }
 
 export const KIND_OF: Record<SpeciesId, CreatureKind> = {
+  zou: 'unknown',
+  raion: 'unknown',
+  kirin: 'unknown',
+  saru: 'unknown',
+  panda: 'unknown',
+  shimauma: 'unknown',
+
   fish: 'fish',
   iruka: 'fish',
   same: 'fish',

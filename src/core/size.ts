@@ -34,6 +34,14 @@ export function halloweenSizeRatio(species?: SpeciesId): number {
   return base
 }
 
+/** 未判定も同じ基準。キリンは首が長いため、体幅ではなく長辺で抑える。 */
+export function zooSizeRatio(species?: SpeciesId): number {
+  if (species === 'kirin') return 0.20
+  if (species === 'saru') return 0.14
+  if (species === 'zou') return 0.19
+  return 0.17
+}
+
 /** 設定で変えられる倍率の範囲。 */
 export const MIN_SIZE_SCALE = 0.5
 export const MAX_SIZE_SCALE = 2
