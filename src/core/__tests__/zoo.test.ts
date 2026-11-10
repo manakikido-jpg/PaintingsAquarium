@@ -12,6 +12,26 @@ const tank = { width: 1920, height: 1080 }
 const lanes = makeLanes(tank, 8, { backRatio: 0.64, frontRatio: 0.94, minScale: 0.75, maxScale: 1 })
 
 describe('お絵描き動物園', () => {
+  it('さるの台紙は横長で、地面付近に4本の手足が分かれている', () => {
+    const bits = TEMPLATE_BITS.saru
+    const cells = [...bits].map((bit, i) => ({ solid: bit === '1', x: i % TEMPLATE_GRID, y: Math.floor(i / TEMPLATE_GRID) }))
+      .filter(cell => cell.solid)
+    const left = Math.min(...cells.map(cell => cell.x))
+    const right = Math.max(...cells.map(cell => cell.x))
+    const top = Math.min(...cells.map(cell => cell.y))
+    const bottom = Math.max(...cells.map(cell => cell.y))
+    expect((right - left + 1) / (bottom - top + 1)).toBeGreaterThan(1.3)
+    let maxFeet = 0
+    for (let y = top + Math.floor((bottom - top) * 0.85); y < bottom; y++) {
+      let feet = 0
+      for (let x = 0; x < TEMPLATE_GRID; x++) {
+        if (bits[y * TEMPLATE_GRID + x] === '1' && (x === 0 || bits[y * TEMPLATE_GRID + x - 1] !== '1')) feet++
+      }
+      maxFeet = Math.max(maxFeet, feet)
+    }
+    expect(maxFeet).toBe(4)
+  })
+
   it('テーマを保存でき、6種だけを照合対象にする', () => {
     expect(isThemeId('zoo')).toBe(true)
     expect(themeOf({ theme: 'zoo' })).toBe('zoo')
