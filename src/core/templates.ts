@@ -281,6 +281,9 @@ export interface SpritePart {
   readonly swing: number
   /** 拍のずれ（0〜1）。前足と後ろ足を逆に動かすのに使う */
   readonly beat: number
+  /** 歩行とは別に、しっぽをゆっくり振るための拍の倍率。 */
+  readonly rate?: number
+  readonly role?: 'tail'
   /**
    * 伸び縮みの幅（倍率のふり幅）。0 なら伸縮しない。
    *
@@ -662,8 +665,8 @@ const FRANKEN_PARTS: readonly SpritePart[] = [
 ]
 
 /** 台紙の腹より下を動かし、首・顔・鼻を固定する。帯の付け根は連続させる。 */
-function zooParts(knee: number): readonly SpritePart[] {
-  return [
+function zooParts(knee: number, tailX: number, tailBottom: number, tailSwing: number): readonly SpritePart[] {
+  const base: readonly SpritePart[] = [
     ...Array.from({ length: WALK_STRIPS }, (_, index): SpritePart => {
       const x = index / WALK_STRIPS
       const centre = x + 0.5 / WALK_STRIPS
@@ -675,11 +678,34 @@ function zooParts(knee: number): readonly SpritePart[] {
     }),
     { box: { x: 0, y: 0, w: 1, h: knee }, pivot: { x: 0.5, y: knee }, swing: 0, beat: 0 },
   ]
+  // 台紙の右端のしっぽだけを分ける。付け根の縦線では変位が0なので、
+  // 回転と違って胴との継ぎ目が開かない。胴・脚から同じ範囲を除き二重描画も防ぐ。
+  const body = base.flatMap((part): SpritePart[] => {
+    const { x, y, w, h } = part.box
+    if (x + w <= tailX || y >= tailBottom) return [part]
+    const out: SpritePart[] = []
+    if (x < tailX) out.push({ ...part, box: { x, y, w: tailX - x, h } })
+    if (y + h > tailBottom) {
+      const left = Math.max(x, tailX)
+      out.push({ ...part, box: { x: left, y: tailBottom, w: x + w - left, h: y + h - tailBottom } })
+    }
+    return out
+  })
+  return [
+    { box: { x: tailX, y: 0, w: 1 - tailX, h: tailBottom },
+      pivot: { x: tailX, y: 0 }, swing: 0, beat: 0.2, rate: 0.45, role: 'tail',
+      shear: tailSwing, shearAxis: 'x' },
+    ...body,
+  ]
 }
 
 export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
-  zou: zooParts(0.82), raion: zooParts(0.83), kirin: zooParts(0.78),
-  saru: zooParts(0.80), panda: zooParts(0.83), shimauma: zooParts(0.74),
+  zou: zooParts(0.82, 0.87, 0.72, 0.32),
+  raion: zooParts(0.83, 0.84, 0.64, 0.28),
+  kirin: zooParts(0.78, 0.88, 0.83, 0.30),
+  saru: zooParts(0.80, 0.86, 0.69, 0.30),
+  panda: zooParts(0.83, 0.955, 0.59, 0.65),
+  shimauma: zooParts(0.74, 0.88, 0.83, 0.30),
   umigame: KAME_PARTS,
   pteranodon: PTERA_PARTS,
   /*
@@ -702,6 +728,8 @@ function mirrorPart(part: SpritePart): SpritePart {
     // 鏡に映すと回る向きも逆になる。伸び縮みは向きを持たないのでそのまま
     swing: -part.swing,
     beat: part.beat,
+    rate: part.rate,
+    role: part.role,
     lift: part.lift,
     liftAxis: part.liftAxis,
     // 鏡に映すと前後が入れ替わるので、足の振りも逆になる
@@ -717,6 +745,8 @@ function turnBackPart(part: SpritePart): SpritePart {
     pivot: { x: part.pivot.y, y: 1 - part.pivot.x },
     swing: part.swing,
     beat: part.beat,
+    rate: part.rate,
+    role: part.role,
     lift: part.lift,
     // 絵を90度まわすと、縦の伸び縮みは横の伸び縮みになる
     liftAxis: part.lift ? ((part.liftAxis ?? 'y') === 'y' ? 'x' : 'y') : part.liftAxis,

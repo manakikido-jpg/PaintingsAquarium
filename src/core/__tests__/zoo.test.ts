@@ -65,19 +65,47 @@ describe('お絵描き動物園', () => {
     expect(zooSizeRatio()).toBe(zooSizeRatio('panda'))
   })
 
-  it('頭と首は変形せず、足だけを逆向きに振る', () => {
+  it('顔・首を固定し、脚としっぽを別々に動かす', () => {
     for (const id of animals) {
       const parts = partsForPiece(id)
-      const body = parts[parts.length - 1]
-      expect(body.box.y).toBe(0)
-      expect(body.swing).toBe(0)
-      expect(body.shear ?? 0).toBe(0)
-      expect(body.lift ?? 0).toBe(0)
-      const legs = parts.slice(0, -1)
+      const tails = parts.filter(p => p.role === 'tail')
+      expect(tails).toHaveLength(1)
+      const tail = tails[0]
+      expect(tail.shearAxis).toBe('x')
+      expect(tail.rate).toBeLessThan(1)
+      expect(tail.pivot.x).toBe(tail.box.x)
+      expect(Math.abs(tail.swing)).toBe(0)
+      const fixed = parts.filter(p => !p.shear)
+      expect(fixed.length).toBeGreaterThan(0)
+      for (const part of fixed) {
+        expect(part.swing).toBe(0)
+        expect(part.lift ?? 0).toBe(0)
+      }
+      const legs = parts.filter(p => p.shearAxis === 'y')
       expect(legs.length).toBeGreaterThan(8)
       expect(Math.min(...legs.map(p => p.shear ?? 0))).toBeLessThan(0)
       expect(Math.max(...legs.map(p => p.shear ?? 0))).toBeGreaterThan(0)
-      for (const leg of legs) expect(leg.box.y).toBe(body.box.h)
+    }
+  })
+
+  it('分割しても画像全体を一度ずつ描き、隙間や重複を作らない', () => {
+    for (const id of animals) {
+      const parts = partsForPiece(id)
+      expect(parts.reduce((sum, p) => sum + p.box.w * p.box.h, 0)).toBeCloseTo(1)
+      for (let y = 0.005; y < 1; y += 0.01) {
+        for (let x = 0.005; x < 1; x += 0.01) {
+          expect(parts.filter(p => x >= p.box.x && x < p.box.x + p.box.w &&
+            y >= p.box.y && y < p.box.y + p.box.h)).toHaveLength(1)
+        }
+      }
+      for (const mirrored of [true, false]) {
+        for (let turns = 0; turns < 4; turns++) {
+          const tail = partsForPiece(id, turns, mirrored).find(p => p.role === 'tail')!
+          expect(tail.rate).toBe(0.45)
+          expect(Math.abs(tail.swing)).toBe(0)
+          expect(tail.shearAxis).toBe(turns % 2 === 0 ? 'x' : 'y')
+        }
+      }
     }
   })
 })

@@ -386,7 +386,7 @@ export function Aquarium({
           const time = walking && swimmer.creature.kind === 'walk'
             ? swimmer.creature.walker.stepPhase : elapsed * swimmer.beat.rate * LIMB_SPEED
           for (const part of limbs) {
-            const wave = Math.sin(time + part.beat * Math.PI * 2 + (walking ? 0 : swimmer.beat.phase))
+            const wave = Math.sin(time * (part.rate ?? 1) + part.beat * Math.PI * 2 + (walking ? 0 : swimmer.beat.phase))
             const angle = part.swing === 0 ? 0 : part.swing * sway * wave
             /*
              * 伸び縮み（プテラノドンの翼）。**回すのとは別の動かし方。**
