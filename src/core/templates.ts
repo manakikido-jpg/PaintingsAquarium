@@ -693,19 +693,19 @@ function zooParts(knee: number, tailX: number, tailBottom: number, tailSwing: nu
   })
   return [
     { box: { x: tailX, y: 0, w: 1 - tailX, h: tailBottom },
-      pivot: { x: tailX, y: 0 }, swing: 0, beat: 0.2, rate: 0.45, role: 'tail',
+      pivot: { x: tailX, y: 0 }, swing: 0, beat: 0.2, rate: 0.30, role: 'tail',
       shear: tailSwing, shearAxis: 'x' },
     ...body,
   ]
 }
 
 export const PARTITION: Partial<Record<SpeciesId, readonly SpritePart[]>> = {
-  zou: zooParts(0.82, 0.87, 0.72, 0.32),
-  raion: zooParts(0.83, 0.84, 0.64, 0.28),
-  kirin: zooParts(0.78, 0.88, 0.83, 0.30),
-  saru: zooParts(0.80, 0.86, 0.69, 0.30),
-  panda: zooParts(0.83, 0.955, 0.59, 0.65),
-  shimauma: zooParts(0.74, 0.88, 0.83, 0.30),
+  zou: zooParts(0.82, 0.87, 0.72, 0.20),
+  raion: zooParts(0.83, 0.84, 0.64, 0.18),
+  kirin: zooParts(0.78, 0.88, 0.83, 0.19),
+  saru: zooParts(0.80, 0.86, 0.69, 0.19),
+  panda: zooParts(0.83, 0.955, 0.59, 0.40),
+  shimauma: zooParts(0.74, 0.88, 0.83, 0.19),
   umigame: KAME_PARTS,
   pteranodon: PTERA_PARTS,
   /*

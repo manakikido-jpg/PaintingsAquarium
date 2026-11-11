@@ -270,6 +270,7 @@ export function App(): React.JSX.Element {
         sceneryStrength={settings?.sceneryStrength ?? 1}
         decorDensity={settings?.decorDensity ?? 2}
         swayStrength={settings?.swayStrength ?? 1}
+        zooTailMotion={settings?.zooTailMotion ?? true}
         sizeScale={settings?.sizeScale ?? 1}
         dinosaurStyle={settings?.dinosaurStyle ?? 'plain'}
       />
@@ -772,6 +773,21 @@ export function App(): React.JSX.Element {
               絵どうしが重なりやすくなります。会場の画面と、来場者が立つ距離で決めてください。
               変えると絵が置き直されるので、いちど散らばります。
             </p>
+
+            {settings.theme === 'zoo' && (
+              <>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={settings.zooTailMotion}
+                    onChange={(event) => void window.aquarium
+                      .updateSettings({ zooTailMotion: event.target.checked }).then(setSettings)}
+                  />
+                  しっぽをゆっくり動かす
+                </label>
+                <p className="note">オフにしても歩く動きは続きます。しっぽの見え方が気になるときに使ってください。</p>
+              </>
+            )}
 
             <label>
               ひれの動き: {settings.swayStrength.toFixed(1)}

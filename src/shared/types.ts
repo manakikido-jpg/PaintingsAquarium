@@ -121,6 +121,8 @@ export interface Settings {
    * 会場で重かったら 0 に落とせるようにしてある。
    */
   readonly swayStrength: number
+  /** 動物園のしっぽだけを止める。歩行と足踏みは維持する。 */
+  readonly zooTailMotion: boolean
   /**
    * 飾りの多さ。1 で標準。大きいほどサンゴや岩が増える。
    * 増やすほど画面は賑やかになるが、**絵を見つけにくくなる**ので上げすぎない。

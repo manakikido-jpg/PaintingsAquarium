@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { savePiece, updatePiece, readPieces, readPieceImage } from '../../../electron/storage'
+import { savePiece, updatePiece, readPieces, readPieceImage, readSettings, writeSettings } from '../../../electron/storage'
 import { pieceImageUrl } from '../pieceImage'
 
 const state = vi.hoisted(() => ({ root: '' }))
@@ -34,5 +34,18 @@ describe('同じidの保存画像を作り直す', () => {
     expect(pieceImageUrl({ id: 'old-piece' })).toContain('revision=0')
     expect(updatePiece('missing', { imageBase64: 'YWJj' })).toBeNull()
     expect(readPieces()).toEqual([])
+  })
+})
+
+
+describe('動物園のしっぽの運用設定', () => {
+  it('古い設定では控えめな動きが既定になり、オフは他の設定と一緒に保存される', () => {
+    fs.mkdirSync(path.join(state.root, 'data'), { recursive: true })
+    fs.writeFileSync(path.join(state.root, 'data/settings.json'), JSON.stringify({ theme: 'zoo', swayStrength: 1 }))
+    expect(readSettings().zooTailMotion).toBe(true)
+    writeSettings({ zooTailMotion: false })
+    expect(readSettings()).toMatchObject({ zooTailMotion: false, theme: 'zoo', swayStrength: 1 })
+    writeSettings({ sizeScale: 1.2 })
+    expect(readSettings().zooTailMotion).toBe(false)
   })
 })

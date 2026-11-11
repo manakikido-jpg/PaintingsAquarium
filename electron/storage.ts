@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS: Settings = {
   noticeDisplay: DEFAULT_NOTICE_MODE,
   decorDensity: 2,
   swayStrength: 1,
+  zooTailMotion: true,
   sizeScale: 1,
 }
 
@@ -65,6 +66,7 @@ export function readSettings(): Settings {
     ...stored,
     // 設定ファイルを人が触れる形で置いているので、知らない値が入りうる。
     // 落とさず既定に戻す。
+    zooTailMotion: typeof stored.zooTailMotion === 'boolean' ? stored.zooTailMotion : true,
     theme: isThemeId(stored.theme) ? stored.theme : DEFAULT_THEME,
     // 知らない値が入っていたら既定に落とす。
     // 前の版で保存した設定ファイルにはこの項目が無い

@@ -101,7 +101,7 @@ describe('お絵描き動物園', () => {
       for (const mirrored of [true, false]) {
         for (let turns = 0; turns < 4; turns++) {
           const tail = partsForPiece(id, turns, mirrored).find(p => p.role === 'tail')!
-          expect(tail.rate).toBe(0.45)
+          expect(tail.rate).toBe(0.30)
           expect(Math.abs(tail.swing)).toBe(0)
           expect(tail.shearAxis).toBe(turns % 2 === 0 ? 'x' : 'y')
         }
