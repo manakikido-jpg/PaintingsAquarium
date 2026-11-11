@@ -50,6 +50,26 @@ describe('お絵描き動物園', () => {
     expect(SPECIES[id].stiff).toBe(true)
   })
 
+  it('ぞうとキリンは移動も足踏みもしっぽの拍もゆっくりにする', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const spawn = (species: typeof animals[number]) => {
+        const creature = spawnCreature('walk', seed, tank, 1000, 800, lanes, 1, 'unknown', species, undefined, 'zoo')
+        if (creature.kind !== 'walk') throw new Error('地面を歩く必要がある')
+        return creature.walker
+      }
+      const regular = spawn('raion')
+      for (const id of ['zou', 'kirin'] as const) {
+        const slow = spawn(id)
+        expect(Math.abs(slow.vx)).toBeLessThan(Math.abs(regular.vx) * 0.8)
+        expect(slow.stepSpeed).toBeCloseTo(regular.stepSpeed * 0.7)
+        expect(partsForPiece(id).find(p => p.role === 'tail')!.rate).toBe(0.30)
+      }
+      expect(spawn('panda').stepSpeed).toBeCloseTo(regular.stepSpeed)
+      expect(spawn('saru').stepSpeed).toBeCloseTo(regular.stepSpeed)
+      expect(spawn('shimauma').stepSpeed).toBeCloseTo(regular.stepSpeed)
+    }
+  })
+
   it('6種と未判定の自由画も地面を歩き、1分後も足元が地面にある', () => {
     let creatures = [...animals, undefined].map((id, seed) => spawnCreature('walk', seed + 1,
       tank, id === 'kirin' ? 650 : 1000, 900, lanes, 1, 'unknown', id, undefined, 'zoo'))

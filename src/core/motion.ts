@@ -107,6 +107,7 @@ export function spawnCreature(
          */
         ...(walkSpeedRange(tank.width, species) ?? {}),
         ...(species === 'kabocha' ? { jump: true } : {}),
+        ...(species === 'zou' || species === 'kirin' ? { stepTempo: 0.7 } : {}),
       }),
     }
   }

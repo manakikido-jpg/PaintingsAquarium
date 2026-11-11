@@ -51,7 +51,7 @@ export const CROSS_SECONDS: Record<string, readonly [number, number]> = {
  * いまの歩きを見てもらって決めた速さだから（変える指示は出ていない）。
  */
 export const WALK_CROSS_SECONDS: Record<string, readonly [number, number]> = {
-  zou: [42, 65], raion: [30, 48], kirin: [40, 60],
+  zou: [60, 90], raion: [30, 48], kirin: [58, 85],
   saru: [24, 38], panda: [48, 70], shimauma: [27, 42],
   /*
    * かぼちゃ。**歩く絵の中でいちばん遅い。**
