@@ -502,7 +502,9 @@ export async function processPhoto(
    * そのまま出すと頭を上に向けたまま横へ滑るので、ここで横向きに直す。
    * 自信が無ければ触らない（`orientForSwimming`）。
    */
-  const oriented = orientForSwimming(trimmed.image)
+  const oriented = theme === 'zoo'
+    ? { image: trimmed.image, rig: estimateRig(trimmed.image), turns: 0, flipped: false }
+    : orientForSwimming(trimmed.image)
 
   /*
    * どの台紙の絵かを見分ける。

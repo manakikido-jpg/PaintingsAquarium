@@ -26,6 +26,12 @@ spec.loader.exec_module(check)
 
 # ファイル名 → アプリの中での種類
 SPECIES = {
+    '01_zou': 'zou',
+    '02_raion': 'raion',
+    '03_kirin': 'kirin',
+    '04_saru': 'saru',
+    '05_panda': 'panda',
+    '06_shimauma': 'shimauma',
     # 水族館
     '01_sakana_A_marusakana': 'fish',
     '03_tako': 'tako',

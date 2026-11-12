@@ -106,6 +106,8 @@ export interface SpawnWalkerOptions {
   readonly minSpeed?: number
   readonly maxSpeed?: number
   readonly jump?: boolean
+  /** 大きな動物の足踏みを落ち着かせる。移動速度とは分けて指定する。 */
+  readonly stepTempo?: number
 }
 
 export function spawnWalker(
@@ -143,7 +145,7 @@ export function spawnWalker(
     width,
     height,
     stepPhase: random() * Math.PI * 2,
-    stepSpeed: 3 + random() * 2.5,
+    stepSpeed: (3 + random() * 2.5) * (options.stepTempo ?? 1),
     bounce: height * (0.02 + random() * 0.03),
     turnMargin: random() * tank.width * 0.14,
     groundOffset: (random() - 0.5) * spacing * 0.5,

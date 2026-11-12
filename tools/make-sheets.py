@@ -81,7 +81,7 @@ TITLE_GAP = mm(9)
 # **余白に落書きした紙**も作って通してから出すこと。
 ART_SCALE = 0.7
 
-FONT = '/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf'
+FONT = next(str(p) for p in [Path('/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf'), Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc')] if p.exists())
 # 線と同じ濃さ。薄くすると印刷でかすれる
 TEXT = (30, 28, 28)
 
@@ -118,7 +118,7 @@ def fitted(font_path: str, text: str, width: int, cap: int) -> ImageFont.FreeTyp
     return ImageFont.truetype(font_path, 8)
 
 
-def sheet(art_path: Path, title: str, lead: str) -> Image.Image:
+def sheet(art_path: Path, title: str, lead: str, title_left: bool = False, title_cap_mm: int = 16, lead_cap_mm: int = 7, art_scale: float = ART_SCALE) -> Image.Image:
     art = Image.open(art_path).convert('L')
     # 台紙は白地に黒線。余白を詰めてから置き直す（元の余白の量に左右されないため）
     trimmed = art.point(lambda v: 0 if v < 250 else 255)
@@ -131,19 +131,19 @@ def sheet(art_path: Path, title: str, lead: str) -> Image.Image:
 
     inner = page.width - MARGIN * 2
     # よこ向きは高さが 210mm しかない。題を大きく取りすぎると絵が痩せる
-    title_font = fitted(FONT, title, inner, mm(16))
-    lead_font = fitted(FONT, lead, inner, mm(7))
+    title_font = fitted(FONT, title, inner, mm(title_cap_mm))
+    lead_font = fitted(FONT, lead, inner, mm(lead_cap_mm))
 
     y = MARGIN
     for text, font in ((title, title_font), (lead, lead_font)):
         left, top, right, bottom = font.getbbox(text)
-        pen.text(((page.width - (right - left)) // 2 - left, y - top), text, font=font, fill=TEXT[0])
+        pen.text((MARGIN - left if title_left else (page.width - (right - left)) // 2 - left, y - top), text, font=font, fill=TEXT[0])
         y += bottom - top + mm(4)
 
     top_of_art = y + TITLE_GAP
     space_w = inner
     space_h = page.height - MARGIN - top_of_art
-    scale = min(space_w / art.width, space_h / art.height) * ART_SCALE
+    scale = min(space_w / art.width, space_h / art.height) * art_scale
     drawn = art.resize((max(1, round(art.width * scale)), max(1, round(art.height * scale))), Image.LANCZOS)
     page.paste(
         drawn,

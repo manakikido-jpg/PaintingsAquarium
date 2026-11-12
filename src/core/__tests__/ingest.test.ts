@@ -107,3 +107,18 @@ describe('鍵に更新時刻を入れる（R-064）', () => {
     if (!decision.ingest) expect(decision.reason).toBe('already-ingested')
   })
 })
+
+describe('監視の更新通知と処理待ち', () => {
+  it('まだ保存されていない同じ版のadd/changeを二重受付しない', () => {
+    const facts = { fileName: 'scan.jpg', sizeBytes: 1000, modifiedMs: 1000 }
+    const delivered = new Set([ingestKey(facts)])
+    expect(decideIngest(facts, new Set(), delivered).ingest).toBe(false)
+    expect(decideIngest({ ...facts, modifiedMs: 2000 }, new Set(), delivered).ingest).toBe(true)
+  })
+
+  it('監視を再開すると未保存の失敗画像だけを再試行できる', () => {
+    const facts = { fileName: 'scan.jpg', sizeBytes: 1000, modifiedMs: 1000 }
+    expect(decideIngest(facts, new Set(), new Set()).ingest).toBe(true)
+    expect(decideIngest(facts, new Set([ingestKey(facts)]), new Set()).ingest).toBe(false)
+  })
+})

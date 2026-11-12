@@ -15,6 +15,7 @@ const api: AquariumApi = {
   chooseWatchFolder: () => ipcRenderer.invoke('aquarium:chooseWatchFolder'),
   listPieces: () => ipcRenderer.invoke('aquarium:listPieces'),
   savePiece: (input: SavePieceInput) => ipcRenderer.invoke('aquarium:savePiece', input),
+  finishIngest: (key: string) => ipcRenderer.send('aquarium:finishIngest', key),
   readPieceImage: (id: string) => ipcRenderer.invoke('aquarium:readPieceImage', id),
   updatePiece: (id: string, patch: UpdatePiecePatch) =>
     ipcRenderer.invoke('aquarium:updatePiece', id, patch),

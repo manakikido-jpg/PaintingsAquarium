@@ -1,5 +1,6 @@
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol } from 'electron'
-import chokidar, { type FSWatcher } from 'chokidar'
+import type { FSWatcher } from 'chokidar'
+import { watchScanFolder } from './scanWatcher'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -37,6 +38,8 @@ protocol.registerSchemesAsPrivileged([
 
 let mainWindow: BrowserWindow | null = null
 let watcher: FSWatcher | null = null
+// 監視の張り直しでも、画面の待ち行列にいる画像の予約は解除しない。
+const pendingIngestKeys = new Set<string>()
 
 function notify(notice: Notice): void {
   mainWindow?.webContents.send('aquarium:notice', notice)
@@ -63,6 +66,7 @@ function sendPhoto(filePath: string): void {
   const decision = decideIngest(
     { fileName, sizeBytes: stats.size, modifiedMs: stats.mtimeMs },
     storage.ingestedKeys(),
+    pendingIngestKeys,
   )
   if (!decision.ingest) {
     // 隠しファイルと取り込み済みは毎回出ると邪魔なので黙らせる。
@@ -77,8 +81,12 @@ function sendPhoto(filePath: string): void {
 
   try {
     const dataUrl = `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`
-    const photo: IncomingPhoto = { key: decision.key, fileName, dataUrl }
-    mainWindow?.webContents.send('aquarium:incoming', photo)
+    const current = storage.readSettings()
+    const photo: IncomingPhoto = { key: decision.key, fileName, dataUrl,
+      ingestSettings: { theme: current.theme, cutout: current.cutout } }
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    mainWindow.webContents.send('aquarium:incoming', photo)
+    pendingIngestKeys.add(decision.key)
   } catch {
     notify({
       level: 'warn',
@@ -100,15 +108,11 @@ function startWatching(folder: string | null): void {
     return
   }
 
-  watcher = chokidar.watch(folder, {
-    depth: 0,
-    ignoreInitial: false,
-    // コピー中のファイルを掴むと壊れた画像を読むので、
-    // サイズが 400ms 変わらなくなるまで待つ。
-    awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
+  const activeWatcher = watchScanFolder(folder, (filePath) => {
+    // 閉じる前の監視が遅れて通知しても、新しい監視へ混ぜない。
+    if (watcher === activeWatcher) sendPhoto(filePath)
   })
-
-  watcher.on('add', sendPhoto)
+  watcher = activeWatcher
   watcher.on('error', (error) => {
     notify({ level: 'warn', message: `フォルダの監視でエラーが起きました: ${String(error)}` })
   })
@@ -147,7 +151,9 @@ function createWindow(): void {
     void mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'))
   }
 
-  mainWindow.webContents.once('did-finish-load', () => {
+  mainWindow.webContents.on('did-finish-load', () => {
+    // 再読込で旧画面の待ち行列は消えるため、未保存の画像を改めて拾う。
+    pendingIngestKeys.clear()
     startWatching(storage.readSettings().watchFolder)
   })
 
@@ -196,6 +202,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('aquarium:listPieces', () => storage.readPieces())
+  ipcMain.on('aquarium:finishIngest', (_event, key: string) => { pendingIngestKeys.delete(key) })
   ipcMain.handle('aquarium:savePiece', (_event, input: SavePieceInput) => storage.savePiece(input))
   ipcMain.handle('aquarium:readPieceImage', (_event, id: string) => storage.readPieceImage(id))
   ipcMain.handle(

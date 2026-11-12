@@ -121,6 +121,8 @@ export interface Settings {
    * 会場で重かったら 0 に落とせるようにしてある。
    */
   readonly swayStrength: number
+  /** 動物園のしっぽだけを止める。歩行と足踏みは維持する。 */
+  readonly zooTailMotion: boolean
   /**
    * 飾りの多さ。1 で標準。大きいほどサンゴや岩が増える。
    * 増やすほど画面は賑やかになるが、**絵を見つけにくくなる**ので上げすぎない。
@@ -134,6 +136,8 @@ export interface IncomingPhoto {
   readonly fileName: string
   /** 元写真の data URL。画像処理は画面側（canvas がある側）で行う */
   readonly dataUrl: string
+  /** フォルダ監視側で受付時に固定する。画面のテーマ切り替えに追随させない。 */
+  readonly ingestSettings?: Pick<Settings, 'theme' | 'cutout'>
 }
 
 export interface SavePieceInput {
@@ -198,6 +202,8 @@ export interface AquariumApi {
   chooseWatchFolder(): Promise<Settings>
   listPieces(): Promise<Piece[]>
   savePiece(input: SavePieceInput): Promise<Piece>
+  /** 成功・失敗のどちらでも受付予約を解放し、再試行可能にする。 */
+  finishIngest(key: string): void
   /** 保存してある絵を base64 で返す（作り直しに使う） */
   readPieceImage(id: string): Promise<string | null>
   /** 作り直した結果で置き換える（R-062）。絵が変わったときだけ `imageBase64` を渡す */

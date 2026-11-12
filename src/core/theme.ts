@@ -1,3 +1,4 @@
+import { SPECIES, speciesForTheme } from './templates'
 /**
  * テーマ（世界の差し替え）。
  *
@@ -5,7 +6,7 @@
  * 変わるのは「どんな世界で、どう動かすか」だけ。設計は `docs/設計-テーマ.md`。
  */
 
-export type ThemeId = 'aquarium' | 'dinosaur' | 'halloween' | 'space' | 'meadow' | 'night'
+export type ThemeId = 'aquarium' | 'zoo' | 'dinosaur' | 'halloween' | 'space' | 'meadow' | 'night'
 
 /**
  * 絵の動き方。
@@ -26,6 +27,7 @@ export interface ThemeMeta {
 
 export const THEMES: readonly ThemeMeta[] = [
   { id: 'aquarium', name: '水族館', motion: 'float', ready: true },
+  { id: 'zoo', name: '動物園', motion: 'walk', ready: true },
   { id: 'dinosaur', name: '恐竜', motion: 'walk', ready: true },
   /*
    * 台紙5種が確定し、実機で 15/15 正しく判定・正しい向きで出ることを
@@ -77,10 +79,14 @@ export function isThemeId(value: unknown): value is ThemeId {
 /**
  * 絵がどのテーマのものか。
  *
- * テーマ機能より前に取り込んだ絵にはテーマが記録されていない。
- * 水族館として扱う。ここで `undefined` を弾くと、過去の絵が
+ * テーマ機能より前に取り込んだ自由画にはテーマが記録されていない。
+ * 種類も不明なら水族館として扱い、既知の台紙はそのテーマを使う。ここで `undefined` を弾くと、過去の絵が
  * どのテーマでも出なくなり、**会期の絵が丸ごと消えたように見える**。
  */
-export function themeOf(piece: { theme?: string }): ThemeId {
-  return isThemeId(piece.theme) ? piece.theme : DEFAULT_THEME
+export function themeOf(piece: { theme?: string; species?: unknown }): ThemeId {
+  if (isThemeId(piece.theme)) return piece.theme
+  // テーマの記録だけが欠けた既知の動物を、水族館へ落とさない。
+  // 何の情報もない昔の自由画は、これまでどおり水族館に残す。
+  const species = speciesForTheme(piece.species)
+  return species ? SPECIES[species].theme : DEFAULT_THEME
 }

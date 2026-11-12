@@ -277,7 +277,7 @@ describe('ハロウィン: 魚の動きを当てない', () => {
   })
 
   it('水族館と恐竜には付けていない（見え方を変えない）', () => {
-    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].theme !== 'halloween')) {
+    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].theme === 'aquarium' || SPECIES[n].theme === 'dinosaur')) {
       expect(speciesIsStiff(id), id).toBe(false)
     }
   })
@@ -355,7 +355,7 @@ describe('横向きの台紙は、顔の向いているほうへ進む', () => {
    * **R-072 のあと、既存テーマを変えないことは毎回ここで確かめる。**
    */
   it('水族館と恐竜の向きは変わっていない', () => {
-    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].theme !== 'halloween')) {
+    for (const id of SPECIES_IDS.filter((n) => SPECIES[n].theme === 'aquarium' || SPECIES[n].theme === 'dinosaur')) {
       for (const mirrored of [false, true]) {
         expect(rigForSpecies(id, mirrored).headsRight, `${id}/${mirrored}`).toBe(mirrored)
       }
