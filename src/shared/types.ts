@@ -136,6 +136,8 @@ export interface IncomingPhoto {
   readonly fileName: string
   /** 元写真の data URL。画像処理は画面側（canvas がある側）で行う */
   readonly dataUrl: string
+  /** フォルダ監視側で受付時に固定する。画面のテーマ切り替えに追随させない。 */
+  readonly ingestSettings?: Pick<Settings, 'theme' | 'cutout'>
 }
 
 export interface SavePieceInput {

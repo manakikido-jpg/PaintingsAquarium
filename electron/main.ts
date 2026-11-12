@@ -77,7 +77,9 @@ function sendPhoto(filePath: string): void {
 
   try {
     const dataUrl = `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`
-    const photo: IncomingPhoto = { key: decision.key, fileName, dataUrl }
+    const current = storage.readSettings()
+    const photo: IncomingPhoto = { key: decision.key, fileName, dataUrl,
+      ingestSettings: { theme: current.theme, cutout: current.cutout } }
     mainWindow?.webContents.send('aquarium:incoming', photo)
   } catch {
     notify({

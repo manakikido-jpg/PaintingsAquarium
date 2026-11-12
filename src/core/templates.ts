@@ -148,6 +148,13 @@ export const SPECIES: Readonly<Record<SpeciesId, SpeciesInfo>> = {
   franken: { id: 'franken', label: 'フランケンシュタイン', theme: NIGHT, head: { x: -1, y: 0 }, swimsSideways: true, walks: true, stiff: true },
 }
 
+/** 保存データに古い値や別テーマの種類が残っても、誤った動きを当てない。 */
+export function speciesForTheme(value: unknown, theme?: ThemeId): SpeciesId | undefined {
+  if (typeof value !== 'string' || !Object.hasOwn(SPECIES, value)) return undefined
+  const id = value as SpeciesId
+  return theme === undefined || SPECIES[id].theme === theme ? id : undefined
+}
+
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[]
 
 /** 台紙の形（`tools/make-template-data.py` が作った升目から組み立てる）。 */

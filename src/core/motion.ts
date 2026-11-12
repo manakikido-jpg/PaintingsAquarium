@@ -20,8 +20,14 @@ import {
 } from './walk'
 import type { MotionKind, ThemeId } from './theme'
 import { sharePrey, speedRange, steer, walkSpeedRange, type Prey } from './behaviour'
-import { SPECIES, speciesFlies, speciesIsStiff, speciesWalks, type SpeciesId } from './templates'
+import { SPECIES, speciesFlies, speciesIsStiff, speciesWalks, speciesForTheme, type SpeciesId } from './templates'
 import type { Piece } from '../shared/types'
+
+/** 未判定の動物や古い魚用リグにも、展示テーマを優先する。 */
+export function rigidArtwork(theme: ThemeId, species?: SpeciesId): boolean {
+  const known = speciesForTheme(species, theme)
+  return theme !== 'aquarium' || speciesFlies(known) || speciesIsStiff(known)
+}
 
 /** 作り直しで種類や画像の寸法が変わると、浮遊／歩行と衝突範囲も作り直す必要がある。 */
 export function needsMotionRebuild(before: Pick<Piece, 'species' | 'width' | 'height'>,
@@ -78,6 +84,7 @@ export function spawnCreature(
   /** 判定できない絵の大きさも、展示中のテーマに合わせる。 */
   theme?: ThemeId,
 ): Creature {
+  species = speciesForTheme(species, theme)
   /*
    * 飛ぶ絵（プテラノドン）は、歩くテーマの中でも**浮遊**として扱う。
    * 地面の列に乗せると、翼竜が地面を歩くことになる。

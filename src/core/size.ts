@@ -47,6 +47,12 @@ export const MIN_SIZE_SCALE = 0.5
 export const MAX_SIZE_SCALE = 2
 export const DEFAULT_SIZE_SCALE = 1
 
+/** 設定の欠損や非数値は標準へ戻し、絵を消したり極端に小さくしたりしない。 */
+export function normalizeSizeScale(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(MAX_SIZE_SCALE, Math.max(MIN_SIZE_SCALE, value)) : DEFAULT_SIZE_SCALE
+}
+
 /**
  * 絵の長辺の目安を出す。
  *
@@ -55,7 +61,7 @@ export const DEFAULT_SIZE_SCALE = 1
  * 泳ぐ場所が無くなって画面の真ん中で止まってしまう。
  */
 export function creatureSize(tank: Tank, ratio: number, scale: number): number {
-  const clamped = Math.min(MAX_SIZE_SCALE, Math.max(MIN_SIZE_SCALE, scale))
+  const clamped = normalizeSizeScale(scale)
   const wanted = tank.width * ratio * clamped
   // 画面の短いほうの 4 割まで。これ以上は泳ぐ余地が無くなる
   return Math.min(wanted, Math.min(tank.width, tank.height) * 0.4)

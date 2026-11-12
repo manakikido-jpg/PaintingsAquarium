@@ -8,6 +8,7 @@ import {
   spawnCreature,
   stepCreatures,
   needsMotionRebuild,
+  rigidArtwork,
   type Creature,
 } from '../core/motion'
 import { appearAlpha, appearProgress, appearScale, isNewlyArrived } from '../core/appear'
@@ -21,7 +22,7 @@ import {
   tailAngle,
 } from '../core/undulate'
 import { headIsKnown, headsRightOf, rigIsUsable, type CreatureKind } from '../core/rig'
-import { partsForPiece, speciesFlies, speciesIsStiff } from '../core/templates'
+import { partsForPiece, speciesFlies, speciesForTheme } from '../core/templates'
 import { FLAP_SPEED, glideTilt } from '../core/behaviour'
 
 /**
@@ -56,6 +57,8 @@ interface Swimmer {
   piece: Piece
   element: HTMLImageElement
   imageSource: string
+  /** 新しい画像が読めるまで、表示中の画像と寸法・種類を一緒に保持する。 */
+  pendingPiece?: Piece
   /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
   readonly bornAt: number
   /** しなりの拍。絵ごとにずらさないと、群れが1枚の布のように揃って見える */
@@ -144,6 +147,16 @@ export function Aquarium({
     let scene: Scene | null = null
     let builtFor = { width: -1, height: -1, theme: '', density: -1, size: -1, style: '' }
 
+    const adoptPiece = (swimming: Swimmer, piece: Piece, tank: Tank): void => {
+      if (!scene) return
+      if (needsMotionRebuild(swimming.piece, piece)) {
+        swimming.creature = spawnCreature(scene.motion, seedOf(piece.id), tank,
+          piece.width, piece.height, scene.lanes, sizeRef.current,
+          piece.rig?.kind ?? 'unknown', piece.species, scene.lanes[0]?.groundY, themeRef.current)
+      }
+      swimming.piece = piece
+    }
+
     const resize = (): void => {
       // 4K の大画面でぼやけないように、実画素に合わせる。
       const ratio = window.devicePixelRatio || 1
@@ -221,36 +234,29 @@ export function Aquarium({
         const swimming = swimmers.get(piece.id)
         if (swimming) {
           const source = pieceImageUrl(piece)
-          if (swimming.imageSource !== source) {
+          if (pieceImageUrl(swimming.piece) === source) {
+            // 画像そのものが同じなら、向き等のメタデータだけを更新する。
+            // 読み込み待ちが取消された場合は、その古いonloadも無効にする。
             swimming.imageSource = source
-            const image = new Image()
-            image.onload = () => {
-              // 読み込みが逆順で終わっても古い画像へ戻さない。完了までは前の絵を描く。
-              if (swimming.imageSource === source) swimming.element = image
+            swimming.pendingPiece = undefined
+            adoptPiece(swimming, piece, tank)
+          } else {
+            swimming.pendingPiece = piece
+            if (swimming.imageSource !== source) {
+              swimming.imageSource = source
+              const image = new Image()
+              image.onload = () => {
+                if (swimming.imageSource !== source || swimmersRef.current.get(piece.id) !== swimming) return
+                const latest = swimming.pendingPiece ?? piece
+                // 寸法だけ先に替えると、旧画像が新しい縦横比へ一瞬潰れる。
+                // 画像・種類・寸法・動きを、読込完了時にまとめて切り替える。
+                adoptPiece(swimming, latest, tank)
+                swimming.element = image
+                swimming.pendingPiece = undefined
+              }
+              image.src = source
             }
-            image.src = source
           }
-          /*
-           * **泳いでいる絵にも、作り直しの結果を届ける（R-075）。**
-           *
-           * ここは長いあいだ `continue` だけだった。一度泳ぎ出した絵は
-           * 取り込んだときの `piece` を抱えたままなので、起動後の作り直し
-           *（`RIG_VERSION`・R-062）が**画面に出ている絵には効かなかった**。
-           * 実機で、まじょの向きを直して台帳も `headsRight: true` に
-           * 書き変わっているのに、**そのとき飛んでいたまじょだけが
-           * 逆を向いたまま**だった。
-           *
-           * 向きだけの修正では絵の情報だけを替え、動きの状態（`creature`・`bornAt`・
-           * `beat`）はそのままにする。作り直しただけで**位置が飛ぶ**のは
-           * 来場者から見れば不具合でしかない。種類や寸法が変わった場合だけは、
-           * 地面と大きさを合わせ直す必要があるので動きも作り直す。
-           */
-          if (needsMotionRebuild(swimming.piece, piece)) {
-            swimming.creature = spawnCreature(scene.motion, seedOf(piece.id), tank,
-              piece.width, piece.height, scene.lanes, sizeRef.current,
-              piece.rig?.kind ?? 'unknown', piece.species, scene.lanes[0]?.groundY, themeRef.current)
-          }
-          if (swimming.piece !== piece) swimming.piece = piece
           continue
         }
         const element = new Image()
@@ -311,13 +317,14 @@ export function Aquarium({
         const rig = rigIsUsable(swimmer.piece.rig) ? swimmer.piece.rig : null
         const kind: CreatureKind = swimmer.piece.rig?.kind ?? 'unknown'
         const drifts = kind === 'tentacled'
-        const flying = speciesFlies(swimmer.piece.species)
+        const species = speciesForTheme(swimmer.piece.species, themeRef.current)
+        const flying = speciesFlies(species)
         /*
          * **魚のしなりを当てない絵。** 飛ぶ絵（プテラノドン）と、
          * ハロウィンの5種（`stiff`）。どちらも「胴をくねらせて水を押す」
          * 生き物ではないので、掛けると旗がはためいて見える。
          */
-        const stiff = flying || speciesIsStiff(swimmer.piece.species)
+        const stiff = rigidArtwork(themeRef.current, species)
         /*
          * 頭がどちら側か分かっている絵か。
          *
@@ -345,7 +352,7 @@ export function Aquarium({
          * 横向きの絵（魚・イルカ・サメ）は今までどおり左右反転で向きを合わせる。
          */
         const head = swimmer.piece.head
-        const turnsToHeading = swimmer.piece.species === 'umigame' && head
+        const turnsToHeading = species === 'umigame' && head
         if (turnsToHeading) {
           context.rotate(place.heading - Math.atan2(head.y, head.x))
         }
@@ -377,7 +384,7 @@ export function Aquarium({
          * 手足の形に切り抜く（`clip()`）のは使えない（3匹で 0.3fps・R-022）。
          */
         const limbs = partsForPiece(
-          swimmer.piece.species,
+          species,
           swimmer.piece.fit?.turns,
           swimmer.piece.fit?.mirrored,
         )
@@ -386,7 +393,7 @@ export function Aquarium({
           const source = swimmer.element.naturalWidth
           const sourceHeight = swimmer.element.naturalHeight
           // 歩行の足踏みと胴の弾みを同じ位相にする。別時計だと足が滑って見える。
-          const walking = swimmer.creature.kind === 'walk' && (swimmer.piece.species === 'franken' || themeRef.current === 'zoo')
+          const walking = swimmer.creature.kind === 'walk' && (species === 'franken' || themeRef.current === 'zoo')
           const time = walking && swimmer.creature.kind === 'walk'
             ? swimmer.creature.walker.stepPhase : elapsed * swimmer.beat.rate * LIMB_SPEED
           for (const part of limbs) {

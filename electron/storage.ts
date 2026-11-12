@@ -1,3 +1,4 @@
+import { normalizeSizeScale } from '../src/core/size'
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -66,6 +67,7 @@ export function readSettings(): Settings {
     ...stored,
     // 設定ファイルを人が触れる形で置いているので、知らない値が入りうる。
     // 落とさず既定に戻す。
+    sizeScale: normalizeSizeScale(stored.sizeScale),
     zooTailMotion: typeof stored.zooTailMotion === 'boolean' ? stored.zooTailMotion : true,
     theme: isThemeId(stored.theme) ? stored.theme : DEFAULT_THEME,
     // 知らない値が入っていたら既定に落とす。

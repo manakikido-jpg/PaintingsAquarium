@@ -1,3 +1,4 @@
+import { enqueueWithSnapshot } from '../core/queue'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Aquarium } from './Aquarium'
 import { processPhoto, rebuildPiece } from './processImage'
@@ -107,12 +108,9 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     return window.aquarium.onIncoming((photo: IncomingPhoto) => {
-      queueRef.current = queueRef.current.then(async () => {
-        // 設定の読み込みは非同期なので、起動直後に届いた写真では
-        // まだ null のことがある。ここで諦めると写真が黙って消える（R-002）。
-        const current = settingsRef.current ?? (await window.aquarium.getSettings())
-        settingsRef.current = current
-
+      // 起動直後も捨てず、処理待ち中のテーマ変更にも追随させない（R-002・R-083）。
+      const atArrival = photo.ingestSettings ?? settingsRef.current ?? window.aquarium.getSettings()
+      queueRef.current = enqueueWithSnapshot<Pick<Settings, 'theme' | 'cutout'>>(queueRef.current, atArrival, async (current) => {
         const result = await processPhoto(photo.dataUrl, photo.fileName, current.cutout, current.theme)
         if (!result.ok) {
           pushNotice({ level: 'warn', message: result.message })
@@ -154,6 +152,9 @@ export function App(): React.JSX.Element {
           built: RIG_VERSION,
         })
         setPieces((current) => [...current, piece])
+      }, (error) => {
+        const detail = error instanceof Error ? error.message : String(error)
+        pushNotice({ level: 'warn', message: `${photo.fileName}: 取り込み中にエラーが起きました（${detail}）。保存先の空き容量と元画像を確認し、ファイル名を変えて取り込みフォルダへ入れ直してください。次の画像の取り込みは続けます。` })
       })
     })
   }, [pushNotice])
