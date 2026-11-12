@@ -73,6 +73,12 @@ jobs:
           tag_name: latest
           name: 最新版 0.1.${{ github.run_number }}（自動ビルド）
           body: |
+            ## 動物園を追加しました
+
+            設定（Sキー）で「動物園」を選ぶと、ぞう・ライオン・キリン・さる・パンダ・しまうまが歩きます。しっぽの動き、小さな鳥と流れる雲、ゆっくり歩くゾウ・キリンを追加しました。
+
+            同名上書きの取り込み、処理待ち中の監視再開、画面再読込、保存失敗時の処理、低FPS時の登場・退出も改善しています。
+
             ## 0.1.73 以前を使っている人へ
 
             **0.1.73 以前は、アプリの「更新」ボタンでは新しい版になりません。**
@@ -112,6 +118,7 @@ jobs:
 
             下のリンクを押すとそのまま落とせます（ログイン不要）。
 
+            - [お絵描き動物園-台紙.pdf](https://github.com/manakikido-jpg/PaintingsAquarium/raw/HEAD/docs/%E3%81%8A%E7%B5%B5%E6%8F%8F%E3%81%8D%E5%8B%95%E7%89%A9%E5%9C%92-%E5%8F%B0%E7%B4%99.pdf) — 最新の大きめサイズ（6ページ）
             - [お絵かきハロウィン-台紙.pdf](https://github.com/manakikido-jpg/PaintingsAquarium/raw/HEAD/docs/%E3%81%8A%E7%B5%B5%E3%81%8B%E3%81%8D%E3%83%8F%E3%83%AD%E3%82%A6%E3%82%A3%E3%83%B3-%E5%8F%B0%E7%B4%99.pdf) — **10月の会期で刷るのはこちら**（5ページ）
             - [お絵かき台紙-全16枚.pdf](https://github.com/manakikido-jpg/PaintingsAquarium/raw/HEAD/docs/%E3%81%8A%E7%B5%B5%E3%81%8B%E3%81%8D%E5%8F%B0%E7%B4%99-%E5%85%A816%E6%9E%9A.pdf) — 3テーマ全部まとめて（下見・試し刷り用）
             - [お絵かき水族館-台紙.pdf](https://github.com/manakikido-jpg/PaintingsAquarium/raw/HEAD/docs/%E3%81%8A%E7%B5%B5%E3%81%8B%E3%81%8D%E6%B0%B4%E6%97%8F%E9%A4%A8-%E5%8F%B0%E7%B4%99.pdf) — 通年の水族館（6ページ）
