@@ -15,6 +15,7 @@ def main():
     parser.add_argument('out', nargs='?', type=Path, default=ROOT/'sheets/zoo')
     parser.add_argument('--art-scale', type=float, default=0.7)
     parser.add_argument('--giraffe-scale', type=float, default=None)
+    parser.add_argument('--zebra-scale', type=float, default=None)
     parser.add_argument('--title-mm', type=int, default=9)
     parser.add_argument('--lead-mm', type=int, default=4)
     parser.add_argument('--pdf', type=Path, default=ROOT/'docs/お絵描き動物園-台紙.pdf')
@@ -23,8 +24,10 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     pages = []
     for path in sorted((ROOT / 'assets/templates/zoo').glob('*.png')):
-        # 縦長のキリンは同じ高さでも塗る面が小さいため、個別の倍率を使えるようにする。
-        scale = args.giraffe_scale if path.stem.endswith('_kirin') and args.giraffe_scale is not None else args.art_scale
+        # 形によって塗る面の広さが違うため、指定した動物だけ倍率を変える。
+        overrides = {'kirin': args.giraffe_scale, 'shimauma': args.zebra_scale}
+        custom_scale = overrides.get(path.stem.split('_', 1)[-1])
+        scale = custom_scale if custom_scale is not None else args.art_scale
         page = sheets.sheet(path, 'お絵描き動物園', 'すきな いろで ぬってね', title_left=True, title_cap_mm=args.title_mm, lead_cap_mm=args.lead_mm, art_scale=scale)
         page.save(out / path.name, dpi=(sheets.DPI, sheets.DPI))
         pages.append(page.convert('RGB'))
