@@ -118,7 +118,7 @@ def fitted(font_path: str, text: str, width: int, cap: int) -> ImageFont.FreeTyp
     return ImageFont.truetype(font_path, 8)
 
 
-def sheet(art_path: Path, title: str, lead: str, title_left: bool = False, title_cap_mm: int = 16, lead_cap_mm: int = 7) -> Image.Image:
+def sheet(art_path: Path, title: str, lead: str, title_left: bool = False, title_cap_mm: int = 16, lead_cap_mm: int = 7, art_scale: float = ART_SCALE) -> Image.Image:
     art = Image.open(art_path).convert('L')
     # 台紙は白地に黒線。余白を詰めてから置き直す（元の余白の量に左右されないため）
     trimmed = art.point(lambda v: 0 if v < 250 else 255)
@@ -143,7 +143,7 @@ def sheet(art_path: Path, title: str, lead: str, title_left: bool = False, title
     top_of_art = y + TITLE_GAP
     space_w = inner
     space_h = page.height - MARGIN - top_of_art
-    scale = min(space_w / art.width, space_h / art.height) * ART_SCALE
+    scale = min(space_w / art.width, space_h / art.height) * art_scale
     drawn = art.resize((max(1, round(art.width * scale)), max(1, round(art.height * scale))), Image.LANCZOS)
     page.paste(
         drawn,
