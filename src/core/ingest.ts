@@ -61,7 +61,11 @@ export function isSupportedImage(fileName: string): boolean {
  * デコードできないため。無言で無視すると「入れたのに泳がない」になるので、
  * 直し方まで書いたメッセージを返す。
  */
-export function decideIngest(facts: FileFacts, alreadyIngested: ReadonlySet<string>): IngestDecision {
+export function decideIngest(
+  facts: FileFacts,
+  alreadyIngested: ReadonlySet<string>,
+  deliveredKeys?: ReadonlySet<string>,
+): IngestDecision {
   const { fileName } = facts
 
   // macOS の .DS_Store や、コピー途中の一時ファイルを拾わないため。
@@ -88,7 +92,7 @@ export function decideIngest(facts: FileFacts, alreadyIngested: ReadonlySet<stri
 
   const key = ingestKey(facts)
   // 古い形の鍵で取り込んだ絵も「取り込み済み」とみなす（R-064）
-  if (alreadyIngested.has(key) || alreadyIngested.has(legacyIngestKey(facts))) {
+  if (alreadyIngested.has(key) || alreadyIngested.has(legacyIngestKey(facts)) || deliveredKeys?.has(key)) {
     return {
       ingest: false,
       reason: 'already-ingested',

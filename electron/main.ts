@@ -1,5 +1,6 @@
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol } from 'electron'
-import chokidar, { type FSWatcher } from 'chokidar'
+import type { FSWatcher } from 'chokidar'
+import { watchScanFolder } from './scanWatcher'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -49,7 +50,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   '.webp': 'image/webp',
 }
 
-function sendPhoto(filePath: string): void {
+function sendPhoto(filePath: string, deliveredKeys: Set<string>): void {
   const fileName = path.basename(filePath)
 
   let stats: fs.Stats
@@ -63,6 +64,7 @@ function sendPhoto(filePath: string): void {
   const decision = decideIngest(
     { fileName, sizeBytes: stats.size, modifiedMs: stats.mtimeMs },
     storage.ingestedKeys(),
+    deliveredKeys,
   )
   if (!decision.ingest) {
     // 隠しファイルと取り込み済みは毎回出ると邪魔なので黙らせる。
@@ -80,7 +82,9 @@ function sendPhoto(filePath: string): void {
     const current = storage.readSettings()
     const photo: IncomingPhoto = { key: decision.key, fileName, dataUrl,
       ingestSettings: { theme: current.theme, cutout: current.cutout } }
-    mainWindow?.webContents.send('aquarium:incoming', photo)
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    mainWindow.webContents.send('aquarium:incoming', photo)
+    deliveredKeys.add(decision.key)
   } catch {
     notify({
       level: 'warn',
@@ -102,15 +106,10 @@ function startWatching(folder: string | null): void {
     return
   }
 
-  watcher = chokidar.watch(folder, {
-    depth: 0,
-    ignoreInitial: false,
-    // コピー中のファイルを掴むと壊れた画像を読むので、
-    // サイズが 400ms 変わらなくなるまで待つ。
-    awaitWriteFinish: { stabilityThreshold: 400, pollInterval: 100 },
-  })
-
-  watcher.on('add', sendPhoto)
+  // 再スキャン時は未保存の失敗画像を再試行できるよう、受付済みの記録を作り直す。
+  // 保存済みの絵はディスク上の鍵で弾くので、監視再開でも二重に入らない。
+  const deliveredKeys = new Set<string>()
+  watcher = watchScanFolder(folder, (filePath) => sendPhoto(filePath, deliveredKeys))
   watcher.on('error', (error) => {
     notify({ level: 'warn', message: `フォルダの監視でエラーが起きました: ${String(error)}` })
   })
