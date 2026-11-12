@@ -6,11 +6,11 @@ from pathlib import Path
 import time
 from playwright.sync_api import sync_playwright
 
-PROBE = '''() => {window.scanAudit={arrivals:[],busy:0};
+PROBE = '''() => {window.scanAudit={arrivals:[],busy:0,delayMs:250};
 window.aquarium.onIncoming(photo=>window.scanAudit.arrivals.push(photo.key));
 const oldDecode=HTMLImageElement.prototype.decode;
 HTMLImageElement.prototype.decode=async function(){window.scanAudit.busy++;
-try{await oldDecode.call(this);await new Promise(r=>setTimeout(r,250));}
+try{await oldDecode.call(this);if(window.scanAudit.delayMs)await new Promise(r=>setTimeout(r,window.scanAudit.delayMs));}
 finally{window.scanAudit.busy--}};}'''
 
 
@@ -21,6 +21,9 @@ def main():
     parser.add_argument('--cdp', required=True)
     parser.add_argument('--rounds', type=int, default=10)
     parser.add_argument('--phase', choices=['before','after'], required=True)
+    parser.add_argument('--delay-ms',type=int,default=250)
+    parser.add_argument('--start-batch',type=int,default=0)
+    parser.add_argument('--wait-seconds',type=int,default=120)
     args = parser.parse_args()
     root = args.out.resolve()
     sources = sorted(args.fixtures.glob('*-colored-cropped.png'))
@@ -32,23 +35,25 @@ def main():
         page.wait_for_function('typeof window.aquarium !== "undefined"')
         settings = page.evaluate('()=>window.aquarium.getSettings()')
         assert settings['watchFolder'] == str(root/'inbox') and settings['theme']=='zoo'
-        assert page.evaluate('()=>window.aquarium.listPieces()') == []
+        initial=page.evaluate('()=>window.aquarium.listPieces()')
+        assert len(initial)==args.start_batch*12
+        assert all(piece['fileName'].startswith('batch') for piece in initial)
         page.reload()
         page.wait_for_function('typeof window.aquarium !== "undefined"')
         page.bring_to_front()
-        page.evaluate(PROBE)
-        for batch in range(args.rounds):
+        page.evaluate(PROBE.replace('delayMs:250',f'delayMs:{args.delay_ms}'))
+        for batch in range(args.start_batch,args.rounds):
             for i, source in enumerate(sources):
                 for copy in range(2):
                     (root/'inbox'/f'batch{batch:03}-{copy}-{source.name}').write_bytes(source.read_bytes())
             deadline=time.monotonic()+30
-            while len(page.evaluate('window.scanAudit.arrivals')) < (batch+1)*12:
+            while len(page.evaluate('window.scanAudit.arrivals')) < (batch-args.start_batch+1)*12:
                 assert time.monotonic()<deadline,'受付が止まった'
                 page.wait_for_timeout(100)
             for repeat in range(3):
                 page.evaluate('()=>window.aquarium.rescan()')
                 page.wait_for_timeout(650)
-            deadline=time.monotonic()+120
+            deadline=time.monotonic()+args.wait_seconds
             last_count=-1;quiet_since=time.monotonic()
             while True:
                 pieces=page.evaluate('()=>window.aquarium.listPieces()')
@@ -70,7 +75,7 @@ def main():
                 assert row['duplicateArrivals']==0,row
                 assert all(piece['theme']=='zoo' and piece['species']==piece['fileName'].split('-',2)[2].split('-',1)[0] for piece in pieces)
             else:assert row['duplicateSaved']>0,row
-    print(f'PASS {args.phase}: {args.rounds} batches',flush=True)
+    print(f'PASS {args.phase}: batches {args.start_batch+1} through {args.rounds}',flush=True)
 
 
 if __name__=='__main__':main()

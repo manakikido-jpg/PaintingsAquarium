@@ -1,0 +1,143 @@
+{
+  "date": "2026-11-12",
+  "syntheticData": true,
+  "unitTestsBeforeClockFix": {
+    "tests": 591,
+    "consecutiveRuns": 3
+  },
+  "finalLocalUnitTests": 594,
+  "queueCases": 1000,
+  "saveReplays": 100,
+  "overwrites": {
+    "duplicateCount": 0,
+    "recoveredAfterBrokenOverwrite": true,
+    "savedCount": 61,
+    "speciesCycle": [
+      "zou",
+      "raion",
+      "kirin"
+    ]
+  },
+  "pageReloads": [
+    {
+      "reload": 1,
+      "saved": 6,
+      "unique": 6
+    },
+    {
+      "reload": 2,
+      "saved": 12,
+      "unique": 12
+    },
+    {
+      "reload": 3,
+      "saved": 18,
+      "unique": 18
+    },
+    {
+      "reload": 4,
+      "saved": 24,
+      "unique": 24
+    },
+    {
+      "reload": 5,
+      "saved": 30,
+      "unique": 30
+    }
+  ],
+  "interruptionRecovery": {
+    "retained": 72,
+    "recovered": 12,
+    "saved": 84,
+    "duplicates": 0
+  },
+  "finalBatches": [
+    {
+      "batch": 8,
+      "expectedSaved": 96,
+      "saved": 96,
+      "duplicateSaved": 0,
+      "duplicateArrivals": 0
+    },
+    {
+      "batch": 9,
+      "expectedSaved": 108,
+      "saved": 108,
+      "duplicateSaved": 0,
+      "duplicateArrivals": 0
+    },
+    {
+      "batch": 10,
+      "expectedSaved": 120,
+      "saved": 120,
+      "duplicateSaved": 0,
+      "duplicateArrivals": 0
+    }
+  ],
+  "processRestarts": [
+    {
+      "restart": 1,
+      "saved": 120,
+      "metadataIdentical": true,
+      "imageHashesIdentical": true,
+      "settingsIdentical": true
+    },
+    {
+      "restart": 2,
+      "saved": 120,
+      "metadataIdentical": true,
+      "imageHashesIdentical": true,
+      "settingsIdentical": true
+    },
+    {
+      "restart": 3,
+      "saved": 120,
+      "metadataIdentical": true,
+      "imageHashesIdentical": true,
+      "settingsIdentical": true
+    }
+  ],
+  "exitBefore": {
+    "phase": "before",
+    "limit": 10,
+    "simulatedWallJumpSeconds": 21,
+    "drawnCounts": [
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      62,
+      61,
+      61
+    ]
+  },
+  "exitAfter": {
+    "phase": "after",
+    "limit": 10,
+    "simulatedWallJumpSeconds": 21,
+    "drawnCounts": [
+      50,
+      50,
+      50,
+      10,
+      10,
+      10
+    ]
+  },
+  "uninterrupted120Passed": false,
+  "remaining": [
+    "Software rendering showed slow ingestion around 50 visible drawings; venue hardware timing remains unverified.",
+    "Initial timed runs and the interrupted virtual-display run are not counted as full passes."
+  ]
+}

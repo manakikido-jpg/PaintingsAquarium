@@ -1,3 +1,4 @@
+import { frameTiming, exitExpired } from '../core/frameTiming'
 import { useEffect, useRef } from 'react'
 import type { Tank } from '../core/swim'
 import {
@@ -59,7 +60,7 @@ interface Swimmer {
   imageSource: string
   /** 新しい画像が読めるまで、表示中の画像と寸法・種類を一緒に保持する。 */
   pendingPiece?: Piece
-  /** 水槽に入った時刻（描画ループの経過秒）。演出をしない絵は -Infinity */
+  /** 水槽に入った時刻（単調増加する実時間の秒）。演出をしない絵は -Infinity */
   readonly bornAt: number
   /** しなりの拍。絵ごとにずらさないと、群れが1枚の布のように揃って見える */
   readonly beat: { readonly rate: number; readonly phase: number }
@@ -199,7 +200,7 @@ export function Aquarium({
 
     const frame = (now: number): void => {
       // タブが隠れていた等で dt が跳ねると、絵が一気に壁まで飛ぶ。上限を掛ける。
-      const dt = Math.min(0.05, (now - previous) / 1000)
+      const { deltaSeconds: dt, wallSeconds } = frameTiming(previous, now)
       previous = now
       elapsed += dt
 
@@ -221,11 +222,11 @@ export function Aquarium({
          * 1日200枚・同時50匹なら会期中に150回起きる。
          */
         if (swimmer.leavingAt === null) {
-          swimmer.leavingAt = elapsed
+          swimmer.leavingAt = wallSeconds
           swimmer.creature = sendCreatureOut(swimmer.creature, tank)
         }
         // 画面の外に出たら取り除く。出られないまま長く残る場合の保険も付ける
-        if (isCreatureOutside(swimmer.creature, tank) || elapsed - swimmer.leavingAt > 20) {
+        if (isCreatureOutside(swimmer.creature, tank) || exitExpired(wallSeconds - swimmer.leavingAt)) {
           swimmers.delete(id)
         }
       }
@@ -267,7 +268,7 @@ export function Aquarium({
           imageSource: pieceImageUrl(piece),
           // 起動前からある絵は演出しない。起動のたびに全部が一斉に現れると
           // 不具合に見えるため。
-          bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? elapsed : -Infinity,
+          bornAt: isNewlyArrived(piece.createdAt, appStartedAt) ? wallSeconds : -Infinity,
           leavingAt: null,
           beat: { rate: beatRate(seedOf(piece.id)), phase: beatPhase(seedOf(piece.id)) },
           creature: spawnCreature(
@@ -301,7 +302,7 @@ export function Aquarium({
         if (!scene) return
 
         const place = placeCreature(swimmer.creature, scene.lanes)
-        const progress = appearProgress(elapsed - swimmer.bornAt)
+        const progress = appearProgress(wallSeconds - swimmer.bornAt)
         const scale = appearScale(progress)
 
         context.globalAlpha = appearAlpha(progress)
