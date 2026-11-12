@@ -1,4 +1,6 @@
 import backgroundUrl from '../../../assets/scene/zoo-background.png?url'
+import cloudUrl from '../../../assets/scene/zoo-cloud.png?url'
+import { zooBirds, zooClouds } from '../../core/zooSky'
 import { makeLanes } from '../../core/walk'
 import type { Tank } from '../../core/swim'
 import type { Scene } from './types'
@@ -7,6 +9,8 @@ import type { Scene } from './types'
 export function createZooScene(tank: Tank, decorDensity = 1): Scene {
   const background = new Image()
   background.src = backgroundUrl
+  const cloud = new Image()
+  cloud.src = cloudUrl
   const lanes = makeLanes(tank, 8, {
     backRatio: 0.64, frontRatio: 0.94, minScale: 0.75, maxScale: 1,
   })
@@ -20,6 +24,37 @@ export function createZooScene(tank: Tank, decorDensity = 1): Scene {
         // 地面の高さを画面の割合で決めるため、背景も同じ画面へ合わせる。
         context.drawImage(background, 0, 0, tank.width, tank.height)
       }
+      context.save()
+      if (cloud.complete && cloud.naturalWidth > 0) {
+        const ratio = cloud.naturalHeight / cloud.naturalWidth
+        for (const sprite of zooClouds(elapsed)) {
+          // 横長画面でも雲が看板まで下がらないよう、高さも上限にする。
+          const width = Math.min(sprite.width * tank.width, tank.height * 0.065 / ratio)
+          const height = width * ratio
+          context.globalAlpha = sprite.alpha
+          context.drawImage(cloud, sprite.x * tank.width - width / 2,
+            sprite.y * tank.height - height / 2, width, height)
+        }
+      }
+      context.strokeStyle = '#506e7a'
+      context.fillStyle = '#506e7a'
+      context.lineCap = 'round'
+      context.lineWidth = Math.max(1, tank.width * 0.001)
+      for (const bird of zooBirds(elapsed, decorDensity)) {
+        const size = Math.min(bird.width * tank.width, tank.height * 0.02)
+        const wing = (0.3 + bird.wing * 0.7) * size * 0.28
+        context.save()
+        context.globalAlpha = bird.alpha
+        context.translate(bird.x * tank.width, bird.y * tank.height)
+        context.scale(bird.direction, 1)
+        context.beginPath()
+        context.moveTo(-size / 2, -wing)
+        context.quadraticCurveTo(-size * 0.23, -size * 0.12, 0, 0)
+        context.quadraticCurveTo(size * 0.23, -size * 0.12, size / 2, -wing)
+        context.stroke()
+        context.restore()
+      }
+      context.restore()
       context.fillStyle = `rgba(237,248,222,${(1 - Math.min(1, strength)) * 0.85})`
       context.fillRect(0, 0, tank.width, tank.height)
       // 風の粒は上空だけ。子どもの絵が歩く中央を空ける。
