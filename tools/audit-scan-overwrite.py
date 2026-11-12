@@ -13,9 +13,10 @@ def main():
     parser.add_argument('out', type=Path)
     parser.add_argument('--fixtures', type=Path, required=True)
     parser.add_argument('--cdp', required=True)
+    parser.add_argument('--rounds', type=int, default=1)
     args = parser.parse_args()
     root = args.out.resolve()
-    animals = ['zou', 'raion', 'kirin']
+    animals = ['zou', 'raion', 'kirin'] * args.rounds
     images = [(args.fixtures / (animal + '-colored-cropped.png')).read_bytes() for animal in animals]
     length = max(map(len, images))
     with sync_playwright() as p:
@@ -47,17 +48,17 @@ def main():
         stamp = target.stat().st_mtime_ns
         os.utime(target, ns=(stamp+1000000000, stamp))
         page.wait_for_timeout(1500)
-        assert len(page.evaluate('()=>window.aquarium.listPieces()')) == 3
+        assert len(page.evaluate('()=>window.aquarium.listPieces()')) == len(animals)
         await_rescan = '()=>window.aquarium.rescan()'
         page.evaluate(await_rescan)
         page.wait_for_timeout(1500)
-        assert len(page.evaluate('()=>window.aquarium.listPieces()')) == 3
+        assert len(page.evaluate('()=>window.aquarium.listPieces()')) == len(animals)
         # 読めない保存のあと、同じ名前を正常な内容で上書きして復帰する。
         target.write_bytes(b'broken image')
         page.wait_for_timeout(1500)
         target.write_bytes(images[0])
         os.utime(target, (1800000100, 1800000100))
-        wait_count(4)
+        wait_count(len(animals) + 1)
         pieces = page.evaluate('()=>window.aquarium.listPieces()')
         assert pieces[-1].get('species') == 'zou'
         report = {'sameNameAndSizeSpecies': animals, 'duplicateCount': 0, 'recoveredAfterBrokenOverwrite': True,

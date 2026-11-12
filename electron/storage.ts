@@ -47,8 +47,13 @@ function indexPath(): string {
 function writeJsonAtomic(filePath: string, payload: unknown): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
   const temporary = `${filePath}.tmp`
-  fs.writeFileSync(temporary, JSON.stringify(payload, null, 2), 'utf8')
-  fs.renameSync(temporary, filePath)
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(payload, null, 2), 'utf8')
+    fs.renameSync(temporary, filePath)
+  } catch (error) {
+    try { fs.unlinkSync(temporary) } catch { /* 元の保存エラーを保つ。 */ }
+    throw error
+  }
 }
 
 function readJson<T>(filePath: string, fallback: T): T {
@@ -127,9 +132,13 @@ export function findPieceFile(id: string): string {
 }
 
 export function savePiece(input: SavePieceInput): Piece {
+  // 監視の張り直しやIPC再送でも、同じ受付の絵は1枚に保つ。
+  // 先に確認しないと、台帳だけでなく画像ファイルも重複して残る。
+  const pieces = readPieces()
+  const existing = pieces.find(piece => piece.key === input.key)
+  if (existing) return existing
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
   fs.mkdirSync(piecesDir(), { recursive: true })
-  fs.writeFileSync(pieceFile(id), Buffer.from(input.imageBase64, 'base64'))
 
   const piece: Piece = {
     id,
@@ -146,7 +155,15 @@ export function savePiece(input: SavePieceInput): Piece {
     built: input.built,
   }
 
-  writeJsonAtomic(indexPath(), [...readPieces(), piece])
+  try {
+    fs.writeFileSync(pieceFile(id), Buffer.from(input.imageBase64, 'base64'))
+    writeJsonAtomic(indexPath(), [...pieces, piece])
+  } catch (error) {
+    // 台帳に登録されない画像が失敗のたびに溜まると、容量不足を悪化させる。
+    // 今回作った画像だけを片付け、既存の絵と元のエラーは保つ。
+    try { fs.unlinkSync(pieceFile(id)) } catch { /* 消せない場合も保存失敗を通知する。 */ }
+    throw error
+  }
   return piece
 }
 

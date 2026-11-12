@@ -202,6 +202,8 @@ export interface AquariumApi {
   chooseWatchFolder(): Promise<Settings>
   listPieces(): Promise<Piece[]>
   savePiece(input: SavePieceInput): Promise<Piece>
+  /** 成功・失敗のどちらでも受付予約を解放し、再試行可能にする。 */
+  finishIngest(key: string): void
   /** 保存してある絵を base64 で返す（作り直しに使う） */
   readPieceImage(id: string): Promise<string | null>
   /** 作り直した結果で置き換える（R-062）。絵が変わったときだけ `imageBase64` を渡す */

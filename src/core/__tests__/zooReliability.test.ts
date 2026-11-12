@@ -96,3 +96,33 @@ describe('取り込み受付時の設定と処理待ち', () => {
     expect(saved).toEqual(['good'])
   })
 })
+
+describe('連続受付の順序と失敗からの継続を繰り返す', () => {
+  it('20通り×50件でテーマ変更と設定取得・画像処理の失敗を混ぜても、成功した絵を受付順に処理する', async () => {
+    for (let seed = 0; seed < 20; seed++) {
+      let release!: () => void
+      let queue = new Promise<void>(resolve => { release = resolve })
+      const actual: string[] = []
+      const expected: string[] = []
+      const errors: unknown[] = []
+      let failures = 0
+      for (let i = 0; i < 50; i++) {
+        const theme = (i + seed) % 2 ? 'zoo' : 'aquarium'
+        const missingSettings = (i + seed) % 13 === 0
+        const failedImage = (i + seed) % 11 === 0
+        const context = missingSettings ? Promise.reject(new Error('settings')) : { theme }
+        if (missingSettings || failedImage) failures++
+        else expected.push(`${i}:${theme}`)
+        queue = enqueueWithSnapshot(queue, context, async snapshot => {
+          if (failedImage) throw new Error('image')
+          actual.push(`${i}:${snapshot.theme}`)
+        }, error => { errors.push(error) })
+      }
+      expect(actual).toEqual([])
+      release()
+      await queue
+      expect(actual).toEqual(expected)
+      expect(errors).toHaveLength(failures)
+    }
+  })
+})

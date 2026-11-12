@@ -151,11 +151,11 @@ export function App(): React.JSX.Element {
           fit: result.fit,
           built: RIG_VERSION,
         })
-        setPieces((current) => [...current, piece])
+        setPieces((current) => current.some(saved => saved.id === piece.id) ? current : [...current, piece])
       }, (error) => {
         const detail = error instanceof Error ? error.message : String(error)
         pushNotice({ level: 'warn', message: `${photo.fileName}: 取り込み中にエラーが起きました（${detail}）。保存先の空き容量と元画像を確認し、ファイル名を変えて取り込みフォルダへ入れ直してください。次の画像の取り込みは続けます。` })
-      })
+      }).finally(() => window.aquarium.finishIngest(photo.key))
     })
   }, [pushNotice])
 
