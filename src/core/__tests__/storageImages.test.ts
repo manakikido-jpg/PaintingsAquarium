@@ -12,6 +12,34 @@ beforeEach(() => { state.root = fs.mkdtempSync(path.join(os.tmpdir(), 'aqua-imag
 afterEach(() => { fs.rmSync(state.root, { recursive: true, force: true }) })
 
 describe('同じidの保存画像を作り直す', () => {
+  it('紙除去の前の画像を一度だけ退避し、idと日時は保つ', () => {
+    const original = Buffer.from('original-scanned-piece').toString('base64')
+    const replacement = Buffer.from('paper-removed-piece').toString('base64')
+    const piece = savePiece({ key: 'old-zoo:1', fileName: 'zoo.png', width: 100, height: 80,
+      imageBase64: original, theme: 'zoo', built: 3 })
+    const rebuilt = updatePiece(piece.id, { imageBase64: replacement, built: 4 })!
+    const backup = path.join(state.root, 'data/paper-repair-backup', piece.id+'.webp')
+    expect(fs.readFileSync(backup).toString('base64')).toBe(original)
+    expect(readPieceImage(piece.id)).toBe(replacement)
+    expect(rebuilt.id).toBe(piece.id)
+    expect(rebuilt.createdAt).toBe(piece.createdAt)
+    updatePiece(piece.id, { built: 3 })
+    updatePiece(piece.id, { imageBase64: replacement, built: 4 })
+    expect(fs.readFileSync(backup).toString('base64')).toBe(original)
+  })
+
+  it('紙除去前の退避に失敗したら元画像と台帳を上書きしない', () => {
+    const original = Buffer.from('keep-original').toString('base64')
+    const piece = savePiece({ key: 'old-zoo:2', fileName: 'zoo.png', width: 100, height: 80,
+      imageBase64: original, theme: 'zoo', built: 3 })
+    const copy = vi.spyOn(fs, 'copyFileSync').mockImplementation(() => { throw new Error('disk full') })
+    try {
+      expect(() => updatePiece(piece.id, { imageBase64: 'YWJj', built: 4 })).toThrow('disk full')
+      expect(readPieceImage(piece.id)).toBe(original)
+      expect(readPieces()).toEqual([piece])
+    } finally { copy.mockRestore() }
+  })
+
   it('画像の置き換えをURLへ反映し、メタデータだけの更新では再読み込みしない', () => {
     const original = Buffer.from('original-image').toString('base64')
     const replacement = Buffer.from('replacement-image').toString('base64')

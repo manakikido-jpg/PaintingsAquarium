@@ -1,5 +1,6 @@
 import { cloneImage, saturation, value, type RgbaImage } from './image'
 import { floodFromBorder, sealSteps } from './flood'
+import { paperColourAt, type PaperColourMap } from './paperColourMap'
 
 /**
  * 紙の白を透明にする設定。
@@ -38,6 +39,8 @@ export interface CutoutOptions {
    * 渡さなければ今までどおり写真全体で1つのしきい値を使う。
    */
   localPaperMap?: LocalPaperMap
+  /** 自動白抜きで使う紙の局所的な色。明るさの地図とは独立させる。 */
+  paperColours?: PaperColourMap
 }
 
 /**
@@ -129,6 +132,8 @@ export function paperColour(image: RgbaImage): readonly [number, number, number]
 
   const take = (x: number, y: number): void => {
     const offset = (y * width + x) * 4
+    // 保存済みWebPの透明な余白は黒で復号されることがあり、紙色の標本にできない。
+    if (data[offset + 3] < 128) return
     reds.push(data[offset])
     greens.push(data[offset + 1])
     blues.push(data[offset + 2])
@@ -316,6 +321,8 @@ export function cutoutPaper(
 
   const looksLikePaper = (index: number): boolean => {
     const offset = index * 4
+    // 残った紙の再処理では、既に透明な外側から紙の部分へ探索を進める。
+    if (data[offset + 3] < 8) return true
     const r = data[offset]
     const g = data[offset + 1]
     const b = data[offset + 2]
@@ -326,7 +333,10 @@ export function cutoutPaper(
     if (saturation(r, g, b) > looseSaturation) return false
     // **紙と色が違うものは、うすくても絵として残す。**
     // ここが無いと、軽く塗ったオレンジや肌色が紙と一緒に消える
-    return tintDistance(r, g, b, paper) <= PAPER_TINT_TOLERANCE
+    const colour = options.paperColours
+      ? paperColourAt(options.paperColours, index % width, Math.floor(index / width), width, height)
+      : paper
+    return tintDistance(r, g, b, colour) <= PAPER_TINT_TOLERANCE
   }
 
   /*

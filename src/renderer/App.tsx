@@ -213,26 +213,32 @@ export function App(): React.JSX.Element {
     const run = async (): Promise<void> => {
       for (const piece of old) {
         if (stopped) return
-        const png = await window.aquarium.readPieceImage(piece.id)
-        const rebuilt = png
-          ? await rebuildPiece(`data:image/png;base64,${png}`, themeOf(piece))
-          : null
-        if (stopped) return
-        /*
-         * **1枚ずつ、書き戻したものだけを差し替える。**
-         * 毎回 `listPieces()` で全件を読み直していたときは、
-         * 会期後半（600枚・0.93MB）で作り直しの間だけ 16.1 → 13.7fps まで落ちた。
-         * 読めない絵は版だけ上げて次へ進む（そこで止まらないため）。
-         */
-        const saved = await window.aquarium.updatePiece(
-          piece.id,
-          rebuilt ? { ...rebuilt, built: RIG_VERSION } : { built: RIG_VERSION },
-        )
-        if (stopped) return
-        if (saved) {
-          setPieces((current) =>
-            current.map((one) => (one.id === saved.id ? saved : one)),
+        try {
+          const png = await window.aquarium.readPieceImage(piece.id)
+          const rebuilt = png
+            ? await rebuildPiece(`data:image/png;base64,${png}`, themeOf(piece))
+            : null
+          if (stopped) return
+          /*
+           * **1枚ずつ、書き戻したものだけを差し替える。**
+           * 毎回 `listPieces()` で全件を読み直していたときは、
+           * 会期後半（600枚・0.93MB）で作り直しの間だけ 16.1 → 13.7fps まで落ちた。
+           * 読めない絵は版だけ上げて次へ進む（そこで止まらないため）。
+           */
+          const saved = await window.aquarium.updatePiece(
+            piece.id,
+            rebuilt ? { ...rebuilt, built: RIG_VERSION } : { built: RIG_VERSION },
           )
+          if (stopped) return
+          if (saved) {
+            setPieces((current) =>
+              current.map((one) => (one.id === saved.id ? saved : one)),
+            )
+          }
+        } catch {
+          if (stopped) return
+          pushNotice({ level: 'warn', message:
+            `${piece.fileName}: 保存画像の作り直しに失敗しました。保存先の空き容量と書き込み権限を確認し、アプリを再起動してください。` })
         }
         /*
          * **間を空ける。** 作り直しは絵の読み込みと照合をやるので、
@@ -248,7 +254,7 @@ export function App(): React.JSX.Element {
     }
     // visible の中身ではなく「作り直すものがあるか」で動かす
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.theme, settings?.maxVisible, pieces.length])
+  }, [settings?.theme, settings?.maxVisible, pieces.length, pushNotice])
 
   const today = new Date().toISOString().slice(0, 10)
   const todayCount = pieces.filter((piece) => piece.createdAt.startsWith(today)).length
