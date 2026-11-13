@@ -7,8 +7,11 @@ import {
   localPaperValueMap,
   fillsWholePhoto,
   SEAL_RATIOS,
+  DEFAULT_CUTOUT_OPTIONS,
+  paperColour,
   type CutoutOptions,
 } from '../core/cutout'
+import { localPaperColours } from '../core/paperColourMap'
 import { trimTransparent } from '../core/trim'
 import { insideOutline } from '../core/outline'
 import { keepMainRegions, largestRegion } from '../core/regions'
@@ -251,8 +254,8 @@ export interface Rebuilt {
  * **すでに取り込んだ絵を、いまの見分け方で作り直す（R-062）。**
  *
  * 元の写真は残していないので、**保存してある絵**から作り直す。
- * 切り抜きはやり直せないが、直したのは切り抜きの後ろ（種類・向き・動き方）なので、
- * ここだけで足りる。
+ * 動物園では、台紙に一致する絵の外側に残った明るい紙も取り除く（R-093）。
+ * 失われた線や塗りは戻せない。台紙の線と色は生成・補正しない。
  *
  * **向き直し（`orientForSwimming`）はやり直さない。** 保存してある絵は
  * すでに落ち着いた向きなので、もう一度かけると余計に回すことがある。
@@ -269,7 +272,21 @@ export async function rebuildPiece(src: string, theme?: ThemeId): Promise<Rebuil
   context.drawImage(image, 0, 0)
   const before = context.getImageData(0, 0, canvas.width, canvas.height)
 
-  const settled = settle(before, theme)
+  let cleaned: RgbaImage = before
+  const outline = theme === 'zoo' ? insideOutline(before) : null
+  const known = outline ? identifySpecies(largestRegion(outline), theme) : null
+  if (outline && known && known.score >= RAW_SHAPE_THRESHOLD) {
+    const cut = cutoutPaper(before, {
+      ...DEFAULT_CUTOUT_OPTIONS,
+      paperColours: localPaperColours(before, paperColour(before), outline),
+    })
+    const trimmed = trimTransparent(cut)
+    // 台紙に合う形を保てた場合だけ採用する。直せない画像を空にして書き戻さない。
+    if (trimmed && diagnoseResult(trimmed.image).ok && identify(trimmed.image, theme)?.id === known.id) {
+      cleaned = trimmed.image
+    }
+  }
+  const settled = settle(cleaned, theme)
 
   /*
    * **絵はいつも書き戻す。** 向きが変わらなくても、
@@ -425,6 +442,14 @@ export async function processPhoto(
   context.drawImage(source, 0, 0, width, height)
 
   const source_ = context.getImageData(0, 0, width, height)
+  // 一部分だけ色の違う紙は、全体の中央値では消せない。明るさの自動選択と
+  // 同じ局所色を使い、部分的な紙残りが「成功」として通るのを防ぐ。
+  const outline = theme === 'zoo' && options.auto !== false ? insideOutline(source_) : null
+  const known = outline ? identifySpecies(largestRegion(outline), theme) : null
+  // 台紙のない自由画を、淡い色というだけで紙の標本にしてはいけない。
+  const paperColours = outline && known && known.score >= RAW_SHAPE_THRESHOLD
+    ? localPaperColours(source_, paperColour(source_), outline) : undefined
+  const colourOptions: CutoutOptions = { ...options, paperColours }
 
   /*
    * この写真に合うしきい値を選ぶ。
@@ -440,7 +465,7 @@ export async function processPhoto(
   if (options.auto !== false) {
     const small = downscale(source_, 400)
     const found = chooseCutoutValue((paperValue) => {
-      const trial = cutoutPaper(small, { ...options, paperValue })
+      const trial = cutoutPaper(small, { ...colourOptions, paperValue })
       if (!diagnoseCutout(trial).ok) return null
       const { image } = keepMainRegions(trial)
       const cropped = trimTransparent(image)
@@ -468,7 +493,7 @@ export async function processPhoto(
    * その素点で幅を選ばせたところ、**実寸なら当たっていたクラゲ 3枚が
    * 3枚とも当たらなくなった**。縮めた絵で決めてよいのは明るさのしきい値だけ。
    */
-  const baseOptions: CutoutOptions = { ...options, paperValue: chosen }
+  const baseOptions: CutoutOptions = { ...colourOptions, paperValue: chosen }
   let { attempt, refusalCode, refusalMessage } = trySealRatios(source_, baseOptions)
 
   /*

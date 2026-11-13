@@ -1,0 +1,166 @@
+{
+  "synthetic": true,
+  "cases": [
+    {
+      "animal": "zou",
+      "variant": "blank",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "zou",
+      "variant": "painted",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "raion",
+      "variant": "blank",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "raion",
+      "variant": "painted",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "kirin",
+      "variant": "blank",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "kirin",
+      "variant": "painted",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "saru",
+      "variant": "blank",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "saru",
+      "variant": "painted",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "panda",
+      "variant": "blank",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "panda",
+      "variant": "painted",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "shimauma",
+      "variant": "blank",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    },
+    {
+      "animal": "shimauma",
+      "variant": "painted",
+      "fresh": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      },
+      "repaired": {
+        "outsidePaperPixels": 0,
+        "missingInteriorPixels": 0
+      }
+    }
+  ],
+  "paleFreehandPreserved": true,
+  "browserErrors": [],
+  "electron": {
+    "synthetic": true,
+    "oldImagesRepaired": 6,
+    "identityAndSettingsPreserved": true,
+    "backupFailurePreservesImagesAndNotifies": true,
+    "originalBackupsMatch": true,
+    "allSixMoving": true,
+    "newScansSaved": 6,
+    "afterRescanAndReload": 12,
+    "unnecessaryRepeatRepair": false,
+    "rendererErrors": []
+  },
+  "unitTests": 600,
+  "date": "2026-11-13",
+  "sourceScanProvided": false
+}

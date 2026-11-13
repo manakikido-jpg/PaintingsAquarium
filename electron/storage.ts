@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Piece, SavePieceInput, Settings } from '../src/shared/types'
 import { DEFAULT_CUTOUT_OPTIONS } from '../src/core/cutout'
-import { DEFAULT_DINOSAUR_STYLE, DEFAULT_THEME, isDinosaurStyle, isThemeId } from '../src/core/theme'
+import { DEFAULT_DINOSAUR_STYLE, DEFAULT_THEME, isDinosaurStyle, isThemeId, themeOf } from '../src/core/theme'
 import { DEFAULT_NOTICE_MODE, isNoticeMode } from '../src/core/notices'
 import { eventFolderName } from '../src/core/events'
 import { SUPPORTED_EXTENSIONS } from '../src/core/ingest'
@@ -197,6 +197,15 @@ export function updatePiece(
 
   const { imageBase64, ...rest } = patch
   if (imageBase64) {
+    if (rest.built === 4 && (pieces[index].built ?? 0) < 4 && themeOf(pieces[index]) === 'zoo') {
+      // 元スキャンが手元に残っていない場合も戻せるよう、紙除去前の画像を一度だけ保つ。
+      // 退避に失敗したら上書きへ進まない（R-093）。
+      const source = findPieceFile(id)
+      const backupDir = path.join(dataRoot(), 'paper-repair-backup')
+      fs.mkdirSync(backupDir, { recursive: true })
+      const backup = path.join(backupDir, path.basename(source))
+      if (!fs.existsSync(backup)) fs.copyFileSync(source, backup, fs.constants.COPYFILE_EXCL)
+    }
     fs.mkdirSync(piecesDir(), { recursive: true })
     fs.writeFileSync(pieceFile(id), Buffer.from(imageBase64, 'base64'))
     // 作り直したついでに WebP へ移す。古い PNG は置いておかない

@@ -76,7 +76,8 @@ export interface Piece {
  *      右向きに描いてあるまじょだけ**顔と逆向きに飛んでいた**。
  *      **上げないと、すでに取り込んだまじょは逆を向いたまま**になる。
  */
-export const RIG_VERSION = 3
+// 4: 動物園の保存画像に残った紙を局所色で再処理し、外接矩形と種類も測り直す。
+export const RIG_VERSION = 4
 
 /** 作り直した結果を書き戻すときに渡すもの。 */
 export type UpdatePiecePatch = Partial<
