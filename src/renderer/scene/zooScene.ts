@@ -1,7 +1,7 @@
 import backgroundUrl from '../../../assets/scene/zoo-background.png?url'
 import cloudUrl from '../../../assets/scene/zoo-cloud.png?url'
 import { zooBirds, zooClouds } from '../../core/zooSky'
-import { makeLanes } from '../../core/walk'
+import { makeZooLanes } from '../../core/walk'
 import type { Tank } from '../../core/swim'
 import type { Scene } from './types'
 
@@ -11,9 +11,7 @@ export function createZooScene(tank: Tank, decorDensity = 1): Scene {
   background.src = backgroundUrl
   const cloud = new Image()
   cloud.src = cloudUrl
-  const lanes = makeLanes(tank, 8, {
-    backRatio: 0.64, frontRatio: 0.94, minScale: 0.75, maxScale: 1,
-  })
+  const lanes = makeZooLanes(tank)
   return {
     motion: 'walk', lanes, drawsFlat: true,
     drawBehind(context, elapsed, strength) {
