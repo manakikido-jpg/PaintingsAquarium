@@ -52,6 +52,13 @@ export function makeLanes(
   })
 }
 
+/** 奥の芝生も使い、足元が入口・柵より手前に来る帯へ分散させる。 */
+export function makeZooLanes(tank: Tank): Lane[] {
+  return makeLanes(tank, 10, {
+    backRatio: 0.56, frontRatio: 0.94, minScale: 0.75, maxScale: 1,
+  })
+}
+
 /**
  * ハロウィンの地面の列。**数と帯をここに置くのは、単体テストで固定するため。**
  * 2026-10-23: 5種を1.5倍にしたため6列へ分散。以下の4列の測定は拡大前の記録。

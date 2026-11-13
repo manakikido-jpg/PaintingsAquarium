@@ -1,0 +1,27 @@
+{
+  "1280x800": {
+    "minFootRatio": 0.5522069468304078,
+    "maxFootRatio": 0.9451168559538733,
+    "backFraction": 0.08333333333333333,
+    "drawnSamples": 1200
+  },
+  "1920x1200": {
+    "minFootRatio": 0.5522042668997161,
+    "maxFootRatio": 0.9456788175360634,
+    "backFraction": 0.08333333333333333,
+    "drawnSamples": 1200
+  },
+  "1920x1080": {
+    "minFootRatio": 0.5518622962782165,
+    "maxFootRatio": 0.9454309040744369,
+    "backFraction": 0.08333333333333333,
+    "drawnSamples": 1200
+  },
+  "savedImagesUnchanged": true,
+  "themeButtonsWork": true,
+  "rendererErrors": [],
+  "date": "2026-11-13",
+  "synthetic": true,
+  "savedCount": 12,
+  "unitTests": 601
+}

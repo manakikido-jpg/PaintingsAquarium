@@ -70,7 +70,7 @@ def main():
                 for id,r in summarized.items():
                     if not(id.startswith('unknown-') or id.startswith('foreign-')):continue
                     assert base*.74<=r['longSide']<=base*1.02,(id,canvas,base,r)
-                    assert r['bottom']>canvas['height']*.60,(id,r)
+                    assert r['bottom']>canvas['height']*.53,(id,r)
             report[f'zoo-{w}x{h}']={'canvas':canvas,'pieces':summarized}
         client.send('Emulation.clearDeviceMetricsOverride')
         page.wait_for_timeout(500)

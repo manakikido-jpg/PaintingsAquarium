@@ -4,14 +4,34 @@ import { spawnCreature, placeCreature, stepCreatures } from '../motion'
 import { TEMPLATE_BITS, TEMPLATE_GRID } from '../templates.generated'
 import { identifySpecies, partsForPiece, templatesForTheme, SPECIES } from '../templates'
 import { isThemeId, themeMeta, themeOf } from '../theme'
-import { makeLanes } from '../walk'
+import { makeZooLanes } from '../walk'
 import { zooSizeRatio } from '../size'
 
 const animals = ['zou', 'raion', 'kirin', 'saru', 'panda', 'shimauma'] as const
 const tank = { width: 1920, height: 1080 }
-const lanes = makeLanes(tank, 8, { backRatio: 0.64, frontRatio: 0.94, minScale: 0.75, maxScale: 1 })
+const lanes = makeZooLanes(tank)
 
 describe('お絵描き動物園', () => {
+  it('奥の芝生まで使いつつ、前の列と絵の大きさの下限を保つ', () => {
+    expect(lanes).toHaveLength(10)
+    expect(lanes[0].groundY / tank.height).toBeGreaterThan(0.53)
+    expect(lanes[0].groundY / tank.height).toBeLessThan(0.60)
+    expect(lanes.at(-1)!.groundY / tank.height).toBeCloseTo(0.94)
+    expect(Math.min(...lanes.map(lane => lane.scale))).toBe(0.75)
+    expect(Math.max(...lanes.map(lane => lane.scale))).toBe(1)
+    const occupied = new Set<number>()
+    let backCount = 0
+    for (let seed = 1; seed <= 300; seed++) {
+      const creature = spawnCreature('walk', seed, tank, 1000, 800, lanes, 1, 'unknown', 'panda', undefined, 'zoo')
+      if (creature.kind !== 'walk') throw new Error('地面を歩く必要がある')
+      occupied.add(creature.walker.lane)
+      const foot = placeCreature(creature, lanes)
+      if (foot.y + foot.height / 2 < tank.height * 0.64) backCount++
+    }
+    expect(occupied.size).toBe(lanes.length)
+    expect(backCount).toBeGreaterThan(30)
+  })
+
   it('さるの台紙は横長で、地面付近に4本の手足が分かれている', () => {
     const bits = TEMPLATE_BITS.saru
     const cells = [...bits].map((bit, i) => ({ solid: bit === '1', x: i % TEMPLATE_GRID, y: Math.floor(i / TEMPLATE_GRID) }))
